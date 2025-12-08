@@ -1,133 +1,183 @@
-# Nuclei Dashboard
+<div align="center">
 
-A modern, web-based interface for managing and executing [Nuclei](https://github.com/projectdiscovery/nuclei) vulnerability scans.
+# 🛡️ Nuclei Command Center
 
-![Dashboard Screenshot](https://via.placeholder.com/800x400?text=Nuclei+Dashboard)
+### Modern Web Interface for Nuclei Vulnerability Scanner
 
----
+[![GitHub Stars](https://img.shields.io/github/stars/devtint/NUCLEI_CNM?style=for-the-badge&logo=github&color=yellow)](https://github.com/devtint/NUCLEI_CNM/stargazers)
+[![GitHub Forks](https://img.shields.io/github/forks/devtint/NUCLEI_CNM?style=for-the-badge&logo=github&color=blue)](https://github.com/devtint/NUCLEI_CNM/network/members)
+[![License](https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge)](LICENSE)
+[![Next.js](https://img.shields.io/badge/Next.js-15-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react)](https://reactjs.org/)
 
-## Features
+[Features](#-features) • [Quick Start](#-quick-start) • [Documentation](#-documentation) • [Screenshots](#-screenshots)
 
-✨ **One-Click Presets** - Pre-configured scans for common vulnerability checks  
-🔴 **Real-Time Monitoring** - Live console output with Server-Sent Events  
-📊 **Vulnerability Feed** - Detailed findings with delete and rescan capabilities  
-📝 **Custom Templates** - Create and manage your own Nuclei templates  
-📈 **Scan History** - Download and review past scan results  
-⚙️ **Performance Tuning** - Configure rate limiting and concurrency  
-🎨 **Modern UI** - Built with Next.js, React, and Tailwind CSS
+</div>
 
 ---
 
-## Quick Start
+## ✨ Features
+
+<table>
+<tr>
+<td width="50%">
+
+### 🎯 **One-Click Presets**
+Pre-configured scans for common vulnerability checks with visible flags
+
+### 🔴 **Real-Time Monitoring**
+Live console output with Server-Sent Events streaming
+
+### 📊 **Vulnerability Feed**
+Detailed findings with delete and rescan capabilities
+
+</td>
+<td width="50%">
+
+### 📝 **Custom Templates**
+Create and manage your own Nuclei templates
+
+### 📈 **Scan History**
+Download and review past scan results
+
+### ⚙️ **Performance Tuning**
+Configure rate limiting and concurrency settings
+
+</td>
+</tr>
+</table>
+
+---
+
+## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js v18+
-- Nuclei v3.6.0+ (installed and in PATH)
+
+```bash
+# Required
+Node.js v18+
+Nuclei v3.6.0+ (installed and in PATH)
+```
 
 ### Installation
+
 ```bash
+# Clone the repository
 git clone https://github.com/devtint/NUCLEI_CNM.git
+
+# Navigate to dashboard
 cd NCNC/dashboard
+
+# Install dependencies
 npm install
+
+# Start development server
 npm run dev
 ```
 
-Open **http://localhost:3000** in your browser.
+🌐 Open **http://localhost:3000** in your browser
 
 ---
 
-## Documentation
+## 📖 Documentation
 
-📖 **[Getting Started Guide](./Refrencce%20and%20Usage%20And%20Guide/GETTING_STARTED.md)** - Installation and first scan  
-🏗️ **[Architecture](./Refrencce%20and%20Usage%20And%20Guide/ARCHITECTURE.md)** - System design and data flow  
-🔌 **[API Reference](./Refrencce%20and%20Usage%20And%20Guide/API_REFERENCE.md)** - Complete API documentation  
-🧩 **[Components](./Refrencce%20and%20Usage%20And%20Guide/COMPONENTS.md)** - React component documentation
+| Document | Description |
+|----------|-------------|
+| � [**Getting Started**](./Refrencce%20and%20Usage%20And%20Guide/GETTING_STARTED.md) | Installation and first scan tutorial |
+| 🏗️ [**Architecture**](./Refrencce%20and%20Usage%20And%20Guide/ARCHITECTURE.md) | System design and data flow |
+| 🔌 [**API Reference**](./Refrencce%20and%20Usage%20And%20Guide/API_REFERENCE.md) | Complete API documentation |
+| 🧩 [**Components**](./Refrencce%20and%20Usage%20And%20Guide/COMPONENTS.md) | React component documentation |
 
 ---
 
-## Usage
-
-### Running a Scan
-
-1. Navigate to **New Operation**
-2. Enter target URL (e.g., `scanme.sh`)
-3. Choose a preset or enter custom flags
-4. Click **Run**
-
-### One-Click Presets
+## 🎯 One-Click Presets
 
 | Preset | Flags | Description |
 |--------|-------|-------------|
-| **Full Scan (Critical)** | `-s critical` | Critical severity only |
-| **Full Scan (High/Crit)** | `-s critical,high` | High and critical |
-| **Tech Detect** | `-tags tech` | Technology detection |
-| **CVEs (2023-2024)** | `-tags cve2023,cve2024` | Recent CVEs |
-| **Misconfigurations** | `-tags misconfig` | Security misconfigurations |
-| **Panels & Logins** | `-tags panel,login` | Exposed login panels |
-
-### Custom Templates
-
-1. Go to **Templates**
-2. Click **New Template**
-3. Write YAML template
-4. Click **Save**
-5. Click **Run** to execute
+| 🔴 **Full Scan (Critical)** | `-s critical` | Critical severity vulnerabilities only |
+| 🟠 **Full Scan (High/Crit)** | `-s critical,high` | High and critical vulnerabilities |
+| 🔍 **Tech Detect** | `-tags tech` | Technology detection and fingerprinting |
+| 🆕 **CVEs (2023-2024)** | `-tags cve2023,cve2024` | Recent CVE vulnerabilities |
+| ⚙️ **Misconfigurations** | `-tags misconfig` | Security misconfigurations |
+| 🔐 **Panels & Logins** | `-tags panel,login` | Exposed admin panels and login pages |
 
 ---
 
-## Technology Stack
+## 💻 Technology Stack
 
-- **Frontend**: Next.js 15, React 19, Tailwind CSS
-- **Backend**: Next.js API Routes, Node.js
-- **UI Components**: shadcn/ui (Radix UI)
-- **Icons**: Lucide React
-- **Scanning**: Native Nuclei binary
+<div align="center">
+
+| Frontend | Backend | UI/UX |
+|----------|---------|-------|
+| ![Next.js](https://img.shields.io/badge/Next.js-15-black?style=flat-square&logo=next.js) | ![Node.js](https://img.shields.io/badge/Node.js-API-339933?style=flat-square&logo=node.js) | ![Tailwind](https://img.shields.io/badge/Tailwind-CSS-38B2AC?style=flat-square&logo=tailwind-css) |
+| ![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react) | ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript) | ![shadcn/ui](https://img.shields.io/badge/shadcn/ui-Components-000000?style=flat-square) |
+
+</div>
+
+**Scanning Engine:** Native Nuclei Binary Integration
 
 ---
 
-## Project Structure
+## 📁 Project Structure
 
 ```
 NCNC/
-├── dashboard/                  # Next.js application
-│   ├── app/                    # App Router
-│   │   ├── api/                # API routes
-│   │   └── page.tsx            # Main page
-│   ├── components/             # React components
-│   ├── lib/                    # Utilities
-│   └── scans/                  # Scan results (gitignored)
-├── Refrencce and Usage And Guide/  # Documentation
-└── guide.txt                   # Original requirements
+├── 📂 dashboard/                    # Next.js Application
+│   ├── 📂 app/                      # App Router
+│   │   ├── 📂 api/                  # API Routes (Backend)
+│   │   │   ├── findings/            # Vulnerability findings API
+│   │   │   ├── history/             # Scan history API
+│   │   │   ├── scan/                # Scan execution API
+│   │   │   ├── stream/              # Real-time log streaming
+│   │   │   └── templates/           # Template management API
+│   │   ├── layout.tsx               # Root layout
+│   │   ├── page.tsx                 # Main dashboard
+│   │   └── globals.css              # Global styles
+│   ├── 📂 components/               # React Components
+│   │   ├── dashboard/               # Dashboard views
+│   │   ├── findings/                # Vulnerability feed
+│   │   ├── scan/                    # Scan management
+│   │   ├── templates/               # Template management
+│   │   └── ui/                      # shadcn/ui components
+│   ├── 📂 lib/                      # Utilities
+│   │   └── nuclei/                  # Nuclei configuration
+│   └── 📂 scans/                    # Scan results (gitignored)
+├── 📂 Refrencce and Usage And Guide/ # Documentation
+└── 📄 guide.txt                     # Original requirements
 ```
 
 ---
 
-## Performance Settings
+## ⚡ Performance Settings
 
-Configure in **Settings**:
+Configure in **Settings** panel:
 
-- **Rate Limit**: 50-1000 req/s (default: 150)
-- **Concurrency**: 25-300 templates (default: 25)
-- **Bulk Size**: 25-100 hosts (default: 25)
+| Setting | Range | Default | Recommended |
+|---------|-------|---------|-------------|
+| **Rate Limit** | 50-1000 req/s | 150 | 300-500 |
+| **Concurrency** | 25-300 templates | 25 | 75-100 |
+| **Bulk Size** | 25-100 hosts | 25 | 50 |
 
-**Recommended for speed:**
-- Rate Limit: 300-500
-- Concurrency: 75-100
-
----
-
-## Security
-
-⚠️ **Important Security Notes:**
-
-1. **Local Use Only** - No authentication implemented
-2. **Scan Permissions** - Only scan targets you own or have permission to test
-3. **Rate Limiting** - High rates can be considered DoS attacks
-4. **Data Privacy** - Scan results contain sensitive information
+> ⚠️ **Note:** Higher values = faster scans, but may trigger WAF/rate limiting
 
 ---
 
-## Development
+## 🔒 Security
+
+<div align="center">
+
+| ⚠️ Important Security Notes |
+|----------------------------|
+| **Local Use Only** - No authentication implemented |
+| **Scan Permissions** - Only scan targets you own or have permission to test |
+| **Rate Limiting** - High rates can be considered DoS attacks |
+| **Data Privacy** - Scan results contain sensitive information |
+
+</div>
+
+---
+
+## 🛠️ Development
 
 ### Running in Development
 ```bash
@@ -149,52 +199,83 @@ npm run lint
 
 ---
 
-## Contributing
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
 ---
 
-## Troubleshooting
+## 🐛 Troubleshooting
 
-### Scan Stuck in "Running"
-Restart the dashboard server.
+<details>
+<summary><b>Scan Stuck in "Running"</b></summary>
 
-### No Findings Shown
-Check scan history to confirm scan completed with 0 vulnerabilities.
+Restart the dashboard server. This usually happens when the Nuclei process is waiting for input.
+</details>
 
-### Nuclei Command Not Found
-Ensure Nuclei is installed and in your system PATH.
+<details>
+<summary><b>No Findings Shown</b></summary>
+
+Check scan history to confirm the scan completed with 0 vulnerabilities. This is normal for secure targets.
+</details>
+
+<details>
+<summary><b>Nuclei Command Not Found</b></summary>
+
+Ensure Nuclei is installed and added to your system PATH. Run `nuclei -version` to verify.
+</details>
 
 For more troubleshooting, see [Getting Started Guide](./Refrencce%20and%20Usage%20And%20Guide/GETTING_STARTED.md#troubleshooting).
 
 ---
 
-## License
+## 📜 License
 
 This project wraps the Nuclei binary. Nuclei is licensed under the MIT License.
 
 ---
 
-## Acknowledgments
+## 🙏 Acknowledgments
 
-- [Nuclei](https://github.com/projectdiscovery/nuclei) by ProjectDiscovery
-- [Next.js](https://nextjs.org/) by Vercel
-- [shadcn/ui](https://ui.shadcn.com/) by shadcn
-- [Tailwind CSS](https://tailwindcss.com/)
+<div align="center">
+
+Built with amazing open-source tools:
+
+[![Nuclei](https://img.shields.io/badge/Nuclei-ProjectDiscovery-blue?style=flat-square)](https://github.com/projectdiscovery/nuclei)
+[![Next.js](https://img.shields.io/badge/Next.js-Vercel-black?style=flat-square&logo=next.js)](https://nextjs.org/)
+[![shadcn/ui](https://img.shields.io/badge/shadcn/ui-Components-black?style=flat-square)](https://ui.shadcn.com/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-CSS-38B2AC?style=flat-square&logo=tailwind-css)](https://tailwindcss.com/)
+
+</div>
 
 ---
 
-## Support
+## 💬 Support
 
 For issues or questions:
-1. Check the [Troubleshooting](#troubleshooting) section
-2. Review the [documentation](./Refrencce%20and%20Usage%20And%20Guide/)
-3. Check [Nuclei's official documentation](https://docs.projectdiscovery.io/tools/nuclei/overview)
+1. 📋 Check the [Troubleshooting](#-troubleshooting) section
+2. 📚 Review the [documentation](./Refrencce%20and%20Usage%20And%20Guide/)
+3. 🔗 Check [Nuclei's official documentation](https://docs.projectdiscovery.io/tools/nuclei/overview)
+4. ⭐ Star this repo if you find it helpful!
 
 ---
 
+<div align="center">
+
+### ⭐ Star the Repository
+
+If you find this project useful, please consider giving it a star!
+
+[![GitHub stars](https://img.shields.io/github/stars/devtint/NUCLEI_CNM?style=social)](https://github.com/devtint/NUCLEI_CNM/stargazers)
+
 **Built with ❤️ for the security community**
+
+[⬆ Back to Top](#-nuclei-command-center)
+
+</div>

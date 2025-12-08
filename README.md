@@ -26,7 +26,7 @@ A modern, web-based interface for managing and executing [Nuclei](https://github
 
 ### Installation
 ```bash
-git clone <repository-url>
+git clone https://github.com/devtint/NUCLEI_CNM.git
 cd NCNC/dashboard
 npm install
 npm run dev

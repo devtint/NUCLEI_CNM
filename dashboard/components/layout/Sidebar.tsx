@@ -9,7 +9,8 @@ import {
     Activity,
     FileCode,
     Settings,
-    History
+    History,
+    Star
 } from "lucide-react";
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -51,6 +52,24 @@ export function Sidebar({ className, activeView, onChangeView }: SidebarProps) {
                             </Button>
                         ))}
                     </div>
+                </div>
+
+                {/* Star the Repo Button */}
+                <div className="absolute bottom-4 left-4 right-4">
+                    <a
+                        href="https://github.com/devtint/NUCLEI_CNM"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block"
+                    >
+                        <Button
+                            variant="outline"
+                            className="w-full justify-center gap-2 border-emerald-500/30 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 hover:text-emerald-400 hover:border-emerald-500/50 transition-all duration-300 group"
+                        >
+                            <Star className="h-4 w-4 group-hover:fill-emerald-400 group-hover:scale-110 transition-all duration-300" />
+                            <span className="font-medium">Star the Repo ⭐</span>
+                        </Button>
+                    </a>
                 </div>
             </div>
         </div>

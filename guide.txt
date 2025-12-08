@@ -1,0 +1,70 @@
+run: go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
+
+-----------------
+
+where nuclei : PS D:\NCNC> nuclei -version
+>> 
+[INF] Nuclei Engine Version: v3.6.0
+[INF] Nuclei Config Directory: C:\Users\<username>\AppData\Roaming\nuclei
+[INF] Nuclei Cache Directory: C:\Users\<username>\AppData\Local\nuclei
+[INF] PDCP Directory: C:\Users\<username>\.pdcp
+
+-----------------
+
+where is tehplates : https://cloud.projectdiscovery.io/library?page=0&limit=10
+example search : https://cloud.projectdiscovery.io/library?search=react2shell&page=0&limit=10
+
+-----------------
+
+cmds and running : https://docs.projectdiscovery.io/opensource/nuclei/running
+
+-----------------
+
+Dashboard : https://cloud.projectdiscovery.io/
+
+-----------------
+
+What I want to do ?
+1. Clone the style and full usage cmds of nuclei 
+2. Make this cmd and functions into easy use for me by making popular and basic cmds into predefined file for me to use with 1 click button for each cmd
+3. Have rescan function for me to use with 1 click button for each findings 
+    how to do it ?
+    1. there is template id for each findings in json format of nuclei output
+    2. use this template id to run nuclei again with -t tag 
+        example : nuclei -u <target> -t <template id> -o <output>
+4. save seperate json files for each scan (not per findings, but include all findings of each scan) 
+5. Include Dashboard , Vulnerability , Scans and Report
+6. And have a feature to export findings to sv files with colorized output
+    Options : 
+    1. export all findings to sv files with colorized output
+    2. export only findings with severity critical to sv files with colorized output
+    3. export only findings with severity high to sv files with colorized output
+    4. export only findings with severity medium to sv files with colorized output
+    5. export only findings with severity low to sv files with colorized output
+    6. export only findings with severity info to sv files with colorized output
+
+-----------------   
+7. Extra features
+    1. Custom template Create / Upload for nuclei
+    2. Custom cmds for nuclei
+
+8. What are not essential (Different from nuclei offical dashboard) ?
+    1. inventory of nuclei templates
+        which use to View all discovered assets across your groups. Filter and search to find specific resources.
+    2. asset group 
+        Create and manage asset discovery groups. Start by adding domains or IP ranges to monitor.
+
+9. what wll we focus on ?
+    1. Implementing nuclei offical usage cmds by analyzing 
+    [cmds and running : https://docs.projectdiscovery.io/opensource/nuclei/running] and 
+    These files{ 
+        [INF] Nuclei Engine Version: v3.6.0
+        [INF] Nuclei Config Directory: C:\Users\name\AppData\Roaming\nuclei
+        [INF] Nuclei Cache Directory: C:\Users\name\AppData\Local\nuclei
+        [INF] PDCP Directory: C:\Users\name\.pdcp
+    }
+
+Important : 
+    1.  You have right to sigin using google to access the projectdiscovery cloud for learning , analying and checking sourcecode and getting templates
+    2.  You have right to use the projectdiscovery cloud for learning , analying and checking sourcecode and getting templates
+

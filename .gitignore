@@ -1,0 +1,69 @@
+# Dependencies
+node_modules/
+/.pnp
+.pnp.js
+
+# Testing
+/coverage
+
+# Next.js
+/.next/
+/out/
+
+# Production
+/build
+/dist
+
+# Misc
+.DS_Store
+*.pem
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local env files
+.env
+.env*.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Scan Results (Generated at Runtime)
+dashboard/scans/*.json
+dashboard/scans/*.log
+
+# Privacy - Exclude saved documentation pages
+Refrencce and Usage And Guide/*.mhtml
+
+# Temporary files
+*.tmp
+*.temp
+tags_output.txt
+tags_list.txt
+
+# User-specific Nuclei paths (will vary per machine)
+# Note: The application dynamically resolves these at runtime
+# C:\Users\<username>\AppData\Roaming\nuclei
+# C:\Users\<username>\AppData\Local\nuclei
+# C:\Users\<username>\.pdcp
+# C:\Users\<username>\nuclei-custom-templates

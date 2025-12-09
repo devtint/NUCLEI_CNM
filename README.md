@@ -23,13 +23,13 @@
 <td width="50%">
 
 ### 🎯 **One-Click Presets**
-Pre-configured scans for common vulnerability checks with visible flags
+7 pre-configured scans including Full Scan with no filters
 
 ### 🔴 **Real-Time Monitoring**
-Live console output with Server-Sent Events streaming
+Database-backed activity monitor with scan history
 
 ### 📊 **Vulnerability Feed**
-Detailed findings with delete and rescan capabilities
+Multi-select severity filtering and status management
 
 </td>
 <td width="50%">
@@ -37,8 +37,8 @@ Detailed findings with delete and rescan capabilities
 ### 📝 **Custom Templates**
 Create and manage your own Nuclei templates
 
-### 📈 **Scan History**
-Download and review past scan results
+### � **Database Storage**
+SQLite database for persistent findings and history
 
 ### ⚙️ **Performance Tuning**
 Configure rate limiting and concurrency settings
@@ -83,7 +83,7 @@ npm run dev
 
 | Document | Description |
 |----------|-------------|
-| � [**Getting Started**](./Refrencce%20and%20Usage%20And%20Guide/GETTING_STARTED.md) | Installation and first scan tutorial |
+| 🚀 [**Getting Started**](./Refrencce%20and%20Usage%20And%20Guide/GETTING_STARTED.md) | Installation and first scan tutorial |
 | 🏗️ [**Architecture**](./Refrencce%20and%20Usage%20And%20Guide/ARCHITECTURE.md) | System design and data flow |
 | 🔌 [**API Reference**](./Refrencce%20and%20Usage%20And%20Guide/API_REFERENCE.md) | Complete API documentation |
 | 🧩 [**Components**](./Refrencce%20and%20Usage%20And%20Guide/COMPONENTS.md) | React component documentation |
@@ -94,6 +94,7 @@ npm run dev
 
 | Preset | Flags | Description |
 |--------|-------|-------------|
+| ⚡ **Full Scan** | `none` | All templates - comprehensive scan |
 | 🔴 **Full Scan (Critical)** | `-s critical` | Critical severity vulnerabilities only |
 | 🟠 **Full Scan (High/Crit)** | `-s critical,high` | High and critical vulnerabilities |
 | 🔍 **Tech Detect** | `-tags tech` | Technology detection and fingerprinting |
@@ -140,8 +141,12 @@ NCNC/
 │   │   ├── templates/               # Template management
 │   │   └── ui/                      # shadcn/ui components
 │   ├── 📂 lib/                      # Utilities
+│   │   ├── db.ts                    # Database operations
+│   │   ├── cache.ts                 # Response caching
+│   │   ├── errors.ts                # Error handling
 │   │   └── nuclei/                  # Nuclei configuration
-│   └── 📂 scans/                    # Scan results (gitignored)
+│   ├── 📂 scans/                    # Scan results (gitignored)
+│   └── 📄 nuclei.db                 # SQLite database (gitignored)
 ├── 📂 Refrencce and Usage And Guide/ # Documentation
 └── 📄 guide.txt                     # Original requirements
 ```

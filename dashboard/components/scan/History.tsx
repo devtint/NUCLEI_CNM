@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Download, FileText, FileJson, Clock } from "lucide-react";
+import { Download, FileText, FileJson, Clock, Trash2 } from "lucide-react";
 
 interface ScanRecord {
     id: string;
@@ -11,6 +11,12 @@ interface ScanRecord {
     size: number;
     date: string;
     hasLog: boolean;
+    // New database fields
+    target?: string;
+    startTime?: number;
+    endTime?: number;
+    status?: string;
+    findingCount?: number;
 }
 
 export function ScanHistory() {
@@ -22,6 +28,7 @@ export function ScanHistory() {
         try {
             const res = await fetch("/api/history");
             const data = await res.json();
+            console.log("History data received:", data); // Debug log
             setHistory(data);
         } catch (e) { console.error(e) }
         finally { setLoading(false); }
@@ -33,6 +40,29 @@ export function ScanHistory() {
 
     const download = (filename: string) => {
         window.open(`/api/history/download?file=${filename}`, "_blank");
+    };
+
+    const deleteScan = async (id: string, filename: string) => {
+        if (!confirm(`Are you sure you want to delete scan "${filename}"? This will delete all associated findings and cannot be undone.`)) {
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/history?id=${id}`, {
+                method: "DELETE"
+            });
+
+            if (res.ok) {
+                alert("Scan deleted successfully");
+                fetchHistory(); // Refresh list
+            } else {
+                const error = await res.json();
+                alert(`Failed to delete scan: ${error.error || "Unknown error"}`);
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Failed to delete scan");
+        }
     };
 
     const formatSize = (bytes: number) => {
@@ -97,11 +127,19 @@ export function ScanHistory() {
                                                     variant="outline"
                                                     size="sm"
                                                     className="h-8 border-zinc-700 text-zinc-400 hover:bg-zinc-800"
-                                                    onClick={() => download(record.filename.replace(".json", ".log"))}
+                                                    onClick={() => download(`${record.id}.log`)}
                                                 >
                                                     <FileText className="mr-2 h-3 w-3" /> Log
                                                 </Button>
                                             )}
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="h-8 border-red-900/50 text-red-500 hover:bg-red-900/20"
+                                                onClick={() => deleteScan(record.id, record.filename)}
+                                            >
+                                                <Trash2 className="mr-2 h-3 w-3" /> Delete
+                                            </Button>
                                         </div>
                                     </TableCell>
                                 </TableRow>

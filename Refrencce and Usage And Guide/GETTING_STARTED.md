@@ -79,6 +79,7 @@ Enter a target URL (e.g., `scanme.sh` or `https://example.com`)
 
 #### Option A: One-Click Preset
 Click one of the preset buttons:
+- **Full Scan**: All templates (comprehensive scan)
 - **Full Scan (Critical)**: `-s critical`
 - **Full Scan (High/Crit)**: `-s critical,high`
 - **Tech Detect**: `-tags tech`

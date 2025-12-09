@@ -1,6 +1,6 @@
 # Component Documentation
 
-Detailed documentation of all React components in the Nuclei Dashboard.
+Detailed documentation of all React components in the Nuclei Dashboard with database integration.
 
 ---
 
@@ -42,42 +42,56 @@ interface Props {
 - `setActiveView(view: string)`: Changes active view
 
 **Views:**
-- `overview`: Dashboard statistics
-- `scan`: Scan wizard
-- `vulnerabilities`: Findings table
-- `activity`: Live console
+- `overview`: Dashboard statistics with severity breakdown
+- `scan`: Scan wizard with 7 presets
+- `vulnerabilities`: Findings table with filtering
+- `activity`: Activity monitor (database-backed)
 - `history`: Scan history
 - `templates`: Template management
 - `settings`: Settings panel
 
 ---
 
-### Overview.tsx
-**Location:** `dashboard/components/dashboard/Overview.tsx`
+### Stats.tsx
+**Location:** `dashboard/components/dashboard/Stats.tsx`
 
-**Purpose:** Displays dashboard statistics and recent scans.
+**Purpose:** Displays dashboard statistics with severity breakdown.
 
 **Props:**
 ```typescript
 interface Props {
-  stats: {
-    totalScans: number;
-    totalFindings: number;
-    severityCounts: {
-      critical: number;
-      high: number;
-      medium: number;
-      low: number;
-      info: number;
-    };
-  };
+  totalScans?: number;
+  lastScan?: string;
 }
 ```
 
+**State:**
+```typescript
+const [severityCounts, setSeverityCounts] = useState<SeverityCounts>({
+  critical: 0,
+  high: 0,
+  medium: 0,
+  low: 0,
+  info: 0,
+  total: 0
+});
+```
+
 **Features:**
-- Displays total scans and findings
-- Shows severity breakdown with color-coded badges
-- Lists recent scans
+- **Total Scans Card**: Shows scan count
+- **Total Findings Card**: Shows all findings count
+- **Last Activity Card**: Shows last scan timestamp
+- **Severity Breakdown Card**: Visual grid showing:
+  - Critical findings (red)
+  - High findings (orange)
+  - Medium findings (yellow)
+  - Low findings (blue)
+  - Info findings (gray)
+
+**Data Source:**
+- Fetches from `/api/findings` on mount
+- Calculates severity counts client-side
+- Updates automatically when findings change
 
 ---
 
@@ -86,7 +100,7 @@ interface Props {
 ### ScanWizard.tsx
 **Location:** `dashboard/components/scan/Wizard.tsx`
 
-**Purpose:** Scan configuration interface with presets and custom args.
+**Purpose:** Scan configuration interface with 7 one-click presets and custom args.
 
 **State:**
 ```typescript
@@ -107,10 +121,19 @@ interface WizardProps {
 - `startScan(config: any)`: Submits scan to API
   - Merges config with localStorage settings
   - Sends POST to `/api/scan`
+  - **Inserts scan record in database**
   - Calls `onScanStart` callback
 
 **Features:**
 - Two tabs: "One-Click Presets" and "Custom Command"
+- **7 Preset Buttons:**
+  1. Full Scan (no filters)
+  2. Full Scan (Critical)
+  3. Full Scan (High/Crit)
+  4. Tech Detect
+  5. CVEs (2023-2024)
+  6. Misconfigurations
+  7. Panels & Logins
 - Preset buttons display flags in code badges
 - Custom args input for advanced users
 - Auto-fills from `initialTemplate` prop
@@ -123,51 +146,106 @@ import { PREDEFINED_COMMANDS } from "@/lib/nuclei/presets";
 
 ---
 
-### LiveConsole.tsx
+### LiveConsole.tsx (Activity Monitor)
 **Location:** `dashboard/components/scan/LiveConsole.tsx`
 
-**Purpose:** Real-time scan monitoring with SSE log streaming.
+**Purpose:** Database-backed activity monitor showing recent scans.
 
 **State:**
 ```typescript
+interface ScanInfo {
+  id: string;
+  target: string;
+  status: string;
+  startTime: number;
+  endTime?: number;
+  exitCode?: number;
+  config?: {
+    rateLimit?: number;
+    concurrency?: number;
+    bulkSize?: number;
+    templateId?: string;
+    tags?: string[];
+    severity?: string[];
+    customArgs?: string;
+  };
+}
+
 const [activeScans, setActiveScans] = useState<ScanInfo[]>([]);
-const [logs, setLogs] = useState<Map<string, string>>(new Map());
 const [loading, setLoading] = useState(false);
 ```
 
 **Functions:**
 - `fetchScans()`: Polls `/api/scan` every 2 seconds
-- `fetchLogs(scanId)`: Connects to SSE `/api/stream/[scanId]`
+  - **Reads from database (last 20 scans)**
+  - Returns all scans (running + completed)
 - `stopScan(scanId)`: Sends DELETE to `/api/scan`
+  - **Updates database status to 'stopped'**
 
 **Features:**
-- Auto-scrolls to bottom of logs
-- Stop button for active scans
-- Displays scan config (target, template, custom args)
-- Color-coded status badges
+- **Database-backed**: Shows scans from database (persistent)
+- **Last 20 scans** displayed
+- **Status badges** (color-coded):
+  - 🟢 Running (green)
+  - 🔵 Completed (blue)
+  - 🟠 Stopped (orange)
+  - 🔴 Failed (red)
+- **Scan details**:
+  - Target URL
+  - Start time and duration
+  - Exit code (0 = success)
+  - Configuration (rate limit, concurrency, bulk size)
+  - Template filters (tags/severity displayed correctly)
+- Stop button for running scans
+- Empty state when no scans found
+
+**Data Source:**
+```sql
+SELECT * FROM scans 
+ORDER BY start_time DESC 
+LIMIT 20
+```
 
 ---
 
 ### History.tsx
 **Location:** `dashboard/components/scan/History.tsx`
 
-**Purpose:** Displays completed scans with download options.
+**Purpose:** Displays completed scans with download and delete options.
 
 **State:**
 ```typescript
 const [history, setHistory] = useState<HistoryItem[]>([]);
 const [loading, setLoading] = useState(true);
+const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 ```
 
 **Functions:**
 - `fetchHistory()`: GET `/api/history`
+  - **Reads from database with file metadata**
+  - Cached for 30 seconds
 - `downloadFile(file, type)`: Downloads JSON or log file
+- `deleteScan(scanId)`: DELETE `/api/history?id={scanId}`
+  - **Deletes from database (cascade to findings)**
+  - Deletes JSON and log files
+  - Invalidates caches
 
 **Features:**
 - Lists scans by timestamp (newest first)
-- Shows findings count
-- Download buttons for JSON and log files
+- Shows findings count per scan
+- **Download buttons** for JSON and log files
+- **Delete button** with confirmation dialog
 - Refresh button
+- **File metadata from database** (faster loading)
+- Fallback to filesystem for legacy scans
+
+**Data Source:**
+```sql
+SELECT id, target, json_file_path, json_file_size, 
+       log_file_path, start_time, status, exit_code
+FROM scans 
+ORDER BY start_time DESC
+```
 
 ---
 
@@ -176,13 +254,14 @@ const [loading, setLoading] = useState(true);
 ### FindingsTable.tsx
 **Location:** `dashboard/components/findings/Table.tsx`
 
-**Purpose:** Display and manage vulnerability findings.
+**Purpose:** Display and manage vulnerability findings with status tracking and filtering.
 
 **State:**
 ```typescript
 const [findings, setFindings] = useState<Finding[]>([]);
 const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null);
 const [loading, setLoading] = useState(true);
+const [severityFilters, setSeverityFilters] = useState<string[]>([]);
 ```
 
 **Interface:**
@@ -199,18 +278,56 @@ interface Finding {
   "matched-at": string;
   timestamp: string;
   host?: string;
-  _sourceFile?: string; // For deletion
+  _status?: string;    // NEW: Finding status
+  _dbId?: number;      // NEW: Database ID
 }
 ```
 
 **Functions:**
 - `fetchFindings()`: GET `/api/findings`
-- `rescan(finding)`: POST `/api/scan` with finding's template
+  - **Reads from database**
+  - Cached for 20 seconds
+  - Returns findings with `_status` and `_dbId`
+- `updateStatus(finding, newStatus)`: PATCH `/api/findings`
+  - **Updates status in database**
+  - Invalidates cache
+  - Refreshes table
 - `deleteFinding(finding)`: DELETE `/api/findings`
+  - **Deletes by database ID**
+  - Invalidates cache
+- `toggleSeverityFilter(severity)`: Toggles severity in filter array
+- `rescan(finding)`: POST `/api/scan` with finding's template
 - `exportData(severity?)`: Generates CSV export
 - `getSeverityColor(severity)`: Returns Tailwind classes for severity badge
+- `getStatusColor(status)`: Returns Tailwind classes for status badge
 
-**Features:**
+**NEW Features:**
+
+#### 1. Status Management
+- **Status Badge**: Clickable badge showing current status
+- **Dropdown Menu**: Click to change status
+- **Status Options**:
+  - New (Blue)
+  - Confirmed (Red)
+  - False Positive (Gray)
+  - Fixed (Green)
+  - Closed (Purple)
+- **Database Persistence**: Status saved to database
+- **Color-Coded**: Each status has unique color
+
+#### 2. Multi-Select Severity Filtering
+- **Filter Button**: Shows "All Severities" or "{count} selected"
+- **Checkbox Menu**: Select multiple severities
+- **Filter Options**:
+  - Critical
+  - High
+  - Medium
+  - Low
+  - Info
+- **Real-Time Filtering**: Table updates instantly
+- **Clear All**: "All Severities" option resets filters
+
+#### 3. Existing Features
 - Click row → Open detail dialog
 - Detail dialog shows:
   - Key info in cards (Template ID, Severity, Matched At, etc.)
@@ -218,6 +335,19 @@ interface Finding {
 - Delete button (trash icon) in table row
 - Rescan button for re-testing
 - Export to CSV (all or by severity)
+
+**Data Source:**
+```sql
+SELECT * FROM findings 
+WHERE scan_id = ? OR ? IS NULL
+```
+
+**Filtering Logic:**
+```typescript
+const filteredFindings = severityFilters.length === 0
+  ? findings 
+  : findings.filter(f => severityFilters.includes(f.info.severity.toLowerCase()));
+```
 
 ---
 
@@ -373,6 +503,39 @@ All UI components are from **shadcn/ui** (Radix UI primitives with Tailwind styl
 
 ---
 
+### DropdownMenu (NEW)
+**Location:** `dashboard/components/ui/dropdown-menu.tsx`
+
+**Components:**
+- `DropdownMenu`: Root component
+- `DropdownMenuTrigger`: Trigger button
+- `DropdownMenuContent`: Content container
+- `DropdownMenuItem`: Menu item
+- `DropdownMenuLabel`: Label text
+- `DropdownMenuSeparator`: Divider
+
+**Usage:**
+```tsx
+<DropdownMenu>
+  <DropdownMenuTrigger asChild>
+    <Button>Open Menu</Button>
+  </DropdownMenuTrigger>
+  <DropdownMenuContent>
+    <DropdownMenuLabel>Options</DropdownMenuLabel>
+    <DropdownMenuSeparator />
+    <DropdownMenuItem onClick={handleClick}>
+      Option 1
+    </DropdownMenuItem>
+  </DropdownMenuContent>
+</DropdownMenu>
+```
+
+**Used In:**
+- Finding status management
+- Severity filtering
+
+---
+
 ### Card
 **Location:** `dashboard/components/ui/card.tsx`
 
@@ -451,6 +614,20 @@ All UI components are from **shadcn/ui** (Radix UI primitives with Tailwind styl
 </Badge>
 ```
 
+**Custom Status Badges:**
+```tsx
+// Status colors
+const getStatusColor = (status) => {
+  switch (status) {
+    case "New": return "bg-blue-500/20 text-blue-500";
+    case "Confirmed": return "bg-red-500/20 text-red-500";
+    case "False Positive": return "bg-gray-500/20 text-gray-500";
+    case "Fixed": return "bg-green-500/20 text-green-500";
+    case "Closed": return "bg-purple-500/20 text-purple-500";
+  }
+};
+```
+
 ---
 
 ### ScrollArea
@@ -499,16 +676,37 @@ DashboardClient
 ScanWizard (user configures scan)
   ↓
 POST /api/scan
-  ↓
+  ↓ (Database: INSERT INTO scans)
 DashboardClient.startScan(scanId)
   ↓
 Switch to Activity Monitor
   ↓
-LiveConsole (displays scan)
+LiveConsole (displays scan from database)
   ↓
-SSE /api/stream/[scanId]
+Poll /api/scan every 2s
+  ↓ (Database: SELECT FROM scans)
+Real-time status updates
   ↓
-Real-time log updates
+Scan completes
+  ↓ (Database: INSERT INTO findings, UPDATE scans)
+Cache invalidation
+```
+
+### Finding Status Update Flow
+```
+FindingsTable (user clicks status badge)
+  ↓
+Dropdown menu opens
+  ↓
+User selects new status
+  ↓
+PATCH /api/findings
+  ↓ (Database: UPDATE findings SET status = ?)
+Cache invalidation
+  ↓
+fetchFindings() (refresh list)
+  ↓
+Updated table with new status badge
 ```
 
 ### Finding Deletion Flow
@@ -518,10 +716,29 @@ FindingsTable (user clicks delete)
 Confirmation dialog
   ↓
 DELETE /api/findings
+  ↓ (Database: DELETE FROM findings WHERE id = ?)
+Cache invalidation
   ↓
 fetchFindings() (refresh list)
   ↓
 Updated table
+```
+
+### Severity Filtering Flow
+```
+FindingsTable (user clicks filter button)
+  ↓
+Dropdown menu with checkboxes
+  ↓
+User toggles severity checkboxes
+  ↓
+toggleSeverityFilter(severity)
+  ↓
+Update severityFilters state
+  ↓
+filteredFindings computed
+  ↓
+Table re-renders with filtered data
 ```
 
 ### Template Run Flow
@@ -558,6 +775,12 @@ Scan starts
   - Medium: Yellow (`yellow-500`)
   - Low: Blue (`blue-500`)
   - Info: Zinc (`zinc-500`)
+- Status Colors:
+  - New: Blue (`blue-500`)
+  - Confirmed: Red (`red-500`)
+  - False Positive: Gray (`gray-500`)
+  - Fixed: Green (`green-500`)
+  - Closed: Purple (`purple-500`)
 
 ### Typography
 - Font: Geist Sans (default), Geist Mono (code)
@@ -571,6 +794,7 @@ Scan starts
 - Component-specific state
 - Form inputs
 - Loading states
+- Filter selections
 
 ### Props Drilling
 - `activeView` passed from DashboardClient to Sidebar
@@ -581,6 +805,11 @@ Scan starts
 - Settings persistence
 - No global state library (Redux, Zustand, etc.)
 
+### Database State
+- Scans and findings persisted in SQLite
+- Accessed via API endpoints
+- Cached responses for performance
+
 ---
 
 ## Performance Optimizations
@@ -588,6 +817,15 @@ Scan starts
 ### Polling
 - LiveConsole polls every 2 seconds
 - Consider WebSocket for production
+
+### Caching
+- History API: 30-second cache
+- Findings API: 20-second cache
+- Automatic invalidation on mutations
+
+### Database Indexes
+- Optimized queries for common operations
+- Fast filtering and sorting
 
 ### Memoization
 - Not currently implemented
@@ -599,5 +837,36 @@ Scan starts
 
 ---
 
-For API details, see [API_REFERENCE.md](./API_REFERENCE.md)
-For architecture overview, see [ARCHITECTURE.md](./ARCHITECTURE.md)
+## New Component Features Summary
+
+### ✅ Stats.tsx
+- Severity breakdown cards
+- Real-time finding counts
+- Color-coded visual indicators
+
+### ✅ LiveConsole.tsx
+- Database-backed scan list
+- Last 20 scans displayed
+- Duration and exit code display
+- Template filter display (tags/severity)
+
+### ✅ FindingsTable.tsx
+- Status management with dropdown
+- Multi-select severity filtering
+- Database ID tracking
+- Status color coding
+
+### ✅ History.tsx
+- Delete functionality
+- Database metadata
+- File size display
+
+### ✅ ScanWizard.tsx
+- Full Scan preset added
+- 7 total presets
+
+---
+
+For API details, see [API_REFERENCE.md](./API_REFERENCE.md)  
+For architecture overview, see [ARCHITECTURE.md](./ARCHITECTURE.md)  
+For features documentation, see [FEATURES.md](./FEATURES.md)

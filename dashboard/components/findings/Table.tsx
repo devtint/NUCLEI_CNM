@@ -30,12 +30,15 @@ interface Finding {
     timestamp: string;
     host?: string;
     _sourceFile?: string; // For deletion
+    _status?: string; // Status from database
+    _dbId?: number; // Database ID
 }
 
 export function FindingsTable() {
     const [findings, setFindings] = useState<Finding[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null);
+    const [severityFilters, setSeverityFilters] = useState<string[]>([]);
 
     const fetchFindings = async () => {
         setLoading(true);
@@ -89,25 +92,35 @@ export function FindingsTable() {
 
     const rescan = async (f: Finding) => {
         try {
-            await fetch("/api/scan", {
+            const response = await fetch("/api/rescan", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
+                    findingId: (f as any)._dbId || (f as any).id,
                     target: f["matched-at"] || f.host,
                     templateId: f["template-path"] || f["template-id"]
                 }),
             });
-            alert(`Rescan started for ${f["template-id"]}`);
+
+            const result = await response.json();
+
+            if (result.success) {
+                if (result.updated) {
+                    alert(`✅ Finding updated with new rescan results!`);
+                } else if (result.fixed) {
+                    alert(`✅ Rescan completed - No vulnerabilities found! The issue may be fixed.`);
+                }
+                fetchFindings(); // Refresh the list
+            } else {
+                alert(`❌ Rescan failed: ${result.message}`);
+            }
         } catch (e) {
             console.error(e);
+            alert("❌ Rescan failed");
         }
     };
 
     const deleteFinding = async (f: Finding) => {
-        if (!f._sourceFile) {
-            alert("Error: Source file information is missing. Please refresh the vulnerability feed to update the data.");
-            return;
-        }
         if (!confirm("Are you sure you want to delete this finding? This cannot be undone.")) return;
 
         try {
@@ -115,9 +128,7 @@ export function FindingsTable() {
                 method: "DELETE",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    sourceFile: f._sourceFile,
-                    templateId: f["template-id"],
-                    matchedAt: f["matched-at"] || f.host
+                    id: (f as any)._dbId || (f as any).id
                 }),
             });
             fetchFindings(); // Refresh list
@@ -127,11 +138,119 @@ export function FindingsTable() {
         }
     };
 
+    const updateStatus = async (f: Finding, newStatus: string) => {
+        try {
+            const response = await fetch("/api/findings", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    id: f._dbId,
+                    status: newStatus
+                }),
+            });
+
+            if (response.ok) {
+                fetchFindings(); // Refresh list
+            } else {
+                alert("Failed to update status");
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Failed to update status");
+        }
+    };
+
+    const getStatusColor = (status?: string) => {
+        switch (status) {
+            case "New": return "bg-blue-500/20 text-blue-500 border-blue-500/50";
+            case "Confirmed": return "bg-red-500/20 text-red-500 border-red-500/50";
+            case "False Positive": return "bg-gray-500/20 text-gray-500 border-gray-500/50";
+            case "Fixed": return "bg-green-500/20 text-green-500 border-green-500/50";
+            case "Closed": return "bg-purple-500/20 text-purple-500 border-purple-500/50";
+            default: return "bg-zinc-500/20 text-zinc-500 border-zinc-500/50";
+        }
+    };
+
+    // Toggle severity filter
+    const toggleSeverityFilter = (severity: string) => {
+        setSeverityFilters(prev =>
+            prev.includes(severity)
+                ? prev.filter(s => s !== severity)
+                : [...prev, severity]
+        );
+    };
+
+    // Filter findings by severity
+    const filteredFindings = severityFilters.length === 0
+        ? findings
+        : findings.filter(f => severityFilters.includes(f.info.severity.toLowerCase()));
+
     return (
         <div className="space-y-4 bg-card p-4 rounded-xl border border-border shadow-sm">
             <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-foreground">Vulnerability Feed</h3>
                 <div className="flex gap-2">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm">
+                                <Filter className="mr-2 h-4 w-4" />
+                                {severityFilters.length === 0 ? "All Severities" : `${severityFilters.length} selected`}
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="bg-black/90 border-white/10 text-zinc-300">
+                            <DropdownMenuLabel>Filter by Severity</DropdownMenuLabel>
+                            <DropdownMenuSeparator className="bg-white/10" />
+                            <DropdownMenuItem onClick={() => setSeverityFilters([])}>
+                                <span className={severityFilters.length === 0 ? "font-bold" : ""}>All Severities</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator className="bg-white/10" />
+                            <DropdownMenuItem onClick={(e) => { e.preventDefault(); toggleSeverityFilter("critical"); }}>
+                                <input
+                                    type="checkbox"
+                                    checked={severityFilters.includes("critical")}
+                                    onChange={() => { }}
+                                    className="mr-2"
+                                />
+                                Critical
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={(e) => { e.preventDefault(); toggleSeverityFilter("high"); }}>
+                                <input
+                                    type="checkbox"
+                                    checked={severityFilters.includes("high")}
+                                    onChange={() => { }}
+                                    className="mr-2"
+                                />
+                                High
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={(e) => { e.preventDefault(); toggleSeverityFilter("medium"); }}>
+                                <input
+                                    type="checkbox"
+                                    checked={severityFilters.includes("medium")}
+                                    onChange={() => { }}
+                                    className="mr-2"
+                                />
+                                Medium
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={(e) => { e.preventDefault(); toggleSeverityFilter("low"); }}>
+                                <input
+                                    type="checkbox"
+                                    checked={severityFilters.includes("low")}
+                                    onChange={() => { }}
+                                    className="mr-2"
+                                />
+                                Low
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={(e) => { e.preventDefault(); toggleSeverityFilter("info"); }}>
+                                <input
+                                    type="checkbox"
+                                    checked={severityFilters.includes("info")}
+                                    onChange={() => { }}
+                                    className="mr-2"
+                                />
+                                Info
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                     <Button variant="outline" size="sm" onClick={fetchFindings} disabled={loading}>
                         <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                     </Button>
@@ -253,6 +372,7 @@ export function FindingsTable() {
                     <TableHeader className="bg-white/5">
                         <TableRow className="hover:bg-transparent border-white/10">
                             <TableHead className="text-zinc-400">Severity</TableHead>
+                            <TableHead className="text-zinc-400">Status</TableHead>
                             <TableHead className="text-zinc-400">Vulnerability</TableHead>
                             <TableHead className="text-zinc-400">Host</TableHead>
                             <TableHead className="text-zinc-400">Template ID</TableHead>
@@ -260,10 +380,10 @@ export function FindingsTable() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {findings.length === 0 ? (
+                        {filteredFindings.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={5} className="text-center h-24 text-zinc-500">
-                                    {loading ? "Loading..." : "No findings found yet."}
+                                <TableCell colSpan={6} className="text-center h-24 text-zinc-500">
+                                    {loading ? "Loading..." : severityFilters.length > 0 ? `No findings matching selected severities.` : "No findings found yet."}
                                 </TableCell>
                             </TableRow>
                         ) : (
@@ -273,6 +393,34 @@ export function FindingsTable() {
                                         <Badge variant="outline" className={`${getSeverityColor(f.info.severity)} uppercase text-[10px] tracking-wider`}>
                                             {f.info.severity}
                                         </Badge>
+                                    </TableCell>
+                                    <TableCell onClick={(e) => e.stopPropagation()}>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Badge className={`${getStatusColor(f._status)} border cursor-pointer hover:opacity-80 uppercase text-[10px] tracking-wider`}>
+                                                    {f._status || "New"}
+                                                </Badge>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="start" className="bg-black/90 border-white/10 text-zinc-300">
+                                                <DropdownMenuLabel>Change Status</DropdownMenuLabel>
+                                                <DropdownMenuSeparator className="bg-white/10" />
+                                                <DropdownMenuItem onClick={() => updateStatus(f, "New")}>
+                                                    New
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => updateStatus(f, "Confirmed")}>
+                                                    Confirmed
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => updateStatus(f, "False Positive")}>
+                                                    False Positive
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => updateStatus(f, "Fixed")}>
+                                                    Fixed
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => updateStatus(f, "Closed")}>
+                                                    Closed
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
                                     </TableCell>
                                     <TableCell className="font-medium text-zinc-200 group-hover:text-emerald-400 transition-colors">
                                         {f.info.name}

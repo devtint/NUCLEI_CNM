@@ -1,6 +1,6 @@
 # API Reference
 
-Complete documentation of all API endpoints in the Nuclei Dashboard.
+Complete documentation of all API endpoints in the Nuclei Dashboard with database integration.
 
 ---
 
@@ -9,16 +9,15 @@ Complete documentation of all API endpoints in the Nuclei Dashboard.
 2. [Findings API](#findings-api)
 3. [History API](#history-api)
 4. [Templates API](#templates-api)
-5. [Settings API](#settings-api)
-6. [Stats API](#stats-api)
-7. [Stream API](#stream-api)
+5. [Caching](#caching)
+6. [Error Handling](#error-handling)
 
 ---
 
 ## Scan Management API
 
 ### POST `/api/scan`
-Start a new Nuclei scan.
+Start a new Nuclei scan with database tracking.
 
 **Request Body:**
 ```json
@@ -43,15 +42,20 @@ Start a new Nuclei scan.
 
 **Process:**
 1. Generates unique scan ID (UUID)
-2. Constructs Nuclei command from config
-3. Spawns Nuclei process
-4. Stores in activeScans Map
-5. Returns scan ID
+2. **Inserts scan record in database**
+3. Constructs Nuclei command from config
+4. Spawns Nuclei process
+5. Creates log file
+6. On completion:
+   - Parses JSON output
+   - **Inserts findings into database**
+   - **Updates scan metadata (end_time, exit_code, file paths/sizes)**
+   - **Invalidates history and findings caches**
 
 ---
 
 ### GET `/api/scan`
-List all active scans.
+List recent scans from database (last 20).
 
 **Response:**
 ```json
@@ -59,29 +63,118 @@ List all active scans.
   {
     "id": "scan-id",
     "target": "https://example.com",
-    "status": "running" | "stopped" | "completed" | "failed",
+    "status": "running" | "completed" | "stopped" | "failed",
     "startTime": 1702345678901,
+    "endTime": 1702345789012,
+    "exitCode": 0,
     "config": {
       "target": "https://example.com",
-      "templateId": "...",
-      "customArgs": "..."
-    },
-    "args": ["nuclei", "-u", "..."]
+      "tags": ["tech"],
+      "severity": ["critical"]
+    }
   }
 ]
 ```
 
+**Source:** Database query
+```sql
+SELECT * FROM scans 
+ORDER BY start_time DESC 
+LIMIT 20
+```
+
 **Notes:**
-- Returns scans in reverse chronological order (newest first)
-- Only includes scans currently in memory (cleared on server restart)
+- Returns scans from database (persistent across restarts)
+- Includes completed and running scans
+- Config stored as JSON string in database
 
 ---
 
 ### DELETE `/api/scan?id=<scanId>`
-Stop a running scan.
+Stop a running scan and update database.
 
 **Query Parameters:**
 - `id`: Scan ID to stop
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Scan stopped"
+}
+```
+
+**Process:**
+1. Finds scan in activeScans Map
+2. Calls `process.kill()` on Nuclei process
+3. **Updates database: status='stopped', end_time=now()**
+4. Returns success
+
+---
+
+## Findings API
+
+### GET `/api/findings`
+List all vulnerability findings from database.
+
+**Query Parameters (Optional):**
+- `scanId`: Filter by specific scan ID
+
+**Response:**
+```json
+[
+  {
+    "template-id": "cves/2024/CVE-2024-1234",
+    "info": {
+      "name": "Vulnerability Name",
+      "severity": "critical",
+      "description": "Detailed description",
+      "tags": ["cve", "2024"]
+    },
+    "matched-at": "https://example.com/path",
+    "host": "example.com",
+    "timestamp": "2024-12-09T12:34:56.789Z",
+    "_status": "New",
+    "_dbId": 123
+  }
+]
+```
+
+**Source:** Database query
+```sql
+SELECT * FROM findings 
+WHERE scan_id = ? OR ? IS NULL
+```
+
+**Caching:**
+- TTL: 20 seconds
+- Cache key: `findings-all` or `findings-{scanId}`
+- Invalidated on: finding deletion, status update, scan completion
+
+**Notes:**
+- `_status`: Finding status (New/Confirmed/False Positive/Fixed/Closed)
+- `_dbId`: Database ID for updates/deletes
+- Returns empty array if no findings
+
+---
+
+### PATCH `/api/findings`
+Update finding status in database.
+
+**Request Body:**
+```json
+{
+  "id": 123,
+  "status": "Confirmed"
+}
+```
+
+**Allowed Status Values:**
+- `New`
+- `Confirmed`
+- `False Positive`
+- `Fixed`
+- `Closed`
 
 **Response:**
 ```json
@@ -91,10 +184,112 @@ Stop a running scan.
 ```
 
 **Process:**
-1. Finds scan in activeScans Map
-2. Calls `process.kill()` on Nuclei process
-3. Updates status to "stopped"
+1. Validates status value
+2. **Updates finding in database**
+3. **Invalidates findings cache**
 4. Returns success
+
+**Error Response:**
+```json
+{
+  "error": "Invalid status value"
+}
+```
+
+---
+
+### DELETE `/api/findings`
+Delete a specific finding from database.
+
+**Request Body:**
+```json
+{
+  "id": 123
+}
+```
+
+**Response:**
+```json
+{
+  "success": true
+}
+```
+
+**Process:**
+1. **Deletes finding from database by ID**
+2. **Invalidates findings cache**
+3. Returns success
+
+**Error Response:**
+```json
+{
+  "error": "Finding not found"
+}
+```
+
+---
+
+## History API
+
+### GET `/api/history`
+List all scans with metadata from database.
+
+**Response:**
+```json
+[
+  {
+    "id": "scan-id",
+    "target": "https://example.com",
+    "filename": "scan-id_2024-12-09T12-34-56.json",
+    "size": "15.2 KB",
+    "date": "2024-12-09T12:34:56.789Z",
+    "findingsCount": 5,
+    "hasLog": true,
+    "status": "completed",
+    "exitCode": 0
+  }
+]
+```
+
+**Source:** Database query with file metadata
+```sql
+SELECT 
+  id, target, json_file_path, json_file_size, 
+  log_file_path, start_time, status, exit_code
+FROM scans 
+ORDER BY start_time DESC
+```
+
+**Caching:**
+- TTL: 30 seconds
+- Cache key: `history-all`
+- Invalidated on: scan completion, scan deletion
+
+**Fallback:**
+- If `json_file_size` is 0 or NULL, reads from filesystem
+- Ensures legacy scans (pre-database) still display correctly
+
+---
+
+### DELETE `/api/history?id=<scanId>`
+Delete scan and all associated data.
+
+**Query Parameters:**
+- `id`: Scan ID to delete
+
+**Response:**
+```json
+{
+  "success": true
+}
+```
+
+**Process:**
+1. **Deletes scan from database (CASCADE deletes findings)**
+2. Deletes JSON file (`scans/{scanId}_{timestamp}.json`)
+3. Deletes log file (`scans/{scanId}.log`)
+4. **Invalidates history and findings caches**
+5. Returns success
 
 **Error Response:**
 ```json
@@ -105,107 +300,11 @@ Stop a running scan.
 
 ---
 
-## Findings API
-
-### GET `/api/findings`
-List all vulnerability findings from all scans.
-
-**Response:**
-```json
-[
-  {
-    "template-id": "cves/2024/CVE-2024-1234",
-    "template-path": "C:\\path\\to\\template.yaml",
-    "info": {
-      "name": "Vulnerability Name",
-      "severity": "critical" | "high" | "medium" | "low" | "info",
-      "description": "Detailed description",
-      "tags": ["cve", "2024"]
-    },
-    "matched-at": "https://example.com/path",
-    "host": "example.com",
-    "timestamp": "2024-12-09T12:34:56.789Z",
-    "_sourceFile": "scan-id.json"
-  }
-]
-```
-
-**Process:**
-1. Reads all `.json` files from `scans/` directory
-2. Parses each file (JSON array)
-3. Injects `_sourceFile` property for deletion tracking
-4. Flattens and returns all findings
-
-**Notes:**
-- `_sourceFile` is added by backend, not from Nuclei
-- Empty scans return `[]`
-
----
-
-### DELETE `/api/findings`
-Delete a specific finding from its source file.
-
-**Request Body:**
-```json
-{
-  "sourceFile": "scan-id.json",
-  "templateId": "cves/2024/CVE-2024-1234",
-  "matchedAt": "https://example.com/path"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true
-}
-```
-
-**Process:**
-1. Reads `scans/<sourceFile>`
-2. Filters out finding matching `templateId` AND `matchedAt`
-3. Writes updated array back to file
-4. Returns success
-
-**Error Response:**
-```json
-{
-  "error": "Source file not found"
-}
-```
-
----
-
-## History API
-
-### GET `/api/history`
-List all completed scans with metadata.
-
-**Response:**
-```json
-[
-  {
-    "id": "scan-id",
-    "timestamp": "2024-12-09T12:34:56.789Z",
-    "findingsCount": 5,
-    "hasLog": true
-  }
-]
-```
-
-**Process:**
-1. Reads all `.json` files from `scans/` directory
-2. Parses each to count findings
-3. Checks for corresponding `.log` file
-4. Returns sorted by timestamp (newest first)
-
----
-
 ### GET `/api/history/download?file=<filename>&type=<json|log>`
 Download scan results or logs.
 
 **Query Parameters:**
-- `file`: Filename (without extension)
+- `file`: Filename (with or without extension)
 - `type`: `json` or `log`
 
 **Response:**
@@ -225,7 +324,7 @@ Download scan results or logs.
 ## Templates API
 
 ### GET `/api/templates`
-List all custom templates.
+List all available templates (standard + custom).
 
 **Response:**
 ```json
@@ -234,19 +333,16 @@ List all custom templates.
     "id": "my-template",
     "name": "my-template.yaml",
     "path": "C:\\Users\\user\\nuclei-custom-templates\\my-template.yaml",
-    "lastModified": "2024-12-09T12:34:56.789Z"
+    "lastModified": "2024-12-09T12:34:56.789Z",
+    "isCustom": true
   }
 ]
 ```
 
 **Process:**
-1. Reads `C:\Users\<user>\nuclei-custom-templates\` directory
-2. Filters `.yaml` and `.yml` files
-3. Returns metadata for each
-
-**Notes:**
-- Directory created automatically if it doesn't exist
-- Returns empty array if no templates found
+1. Lists standard Nuclei templates
+2. Lists custom templates from `~/nuclei-custom-templates/`
+3. Returns combined list
 
 ---
 
@@ -270,17 +366,10 @@ Create a new custom template.
 ```
 
 **Process:**
-1. Sanitizes filename (alphanumeric + hyphens/underscores only)
+1. Sanitizes filename
 2. Adds `.yaml` extension
-3. Writes to `nuclei-custom-templates/` directory
+3. Writes to `~/nuclei-custom-templates/`
 4. Returns full path
-
-**Error Response:**
-```json
-{
-  "error": "Missing name or content"
-}
-```
 
 ---
 
@@ -297,188 +386,171 @@ Read template content.
 }
 ```
 
-**Error Response:**
-```json
+---
+
+## Caching
+
+### Cache Implementation
+In-memory cache with TTL (Time-To-Live).
+
+**Cache Configuration:**
+```typescript
 {
-  "error": "Template not found"
+  "history-all": { ttl: 30000 },  // 30 seconds
+  "findings-all": { ttl: 20000 }, // 20 seconds
+  "findings-{scanId}": { ttl: 20000 }
 }
 ```
 
----
+### Cache Invalidation
 
-## Settings API
-
-### GET `/api/settings`
-Get current settings (from localStorage on client).
-
-**Note:** This endpoint is not currently implemented. Settings are stored client-side only.
-
----
-
-### POST `/api/settings`
-Save settings (to localStorage on client).
-
-**Note:** This endpoint is not currently implemented. Settings are stored client-side only.
-
-**Client-Side Storage:**
-```javascript
-localStorage.setItem('nuclei_settings', JSON.stringify({
-  rateLimit: 300,
-  concurrency: 75,
-  bulkSize: 50
-}));
+**Pattern-Based Invalidation:**
+```typescript
+cache.invalidate('findings-*')  // Invalidates all findings caches
+cache.invalidate('history-*')   // Invalidates all history caches
 ```
 
----
+**Triggers:**
+- Scan completion → `findings-*`, `history-*`
+- Finding deletion → `findings-*`
+- Finding status update → `findings-*`
+- Scan deletion → `findings-*`, `history-*`
 
-## Stats API
-
-### GET `/api/stats`
-Get dashboard statistics.
-
-**Response:**
-```json
-{
-  "totalScans": 42,
-  "totalFindings": 156,
-  "severityCounts": {
-    "critical": 12,
-    "high": 34,
-    "medium": 56,
-    "low": 45,
-    "info": 9
-  },
-  "recentScans": [
-    {
-      "id": "scan-id",
-      "timestamp": "2024-12-09T12:34:56.789Z",
-      "findingsCount": 5
-    }
-  ]
-}
-```
-
-**Process:**
-1. Counts all `.json` files in `scans/` directory
-2. Parses each to count findings by severity
-3. Returns aggregated statistics
-
----
-
-## Stream API
-
-### GET `/api/stream/[id]`
-Stream scan logs in real-time (Server-Sent Events).
-
-**Path Parameters:**
-- `id`: Scan ID
-
-**Response Headers:**
-```
-Content-Type: text/event-stream
-Cache-Control: no-cache
-Connection: keep-alive
-```
-
-**Event Format:**
-```
-data: [INF] Starting scan...\n\n
-data: [INF] Templates loaded: 1234\n\n
-data: [VUL] Found vulnerability!\n\n
-```
-
-**Process:**
-1. Opens log file (`scans/<id>.log`)
-2. Sends initial content
-3. Watches file for changes
-4. Streams new lines as they're written
-5. Closes on client disconnect or scan completion
-
-**Client Usage:**
-```javascript
-const eventSource = new EventSource(`/api/stream/${scanId}`);
-eventSource.onmessage = (event) => {
-  console.log(event.data);
-};
-```
+### Cache Headers
+No cache headers currently implemented. All caching is server-side.
 
 ---
 
 ## Error Handling
 
-All endpoints return errors in this format:
-
+### Error Response Format
 ```json
 {
-  "error": "Error message description"
+  "error": "Error message description",
+  "type": "DATABASE_ERROR" | "VALIDATION_ERROR" | "FILE_SYSTEM_ERROR",
+  "statusCode": 400 | 404 | 500
 }
 ```
 
-**Common HTTP Status Codes:**
+### Error Types
+
+**DATABASE_ERROR (500)**
+```json
+{
+  "error": "Failed to insert scan into database",
+  "type": "DATABASE_ERROR"
+}
+```
+
+**VALIDATION_ERROR (400)**
+```json
+{
+  "error": "Invalid status value",
+  "type": "VALIDATION_ERROR"
+}
+```
+
+**FILE_SYSTEM_ERROR (500)**
+```json
+{
+  "error": "Failed to read scan file",
+  "type": "FILE_SYSTEM_ERROR"
+}
+```
+
+### HTTP Status Codes
 - `200`: Success
-- `400`: Bad request (missing parameters)
+- `400`: Bad request (validation error)
 - `404`: Resource not found
-- `500`: Internal server error
+- `500`: Internal server error (database, filesystem)
 
 ---
 
-## Rate Limiting
+## Database Operations
 
-Currently, there is **no rate limiting** on API endpoints. Consider implementing rate limiting in production.
+### Scan Operations
+```typescript
+insertScan(id, target, config, start_time)
+updateScan(id, { status, end_time, exit_code, json_file_path, json_file_size, log_file_path })
+getScan(id)
+getAllScans()
+deleteScan(id) // CASCADE deletes findings
+```
 
----
-
-## Authentication
-
-Currently, there is **no authentication**. The dashboard is designed for local use only. For production deployment, implement authentication middleware.
-
----
-
-## CORS
-
-CORS is not configured. The API is designed to be accessed from the same origin (Next.js frontend).
-
----
-
-## Data Validation
-
-### Input Validation
-- Template names: Alphanumeric + hyphens/underscores only
-- Scan IDs: UUID format
-- File paths: Validated against allowed directories
-
-### Output Validation
-- JSON responses validated before sending
-- File contents sanitized for security
+### Finding Operations
+```typescript
+insertFinding(scan_id, template_id, severity, name, matched_at, raw_json, timestamp)
+insertFindings(findings[]) // Batch insert
+updateFinding(id, { status })
+deleteFinding(id)
+getFindings(scan_id?) // Optional filter
+```
 
 ---
 
 ## Performance Considerations
 
-### Caching
-- No caching implemented
-- Consider caching scan history and stats
+### Database Indexes
+```sql
+CREATE INDEX idx_scans_start_time ON scans(start_time);
+CREATE INDEX idx_scans_status ON scans(status);
+CREATE INDEX idx_findings_scan_id ON findings(scan_id);
+CREATE INDEX idx_findings_severity ON findings(severity);
+CREATE INDEX idx_findings_status ON findings(status);
+```
 
-### Pagination
-- No pagination implemented
-- Large result sets may cause performance issues
+### Query Optimization
+- Prepared statements for all queries
+- Batch inserts for findings
+- Indexed columns for common filters
+- LIMIT clauses on list endpoints
 
-### Concurrent Requests
-- Multiple scans can run simultaneously
-- Limited by system resources (CPU, memory)
-
----
-
-## Future API Enhancements
-
-1. **Pagination**: Add `?page=1&limit=50` to list endpoints
-2. **Filtering**: Add `?severity=critical` to findings endpoint
-3. **Sorting**: Add `?sort=timestamp&order=desc`
-4. **Webhooks**: POST to external URL on scan completion
-5. **Batch Operations**: Delete multiple findings at once
-6. **Search**: Full-text search across findings
-7. **Export**: Export findings in multiple formats (PDF, HTML, CSV)
+### Caching Benefits
+- Reduces database load
+- Faster response times
+- Automatic invalidation
 
 ---
 
-For implementation details, see [ARCHITECTURE.md](./ARCHITECTURE.md)
+## Security
+
+### Input Validation
+- Template names: Alphanumeric + hyphens/underscores
+- Scan IDs: UUID format
+- Status values: Whitelist validation
+- File paths: Validated against allowed directories
+
+### SQL Injection Prevention
+- All queries use prepared statements
+- No string concatenation in SQL
+
+### File Access Control
+- Only allowed directories accessible
+- Path traversal prevention
+- Filename sanitization
+
+---
+
+## Future Enhancements
+
+✅ **Completed:**
+- Database integration
+- Response caching
+- Finding status management
+- Multi-select filtering
+
+**Planned:**
+- [ ] Pagination for large result sets
+- [ ] Advanced filtering (by date, template, etc.)
+- [ ] Sorting options
+- [ ] Webhook notifications
+- [ ] Batch operations
+- [ ] Full-text search
+- [ ] Export to PDF/HTML/CSV
+- [ ] API authentication
+- [ ] Rate limiting
+
+---
+
+For implementation details, see [ARCHITECTURE.md](./ARCHITECTURE.md)  
+For feature documentation, see [FEATURES.md](./FEATURES.md)

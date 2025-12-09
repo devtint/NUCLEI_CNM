@@ -3,6 +3,8 @@ import { spawn } from "child_process";
 import path from "path";
 import fs from "fs";
 import { constructCommand, NUCLEI_BINARY } from "@/lib/nuclei/config";
+import { insertScan, updateScan, insertFindings, FindingRecord } from "@/lib/db";
+import { cache } from "@/lib/cache";
 
 // In-memory store for active scans (simple solution for local app)
 // In a production serverless env, this wouldn't work, but for a local dashboard this is fine.
@@ -35,6 +37,15 @@ export async function POST(req: NextRequest) {
         };
         const args = constructCommand({ ...config, customArgs }, outputPath);
 
+        // Insert scan into database
+        insertScan({
+            id: scanId,
+            target,
+            config: JSON.stringify(config),
+            start_time: Date.now(),
+            status: 'running'
+        });
+
         // Spawn the process
         console.log(`Starting scan: ${NUCLEI_BINARY} ${args.join(" ")}`);
         const child = spawn(NUCLEI_BINARY, args);
@@ -53,8 +64,9 @@ export async function POST(req: NextRequest) {
             hasExited: false,
         });
 
-        // Log file path
+        // Log file path - create it first to avoid ENOENT errors
         const logPath = path.join(process.cwd(), "scans", `${scanId}.log`);
+        fs.writeFileSync(logPath, ''); // Create empty file first
         const logStream = fs.createWriteStream(logPath);
 
         child.stdout.on("data", (data) => {
@@ -75,15 +87,60 @@ export async function POST(req: NextRequest) {
                 scan.hasExited = true;
                 scan.endTime = Date.now();
             }
+            // Update database
+            updateScan(scanId, {
+                status: 'failed',
+                end_time: Date.now()
+            });
         });
 
         child.on("close", (code) => {
             console.log(`Scan ${scanId} exited with code ${code}`);
             logStream.end();
 
-            // Check if JSON output exists. If not (0 results), create empty array so history is valid.
-            if (!fs.existsSync(outputPath)) {
+            // Get file sizes for database storage
+            let jsonFileSize = 0;
+            let logFileSize = 0;
+
+            if (fs.existsSync(outputPath)) {
+                jsonFileSize = fs.statSync(outputPath).size;
+            }
+            if (fs.existsSync(logPath)) {
+                logFileSize = fs.statSync(logPath).size;
+            }
+
+            // Parse and store findings in database
+            if (fs.existsSync(outputPath)) {
+                try {
+                    const jsonContent = fs.readFileSync(outputPath, 'utf-8');
+                    const findings = JSON.parse(jsonContent);
+
+                    if (Array.isArray(findings) && findings.length > 0) {
+                        const findingRecords: FindingRecord[] = findings.map((f: any) => ({
+                            scan_id: scanId,
+                            template_id: f['template-id'] || f.templateId,
+                            template_path: f['template-path'] || f.templatePath,
+                            name: f.info?.name,
+                            severity: f.info?.severity,
+                            type: f.type,
+                            host: f.host,
+                            matched_at: f['matched-at'] || f.matchedAt,
+                            request: f.request,
+                            response: f.response,
+                            timestamp: f.timestamp,
+                            raw_json: JSON.stringify(f)
+                        }));
+
+                        insertFindings(findingRecords);
+                        console.log(`Stored ${findingRecords.length} findings for scan ${scanId}`);
+                    }
+                } catch (e) {
+                    console.error(`Failed to parse findings for scan ${scanId}:`, e);
+                }
+            } else {
+                // Create empty file if no results
                 fs.writeFileSync(outputPath, "[]");
+                jsonFileSize = 2; // "[]" is 2 bytes
             }
 
             const scan = activeScans.get(scanId);
@@ -95,6 +152,20 @@ export async function POST(req: NextRequest) {
                 scan.endTime = Date.now();
                 scan.hasExited = true;
             }
+
+            // Update database with file metadata in single operation
+            updateScan(scanId, {
+                status: scan?.status === 'stopped' ? 'stopped' : 'completed',
+                end_time: Date.now(),
+                exit_code: code || 0,
+                json_file_path: filename,
+                json_file_size: jsonFileSize,
+                log_file_path: `${scanId}.log`
+            });
+
+            // Invalidate cache to ensure fresh data
+            cache.invalidate("scan-history");
+            cache.invalidatePattern("findings");
         });
 
         return NextResponse.json({
@@ -110,15 +181,40 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-    // List active scans
-    const scans_list = Array.from(activeScans.values()).map(s => ({
-        id: s.id,
-        target: s.target,
-        status: s.status,
-        startTime: s.startTime,
-        config: s.config, // Send back config
-    })).reverse();
-    return NextResponse.json(scans_list);
+    // Get recent scans from database (last 20)
+    try {
+        const { getDatabase } = await import("@/lib/db");
+        const db = getDatabase();
+
+        const scans = db.prepare(`
+            SELECT 
+                id,
+                target,
+                config,
+                start_time,
+                end_time,
+                status,
+                exit_code
+            FROM scans 
+            ORDER BY start_time DESC 
+            LIMIT 20
+        `).all();
+
+        const scans_list = scans.map((s: any) => ({
+            id: s.id,
+            target: s.target,
+            status: s.status || 'unknown',
+            startTime: s.start_time,
+            endTime: s.end_time,
+            exitCode: s.exit_code,
+            config: s.config ? JSON.parse(s.config) : {}
+        }));
+
+        return NextResponse.json(scans_list);
+    } catch (error) {
+        console.error("Failed to fetch scans from database:", error);
+        return NextResponse.json([], { status: 500 });
+    }
 }
 
 export async function DELETE(req: NextRequest) {
@@ -140,6 +236,12 @@ export async function DELETE(req: NextRequest) {
             scan.status = "stopped";
             scan.hasExited = true;
             console.log(`Scan ${id} stopped by user.`);
+
+            // Update database
+            updateScan(id, {
+                status: 'stopped',
+                end_time: Date.now()
+            });
         } catch (e) {
             console.error(`Failed to kill process ${id}`, e);
         }

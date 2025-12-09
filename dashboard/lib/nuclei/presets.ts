@@ -1,5 +1,11 @@
 export const PREDEFINED_COMMANDS = [
     {
+        name: "Full Scan",
+        description: "Runs all templates (comprehensive scan)",
+        flags: "none",
+        config: {}
+    },
+    {
         name: "Full Scan (Critical)",
         description: "Scans for all critical severity vulnerabilities",
         flags: "-s critical",

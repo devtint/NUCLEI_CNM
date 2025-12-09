@@ -1,36 +1,157 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Nuclei Command Center - Dashboard
+
+A modern, feature-rich web dashboard for managing Nuclei vulnerability scans with real-time monitoring, database storage, and comprehensive finding management.
+
+## Features
+
+### 🎯 Core Functionality
+- **One-Click Scan Presets**: 7 pre-configured scan profiles including Full Scan, Critical/High severity, Tech Detection, CVEs, Misconfigurations, and Login Panels
+- **Custom Command Builder**: Advanced scan configuration with custom Nuclei flags
+- **Real-Time Activity Monitor**: Live scan tracking with status, duration, and exit codes
+- **Database-Backed Storage**: SQLite database for persistent scan history and findings
+- **Finding Status Management**: Track findings as New, Confirmed, False Positive, Fixed, or Closed
+
+### 📊 Dashboard & Analytics
+- **Overview Dashboard**: Total scans, findings count, and last activity
+- **Severity Breakdown**: Visual breakdown of findings by severity (Critical, High, Medium, Low, Info)
+- **Multi-Select Filtering**: Filter vulnerabilities by multiple severity levels simultaneously
+- **Scan History**: Complete history of all scans with metadata and file downloads
+
+### 🔍 Vulnerability Management
+- **Findings Table**: Comprehensive view of all vulnerabilities with severity badges
+- **Status Tracking**: Update finding status with color-coded badges
+- **Detailed View**: Click any finding for full details including template info, matched URL, and raw JSON
+- **Export Options**: Export findings to CSV (all, or filtered by severity)
+- **Delete & Rescan**: Remove false positives or re-verify findings
+
+### ⚙️ Advanced Features
+- **Custom Templates**: Create and manage custom Nuclei templates
+- **Settings Management**: Configure rate limits, concurrency, and bulk size
+- **Response Caching**: Optimized API performance with intelligent caching
+- **File Metadata Storage**: Scan results and logs stored with size and path information
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+- Node.js 18+ 
+- Nuclei binary installed and in PATH
+- Windows/Linux/macOS
 
+### Installation
+
+1. Install dependencies:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Run the development server:
+```bash
+npm run dev
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. Open [http://localhost:3000](http://localhost:3000)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### First Scan
 
-## Learn More
+1. Navigate to **New Operation**
+2. Enter a target URL (e.g., `testhtml5.vulnweb.com`)
+3. Choose a preset or enter custom flags
+4. Click **Run** and monitor in **Activity Monitor**
+5. View results in **Vulnerabilities**
 
-To learn more about Next.js, take a look at the following resources:
+## Database Schema
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Scans Table
+- `id`: Unique scan identifier
+- `target`: Target URL/domain
+- `config`: JSON configuration
+- `start_time`, `end_time`: Timestamps
+- `status`: running/completed/stopped/failed
+- `exit_code`: Nuclei exit code
+- `json_file_path`, `json_file_size`: Result file metadata
+- `log_file_path`: Log file path
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Findings Table
+- `id`: Auto-increment ID
+- `scan_id`: Foreign key to scans
+- `template_id`: Nuclei template identifier
+- `severity`: critical/high/medium/low/info
+- `name`: Vulnerability name
+- `matched_at`: Target URL
+- `status`: New/Confirmed/False Positive/Fixed/Closed
+- `raw_json`: Complete finding data
+- `timestamp`: Detection time
 
-## Deploy on Vercel
+## API Endpoints
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- `GET /api/scan` - List recent scans (last 20)
+- `POST /api/scan` - Start new scan
+- `DELETE /api/scan?id={id}` - Stop running scan
+- `GET /api/findings` - Get all findings (cached 20s)
+- `GET /api/findings?scanId={id}` - Get findings for specific scan
+- `PATCH /api/findings` - Update finding status
+- `DELETE /api/findings` - Delete finding
+- `GET /api/history` - Get scan history (cached 30s)
+- `DELETE /api/history?id={id}` - Delete scan and files
+- `GET /api/templates` - List available templates
+- `POST /api/templates` - Create custom template
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Technology Stack
+
+- **Frontend**: Next.js 14, React, TypeScript, Tailwind CSS
+- **UI Components**: shadcn/ui, Radix UI
+- **Database**: SQLite with better-sqlite3
+- **Backend**: Next.js API Routes
+- **Caching**: In-memory with TTL
+- **Scanner**: Nuclei (native binary)
+
+## Project Structure
+
+```
+dashboard/
+├── app/
+│   ├── api/           # API routes
+│   │   ├── scan/      # Scan management
+│   │   ├── findings/  # Finding operations
+│   │   ├── history/   # Scan history
+│   │   └── templates/ # Template management
+│   └── page.tsx       # Main page
+├── components/
+│   ├── dashboard/     # Dashboard components
+│   ├── findings/      # Finding table & details
+│   ├── scan/          # Scan wizard & console
+│   └── templates/     # Template manager
+├── lib/
+│   ├── db.ts          # Database operations
+│   ├── cache.ts       # Response caching
+│   ├── errors.ts      # Error handling
+│   └── nuclei/        # Nuclei configuration
+├── scans/             # Scan output files
+└── nuclei.db          # SQLite database
+```
+
+## Configuration
+
+### Settings (via UI)
+- **Rate Limit**: Requests per second
+- **Concurrency**: Parallel template execution
+- **Bulk Size**: Targets per template
+
+### Environment
+- Custom template directory: `~/nuclei-custom-templates`
+- Scan output: `dashboard/scans/`
+- Database: `dashboard/nuclei.db`
+
+## Development
+
+Built with Next.js and TypeScript. Hot reload enabled for rapid development.
+
+```bash
+npm run dev    # Development server
+npm run build  # Production build
+npm run start  # Production server
+```
+
+## License
+
+MIT

@@ -1,0 +1,271 @@
+import Database from 'better-sqlite3';
+import path from 'path';
+
+// Database file location
+const DB_PATH = path.join(process.cwd(), 'nuclei.db');
+
+// Initialize database
+let db: Database.Database | null = null;
+
+export function getDatabase(): Database.Database {
+    if (!db) {
+        db = new Database(DB_PATH);
+        db.pragma('journal_mode = WAL'); // Better performance for concurrent access
+        initializeSchema();
+    }
+    return db;
+}
+
+function initializeSchema() {
+    if (!db) return;
+
+    // Create scans table with file metadata
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS scans (
+            id TEXT PRIMARY KEY,
+            target TEXT NOT NULL,
+            config TEXT,
+            start_time INTEGER NOT NULL,
+            end_time INTEGER,
+            status TEXT NOT NULL,
+            exit_code INTEGER,
+            json_file_path TEXT,
+            json_file_size INTEGER DEFAULT 0,
+            log_file_path TEXT,
+            created_at INTEGER DEFAULT (strftime('%s', 'now'))
+        )
+    `);
+
+    // Create findings table
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS findings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            scan_id TEXT NOT NULL,
+            template_id TEXT,
+            template_path TEXT,
+            name TEXT,
+            severity TEXT,
+            type TEXT,
+            host TEXT,
+            matched_at TEXT,
+            request TEXT,
+            response TEXT,
+            timestamp TEXT,
+            raw_json TEXT NOT NULL,
+            status TEXT DEFAULT 'New',
+            created_at INTEGER DEFAULT (strftime('%s', 'now')),
+            FOREIGN KEY (scan_id) REFERENCES scans(id) ON DELETE CASCADE
+        )
+    `);
+
+    // Create indexes for better query performance
+    db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_findings_scan_id ON findings(scan_id);
+        CREATE INDEX IF NOT EXISTS idx_findings_severity ON findings(severity);
+        CREATE INDEX IF NOT EXISTS idx_findings_scan_severity ON findings(scan_id, severity);
+        CREATE INDEX IF NOT EXISTS idx_scans_status ON scans(status);
+        CREATE INDEX IF NOT EXISTS idx_scans_start_time ON scans(start_time DESC);
+        CREATE INDEX IF NOT EXISTS idx_scans_status_time ON scans(status, start_time DESC);
+    `);
+}
+
+
+// Scan operations
+export interface ScanRecord {
+    id: string;
+    target: string;
+    config?: string;
+    start_time: number;
+    end_time?: number;
+    status: 'running' | 'completed' | 'failed' | 'stopped';
+    exit_code?: number;
+}
+
+export function insertScan(scan: ScanRecord) {
+    const db = getDatabase();
+    const stmt = db.prepare(`
+        INSERT INTO scans (id, target, config, start_time, status)
+        VALUES (?, ?, ?, ?, ?)
+    `);
+    stmt.run(scan.id, scan.target, scan.config, scan.start_time, scan.status);
+}
+
+export function updateScan(id: string, updates: Partial<ScanRecord & { json_file_path?: string; json_file_size?: number; log_file_path?: string }>) {
+    const db = getDatabase();
+    const fields: string[] = [];
+    const values: any[] = [];
+
+    if (updates.status !== undefined) {
+        fields.push('status = ?');
+        values.push(updates.status);
+    }
+    if (updates.end_time !== undefined) {
+        fields.push('end_time = ?');
+        values.push(updates.end_time);
+    }
+    if (updates.exit_code !== undefined) {
+        fields.push('exit_code = ?');
+        values.push(updates.exit_code);
+    }
+    if (updates.json_file_path !== undefined) {
+        fields.push('json_file_path = ?');
+        values.push(updates.json_file_path);
+    }
+    if (updates.json_file_size !== undefined) {
+        fields.push('json_file_size = ?');
+        values.push(updates.json_file_size);
+    }
+    if (updates.log_file_path !== undefined) {
+        fields.push('log_file_path = ?');
+        values.push(updates.log_file_path);
+    }
+
+    if (fields.length === 0) return;
+
+    values.push(id);
+    const stmt = db.prepare(`UPDATE scans SET ${fields.join(', ')} WHERE id = ?`);
+    stmt.run(...values);
+}
+
+export function getScan(id: string): ScanRecord | undefined {
+    const db = getDatabase();
+    const stmt = db.prepare('SELECT * FROM scans WHERE id = ?');
+    return stmt.get(id) as ScanRecord | undefined;
+}
+
+export function getAllScans(): ScanRecord[] {
+    const db = getDatabase();
+    const stmt = db.prepare('SELECT * FROM scans ORDER BY start_time DESC');
+    return stmt.all() as ScanRecord[];
+}
+
+export function deleteScan(id: string) {
+    const db = getDatabase();
+    const stmt = db.prepare('DELETE FROM scans WHERE id = ?');
+    stmt.run(id);
+}
+
+// Finding operations
+export interface FindingRecord {
+    id?: number;
+    scan_id: string;
+    template_id?: string;
+    template_path?: string;
+    name?: string;
+    severity?: string;
+    type?: string;
+    host?: string;
+    matched_at?: string;
+    request?: string;
+    response?: string;
+    timestamp?: string;
+    raw_json: string;
+    status?: string;
+}
+
+export function insertFinding(finding: FindingRecord) {
+    const db = getDatabase();
+    const stmt = db.prepare(`
+        INSERT INTO findings (
+            scan_id, template_id, template_path, name, severity, type,
+            host, matched_at, request, response, timestamp, raw_json, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    stmt.run(
+        finding.scan_id,
+        finding.template_id,
+        finding.template_path,
+        finding.name,
+        finding.severity,
+        finding.type,
+        finding.host,
+        finding.matched_at,
+        finding.request,
+        finding.response,
+        finding.timestamp,
+        finding.raw_json,
+        finding.status || 'New'
+    );
+}
+
+export function updateFinding(id: number, updates: { status?: string }) {
+    const db = getDatabase();
+    const fields: string[] = [];
+    const values: any[] = [];
+
+    if (updates.status !== undefined) {
+        fields.push('status = ?');
+        values.push(updates.status);
+    }
+
+    if (fields.length === 0) return;
+
+    values.push(id);
+    const stmt = db.prepare(`UPDATE findings SET ${fields.join(', ')} WHERE id = ?`);
+    stmt.run(...values);
+}
+
+export function insertFindings(findings: FindingRecord[]) {
+    const db = getDatabase();
+    const insert = db.prepare(`
+        INSERT INTO findings (
+            scan_id, template_id, template_path, name, severity, type,
+            host, matched_at, request, response, timestamp, raw_json, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const insertMany = db.transaction((findings: FindingRecord[]) => {
+        for (const finding of findings) {
+            insert.run(
+                finding.scan_id,
+                finding.template_id,
+                finding.template_path,
+                finding.name,
+                finding.severity,
+                finding.type,
+                finding.host,
+                finding.matched_at,
+                finding.request,
+                finding.response,
+                finding.timestamp,
+                finding.raw_json,
+                finding.status || 'New'
+            );
+        }
+    });
+
+    insertMany(findings);
+}
+
+export function getFindingsByScan(scanId: string): FindingRecord[] {
+    const db = getDatabase();
+    const stmt = db.prepare('SELECT * FROM findings WHERE scan_id = ? ORDER BY id');
+    return stmt.all(scanId) as FindingRecord[];
+}
+
+export function getFindingCount(scanId: string): number {
+    const db = getDatabase();
+    const stmt = db.prepare('SELECT COUNT(*) as count FROM findings WHERE scan_id = ?');
+    const result = stmt.get(scanId) as { count: number };
+    return result.count;
+}
+
+export function deleteFinding(id: number) {
+    const db = getDatabase();
+    const stmt = db.prepare('DELETE FROM findings WHERE id = ?');
+    stmt.run(id);
+}
+
+export function deleteAllFindings(scanId: string) {
+    const db = getDatabase();
+    const stmt = db.prepare('DELETE FROM findings WHERE scan_id = ?');
+    stmt.run(scanId);
+}
+
+// Close database connection (useful for cleanup)
+export function closeDatabase() {
+    if (db) {
+        db.close();
+        db = null;
+    }
+}

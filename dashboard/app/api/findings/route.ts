@@ -1,102 +1,111 @@
 import { NextRequest, NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
+import { getFindingsByScan, deleteFinding, updateFinding, getDatabase } from "@/lib/db";
+import { withCache, cache } from "@/lib/cache";
+import { handleApiError, dbOperation, ErrorType, ApiError } from "@/lib/errors";
 
 export async function GET(req: NextRequest) {
-    const scansDir = path.join(process.cwd(), "scans");
-    const findings: any[] = [];
+    try {
+        const { searchParams } = new URL(req.url);
+        const scanId = searchParams.get("scanId");
 
-    if (fs.existsSync(scansDir)) {
-        const files = fs.readdirSync(scansDir).filter(f => f.endsWith(".json"));
+        const findings = withCache(
+            scanId ? `findings-${scanId}` : "findings-all",
+            20000, // 20-second TTL
+            () => {
+                return dbOperation(() => {
+                    let results;
 
-        for (const file of files) {
-            try {
-                const filePath = path.join(scansDir, file);
-                const content = fs.readFileSync(filePath, "utf-8");
-                const json = JSON.parse(content);
+                    if (scanId) {
+                        // Get findings for specific scan
+                        results = getFindingsByScan(scanId);
+                    } else {
+                        // Get ALL findings from all scans
+                        const db = getDatabase();
+                        const stmt = db.prepare('SELECT * FROM findings ORDER BY created_at DESC');
+                        results = stmt.all();
+                    }
 
-                // Nuclei -json output is an array of findings
-                if (Array.isArray(json)) {
-                    // Inject source filename for deletion tracking
-                    const withSource = json.map(f => ({ ...f, _sourceFile: file }));
-                    findings.push(...withSource);
-                } else if (typeof json === 'object') {
-                    // Single object or line-delimited (if we handled it differently, but we used -json-export logic or standard json array)
-                    // If -json-export output [{}, {} ...]
-                    findings.push({ ...json, _sourceFile: file }); // if single
-                } else {
-                    // It might be line-delimited JSON? If so, we need to parse line by line.
-                    // But our API `constructCommand` used `-json`.
-                    // Wait, standard `nuclei -o file.json -json` creates a file where EACH LINE is a JSON object.
-                    // It is NOT a JSON array [].
-                    // `nuclei -json-export file.json` creates a JSON array.
-                    // My `config.ts` used `args.push("-o", outputFile); args.push("-json");`
-                    // This creates Line-Delimited JSON (NDJSON).
-                    // Example:
-                    // {"template-id":...}
-                    // {"template-id":...}
-
-                    // So reading it as `JSON.parse(content)` will FAIL if >1 finding.
-                    // I need to fix `constructCommand` to use `-json-export` OR fix this reader to split by newline.
-
-                    // Let's safe-fix the reader to handle NDJSON.
-                    const lines = content.trim().split("\n");
-                    lines.forEach(line => {
-                        if (line.trim()) findings.push(JSON.parse(line));
+                    // Parse raw_json for each finding and map to expected format
+                    return results.map((f: any) => {
+                        const rawData = JSON.parse(f.raw_json);
+                        return {
+                            ...rawData,
+                            id: f.id,
+                            _sourceFile: `${f.scan_id}.json`,
+                            _dbId: f.id,
+                            _status: f.status || 'New' // Include status
+                        };
                     });
-                }
-            } catch (e) {
-                // ignore parse errors or partial files
+                }, "Failed to fetch findings");
             }
-        }
-    }
+        );
 
-    return NextResponse.json(findings);
+        return NextResponse.json(findings);
+    } catch (error) {
+        return handleApiError(error);
+    }
+}
+
+export async function PATCH(req: NextRequest) {
+    try {
+        const body = await req.json();
+        const { id, status } = body;
+
+        if (!id) {
+            throw new ApiError(
+                ErrorType.VALIDATION_ERROR,
+                "Finding ID is required",
+                400
+            );
+        }
+
+        const validStatuses = ['New', 'False Positive', 'Confirmed', 'Closed', 'Fixed'];
+        if (status && !validStatuses.includes(status)) {
+            throw new ApiError(
+                ErrorType.VALIDATION_ERROR,
+                `Invalid status. Must be one of: ${validStatuses.join(', ')}`,
+                400
+            );
+        }
+
+        dbOperation(() => {
+            updateFinding(parseInt(id), { status });
+        }, "Failed to update finding status");
+
+        // Invalidate cache
+        cache.invalidatePattern("findings");
+
+        return NextResponse.json({
+            success: true,
+            message: "Finding status updated"
+        });
+    } catch (error) {
+        return handleApiError(error);
+    }
 }
 
 export async function DELETE(req: NextRequest) {
     try {
-        const { sourceFile, templateId, matchedAt } = await req.json();
+        const body = await req.json();
+        const id = body.id || body._dbId;
 
-        if (!sourceFile) {
-            return NextResponse.json({ error: "Source file required" }, { status: 400 });
+        if (!id) {
+            throw new ApiError(
+                ErrorType.VALIDATION_ERROR,
+                "Finding ID is required",
+                400
+            );
         }
 
-        const matches = (f: any) =>
-            f["template-id"] === templateId &&
-            (f["matched-at"] === matchedAt || f["host"] === matchedAt || !matchedAt);
+        dbOperation(() => {
+            deleteFinding(parseInt(id));
+        }, "Failed to delete finding");
 
-        const filePath = path.join(process.cwd(), "scans", sourceFile);
-        if (!fs.existsSync(filePath)) {
-            return NextResponse.json({ error: "File not found" }, { status: 404 });
-        }
+        // Invalidate cache
+        cache.invalidatePattern("findings");
 
-        const content = fs.readFileSync(filePath, "utf-8");
-        let json = JSON.parse(content);
-
-        // Filter out the finding
-        // Handle array vs single object
-        if (Array.isArray(json)) {
-            const originalLen = json.length;
-            json = json.filter((f: any) => !matches(f));
-            if (json.length === originalLen) {
-                return NextResponse.json({ error: "Finding not found in file" }, { status: 404 });
-            }
-        } else {
-            if (matches(json)) {
-                json = []; // 'Delete' the single finding by making it empty array? Or empty object?
-                // Better to make it empty array as that's our standard for "empty scan"
-                json = [];
-            } else {
-                return NextResponse.json({ error: "Finding not found" }, { status: 404 });
-            }
-        }
-
-        fs.writeFileSync(filePath, JSON.stringify(json, null, 2));
-        return NextResponse.json({ success: true });
-
-    } catch (e: any) {
-        console.error(e);
-        return NextResponse.json({ error: e.message }, { status: 500 });
+        return NextResponse.json({ success: true, message: "Finding deleted" });
+    } catch (error) {
+        return handleApiError(error);
     }
 }

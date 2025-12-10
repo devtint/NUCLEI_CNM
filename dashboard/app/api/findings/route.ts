@@ -59,7 +59,7 @@ export async function PATCH(req: NextRequest) {
             );
         }
 
-        const validStatuses = ['New', 'False Positive', 'Confirmed', 'Closed', 'Fixed'];
+        const validStatuses = ['New', 'False Positive', 'Confirmed', 'Closed', 'Fixed', 'Regression'];
         if (status && !validStatuses.includes(status)) {
             throw new ApiError(
                 ErrorType.VALIDATION_ERROR,

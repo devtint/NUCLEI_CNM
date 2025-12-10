@@ -9,7 +9,9 @@ A modern, feature-rich web dashboard for managing Nuclei vulnerability scans wit
 - **Custom Command Builder**: Advanced scan configuration with custom Nuclei flags
 - **Real-Time Activity Monitor**: Live scan tracking with status, duration, and exit codes
 - **Database-Backed Storage**: SQLite database for persistent scan history and findings
-- **Finding Status Management**: Track findings as New, Confirmed, False Positive, Fixed, or Closed
+- **Finding Deduplication**: Intelligent hash-based system prevents duplicate findings across scans
+- **Finding Status Management**: Track findings as New, Confirmed, False Positive, Fixed, Closed, or Regression
+- **Regression Detection**: Automatically detects when fixed vulnerabilities reappear
 
 ### 📊 Dashboard & Analytics
 - **Overview Dashboard**: Total scans, findings count, and last activity
@@ -78,7 +80,11 @@ npm run dev
 - `severity`: critical/high/medium/low/info
 - `name`: Vulnerability name
 - `matched_at`: Target URL
-- `status`: New/Confirmed/False Positive/Fixed/Closed
+- `matcher_name`: Specific matcher that triggered
+- `status`: New/Confirmed/False Positive/Fixed/Closed/Regression
+- `finding_hash`: SHA-256 hash for deduplication (template_id + host + matched_at + name + matcher_name)
+- `first_seen`: Unix timestamp when first discovered
+- `last_seen`: Unix timestamp when last seen
 - `raw_json`: Complete finding data
 - `timestamp`: Detection time
 
@@ -129,6 +135,35 @@ dashboard/
 ├── scans/             # Scan output files
 └── nuclei.db          # SQLite database
 ```
+
+## Finding Deduplication System
+
+The dashboard uses a sophisticated hash-based deduplication system to prevent duplicate findings:
+
+### How It Works
+
+1. **Unique Hash Generation**: Each finding gets a SHA-256 hash based on:
+   - Template ID (e.g., `http-missing-security-headers`)
+   - Host (e.g., `fast.com`)
+   - Matched URL (e.g., `https://fast.com`)
+   - Vulnerability name (e.g., `HTTP Missing Security Headers`)
+   - Matcher name (e.g., `x-frame-options`, `csp`)
+
+2. **Smart Upsert Logic**:
+   - If hash exists: Updates `last_seen` timestamp, preserves status
+   - If hash is new: Inserts as new finding with `first_seen` timestamp
+
+3. **Status Preservation**: User-assigned statuses (e.g., "False Positive") persist across rescans
+
+4. **Regression Detection**: Findings marked "Fixed" or "Closed" automatically become "Regression" if detected again
+
+### Benefits
+
+✅ No duplicate findings across multiple scans  
+✅ Status flags survive rescans  
+✅ Automatic regression tracking  
+✅ Historical data (first/last seen)  
+✅ Cleaner UI without duplicates  
 
 ## Configuration
 

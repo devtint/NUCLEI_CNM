@@ -125,6 +125,7 @@ export async function POST(req: NextRequest) {
                             type: f.type,
                             host: f.host,
                             matched_at: f['matched-at'] || f.matchedAt,
+                            matcher_name: f['matcher-name'] || f.matcherName,
                             request: f.request,
                             response: f.response,
                             timestamp: f.timestamp,

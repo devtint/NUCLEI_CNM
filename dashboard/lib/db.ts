@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
 import path from 'path';
+import crypto from 'crypto';
 
 // Database file location
 const DB_PATH = path.join(process.cwd(), 'nuclei.db');
@@ -53,6 +54,9 @@ function initializeSchema() {
             timestamp TEXT,
             raw_json TEXT NOT NULL,
             status TEXT DEFAULT 'New',
+            finding_hash TEXT,
+            first_seen INTEGER,
+            last_seen INTEGER,
             created_at INTEGER DEFAULT (strftime('%s', 'now')),
             FOREIGN KEY (scan_id) REFERENCES scans(id) ON DELETE CASCADE
         )
@@ -63,6 +67,7 @@ function initializeSchema() {
         CREATE INDEX IF NOT EXISTS idx_findings_scan_id ON findings(scan_id);
         CREATE INDEX IF NOT EXISTS idx_findings_severity ON findings(severity);
         CREATE INDEX IF NOT EXISTS idx_findings_scan_severity ON findings(scan_id, severity);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_finding_hash ON findings(finding_hash);
         CREATE INDEX IF NOT EXISTS idx_scans_status ON scans(status);
         CREATE INDEX IF NOT EXISTS idx_scans_start_time ON scans(start_time DESC);
         CREATE INDEX IF NOT EXISTS idx_scans_status_time ON scans(status, start_time DESC);
@@ -156,11 +161,85 @@ export interface FindingRecord {
     type?: string;
     host?: string;
     matched_at?: string;
+    matcher_name?: string;
     request?: string;
     response?: string;
     timestamp?: string;
     raw_json: string;
     status?: string;
+}
+
+// Generate deterministic hash for finding deduplication
+export function generateFindingHash(
+    templateId?: string,
+    host?: string,
+    matchedAt?: string,
+    name?: string,
+    matcherName?: string
+): string {
+    // Use empty string if values are undefined to ensure consistent hashing
+    // Include name AND matcher_name to differentiate findings from same template with different matchers
+    // Example: http-missing-security-headers with different missing headers (x-frame-options, csp, etc.)
+    const data = `${templateId || ''}|${host || ''}|${matchedAt || ''}|${name || ''}|${matcherName || ''}`;
+    return crypto.createHash('sha256').update(data).digest('hex');
+}
+
+// Upsert finding (insert new or update existing based on hash)
+export function upsertFinding(finding: FindingRecord) {
+    const db = getDatabase();
+    const hash = generateFindingHash(finding.template_id, finding.host, finding.matched_at, finding.name, finding.matcher_name);
+    const now = Math.floor(Date.now() / 1000);
+
+    // Check if finding already exists
+    const existing = db.prepare('SELECT * FROM findings WHERE finding_hash = ?').get(hash) as FindingRecord | undefined;
+
+    if (existing) {
+        // Finding already exists - update it
+        let newStatus = existing.status || 'New';
+
+        // Regression detection: if previously Fixed/Closed, mark as Regression
+        if (newStatus === 'Fixed' || newStatus === 'Closed') {
+            newStatus = 'Regression';
+        }
+
+        const updateStmt = db.prepare(`
+            UPDATE findings 
+            SET last_seen = ?, 
+                status = ?, 
+                scan_id = ?, 
+                raw_json = ?,
+                timestamp = ?
+            WHERE finding_hash = ?
+        `);
+        updateStmt.run(now, newStatus, finding.scan_id, finding.raw_json, finding.timestamp, hash);
+    } else {
+        // New finding - insert it
+        const insertStmt = db.prepare(`
+            INSERT INTO findings (
+                scan_id, template_id, template_path, name, severity, type,
+                host, matched_at, request, response, timestamp, raw_json, 
+                status, finding_hash, first_seen, last_seen
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        insertStmt.run(
+            finding.scan_id,
+            finding.template_id,
+            finding.template_path,
+            finding.name,
+            finding.severity,
+            finding.type,
+            finding.host,
+            finding.matched_at,
+            finding.request,
+            finding.response,
+            finding.timestamp,
+            finding.raw_json,
+            finding.status || 'New',
+            hash,
+            now,
+            now
+        );
+    }
 }
 
 export function insertFinding(finding: FindingRecord) {
@@ -207,34 +286,15 @@ export function updateFinding(id: number, updates: { status?: string }) {
 
 export function insertFindings(findings: FindingRecord[]) {
     const db = getDatabase();
-    const insert = db.prepare(`
-        INSERT INTO findings (
-            scan_id, template_id, template_path, name, severity, type,
-            host, matched_at, request, response, timestamp, raw_json, status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
 
-    const insertMany = db.transaction((findings: FindingRecord[]) => {
+    // Use transaction for batch upsert operations
+    const upsertMany = db.transaction((findings: FindingRecord[]) => {
         for (const finding of findings) {
-            insert.run(
-                finding.scan_id,
-                finding.template_id,
-                finding.template_path,
-                finding.name,
-                finding.severity,
-                finding.type,
-                finding.host,
-                finding.matched_at,
-                finding.request,
-                finding.response,
-                finding.timestamp,
-                finding.raw_json,
-                finding.status || 'New'
-            );
+            upsertFinding(finding);
         }
     });
 
-    insertMany(findings);
+    upsertMany(findings);
 }
 
 export function getFindingsByScan(scanId: string): FindingRecord[] {

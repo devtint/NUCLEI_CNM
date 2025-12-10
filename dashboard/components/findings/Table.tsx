@@ -387,7 +387,7 @@ export function FindingsTable() {
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            findings.map((f, i) => (
+                            filteredFindings.map((f, i) => (
                                 <TableRow key={i} className="border-white/10 hover:bg-white/5 group cursor-pointer" onClick={() => setSelectedFinding(f)}>
                                     <TableCell>
                                         <Badge variant="outline" className={`${getSeverityColor(f.info.severity)} uppercase text-[10px] tracking-wider`}>

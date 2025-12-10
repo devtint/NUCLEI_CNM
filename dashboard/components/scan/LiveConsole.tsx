@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, Square, RefreshCcw } from "lucide-react";
+import { Loader2, Square, RefreshCcw, FileText } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
+import { LogViewer } from "./LogViewer";
 
 interface ScanInfo {
     id: string;
@@ -29,6 +30,7 @@ interface ScanInfo {
 export function LiveConsole({ scanId }: { scanId: string | null }) {
     const [activeScans, setActiveScans] = useState<ScanInfo[]>([]);
     const [loading, setLoading] = useState(false);
+    const [viewingLogs, setViewingLogs] = useState<string | null>(null);
 
     const fetchScans = async () => {
         try {
@@ -104,14 +106,29 @@ export function LiveConsole({ scanId }: { scanId: string | null }) {
                                     {scan.exitCode !== undefined && ` • Exit: ${scan.exitCode}`}
                                 </span>
                             </div>
-                            <Button
-                                variant="destructive"
-                                size="sm"
-                                onClick={() => stopScan(scan.id)}
-                                disabled={!isRunning || loading}
-                            >
-                                <Square className="mr-2 h-3 w-3 fill-current" /> Stop
-                            </Button>
+                            <div className="flex gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setViewingLogs(scan.id)}
+                                >
+                                    <FileText className="mr-2 h-3 w-3" /> Logs
+                                </Button>
+                                {isRunning ? (
+                                    <Button
+                                        variant="destructive"
+                                        size="sm"
+                                        onClick={() => stopScan(scan.id)}
+                                        disabled={loading}
+                                    >
+                                        <Square className="mr-2 h-3 w-3 fill-current" /> Stop
+                                    </Button>
+                                ) : (
+                                    <Badge className="bg-green-600 hover:bg-green-600 text-white px-3 py-1">
+                                        ✓ Completed
+                                    </Badge>
+                                )}
+                            </div>
                         </CardHeader>
                         <CardContent>
                             <div className="mt-2 p-3 bg-muted/50 rounded-md border border-border">
@@ -157,6 +174,15 @@ export function LiveConsole({ scanId }: { scanId: string | null }) {
                     </Card>
                 );
             })}
+
+            {viewingLogs && (
+                <LogViewer
+                    scanId={viewingLogs}
+                    isRunning={activeScans.find(s => s.id === viewingLogs)?.status === 'running'}
+                    open={!!viewingLogs}
+                    onClose={() => setViewingLogs(null)}
+                />
+            )}
         </div>
     );
 }

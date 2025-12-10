@@ -37,8 +37,11 @@ Multi-select severity filtering and status management
 ### 📝 **Custom Templates**
 Create and manage your own Nuclei templates
 
-### � **Database Storage**
-SQLite database for persistent findings and history
+### 💾 **Database Storage**
+SQLite database with intelligent deduplication
+
+### 🔄 **Smart Deduplication**
+Hash-based system prevents duplicate findings
 
 ### ⚙️ **Performance Tuning**
 Configure rate limiting and concurrency settings
@@ -46,6 +49,14 @@ Configure rate limiting and concurrency settings
 </td>
 </tr>
 </table>
+
+### 🎯 Key Features
+
+- **Finding Deduplication**: Intelligent hash-based system prevents duplicate findings across scans
+- **Status Management**: Track findings as New, Confirmed, False Positive, Fixed, Closed, or Regression  
+- **Regression Detection**: Automatically detects when fixed vulnerabilities reappear
+- **Historical Tracking**: First seen / last seen timestamps for all findings
+- **Status Preservation**: User-assigned statuses persist across rescans
 
 ---
 

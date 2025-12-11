@@ -1,0 +1,2 @@
+# This file ensures the scans directory is tracked by Git
+# Scan results (.json and .log files) are excluded via .gitignore

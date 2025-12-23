@@ -64,6 +64,11 @@ Configure rate limiting and concurrency settings
 - **Results Feed**: Searchable history of all discovered subdomains with "Scan" actions
 - **Activity Monitor**: Real-time log monitoring for long-running discovery jobs
 
+### 🛡️ **System Health**
+- **Live Status Checks**: Real-time installation and path verification for Nuclei and Subfinder
+- **Visual Feedback**: Instant green/red status indicators with version details on hover
+- **Diagnostic Tooltips**: Clear troubleshooting messages for missing or broken tools
+
 ---
 
 ## 🚀 Quick Start

@@ -11,10 +11,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 interface WizardProps {
     onScanStart: (scanId: string) => void;
     initialTemplate?: string;
+    initialTarget?: string;
 }
 
-export function ScanWizard({ onScanStart, initialTemplate }: WizardProps) {
-    const [target, setTarget] = useState("");
+export function ScanWizard({ onScanStart, initialTemplate, initialTarget }: WizardProps) {
+    const [target, setTarget] = useState(initialTarget || "");
     const [customArgs, setCustomArgs] = useState(initialTemplate ? `-t "${initialTemplate}"` : "");
     const [loading, setLoading] = useState(false);
 

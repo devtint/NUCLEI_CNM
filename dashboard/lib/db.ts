@@ -62,6 +62,31 @@ function initializeSchema() {
         )
     `);
 
+    // Create subfinder scans table
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS subfinder_scans (
+            id TEXT PRIMARY KEY,
+            target TEXT NOT NULL,
+            start_time INTEGER NOT NULL,
+            end_time INTEGER,
+            status TEXT NOT NULL,
+            count INTEGER DEFAULT 0,
+            created_at INTEGER DEFAULT (strftime('%s', 'now'))
+        )
+    `);
+
+    // Create subfinder results table
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS subfinder_results (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            scan_id TEXT NOT NULL,
+            subdomain TEXT NOT NULL,
+            first_seen INTEGER,
+            last_seen INTEGER,
+            FOREIGN KEY (scan_id) REFERENCES subfinder_scans(id) ON DELETE CASCADE
+        )
+    `);
+
     // Create indexes for better query performance
     db.exec(`
         CREATE INDEX IF NOT EXISTS idx_findings_scan_id ON findings(scan_id);
@@ -71,6 +96,10 @@ function initializeSchema() {
         CREATE INDEX IF NOT EXISTS idx_scans_status ON scans(status);
         CREATE INDEX IF NOT EXISTS idx_scans_start_time ON scans(start_time DESC);
         CREATE INDEX IF NOT EXISTS idx_scans_status_time ON scans(status, start_time DESC);
+
+        CREATE INDEX IF NOT EXISTS idx_subfinder_results_scan_id ON subfinder_results(scan_id);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_subfinder_results_scan_subdomain ON subfinder_results(scan_id, subdomain);
+        CREATE INDEX IF NOT EXISTS idx_subfinder_scans_start_time ON subfinder_scans(start_time DESC);
     `);
 }
 
@@ -329,3 +358,120 @@ export function closeDatabase() {
         db = null;
     }
 }
+
+// Subfinder Operations
+
+export interface SubfinderScanRecord {
+    id: string;
+    target: string;
+    start_time: number;
+    end_time?: number;
+    status: 'running' | 'completed' | 'failed';
+    count: number;
+}
+
+export function insertSubfinderScan(scan: SubfinderScanRecord) {
+    const db = getDatabase();
+    const stmt = db.prepare(`
+        INSERT INTO subfinder_scans (id, target, start_time, status, count)
+        VALUES (?, ?, ?, ?, ?)
+    `);
+    stmt.run(scan.id, scan.target, scan.start_time, scan.status, scan.count);
+}
+
+export function updateSubfinderScan(id: string, updates: Partial<SubfinderScanRecord>) {
+    const db = getDatabase();
+    const fields: string[] = [];
+    const values: any[] = [];
+
+    if (updates.status !== undefined) {
+        fields.push('status = ?');
+        values.push(updates.status);
+    }
+    if (updates.end_time !== undefined) {
+        fields.push('end_time = ?');
+        values.push(updates.end_time);
+    }
+    if (updates.count !== undefined) {
+        fields.push('count = ?');
+        values.push(updates.count);
+    }
+
+    if (fields.length === 0) return;
+
+    values.push(id);
+    const stmt = db.prepare(`UPDATE subfinder_scans SET ${fields.join(', ')} WHERE id = ?`);
+    stmt.run(...values);
+}
+
+export function getSubfinderScans(): SubfinderScanRecord[] {
+    const db = getDatabase();
+    const stmt = db.prepare('SELECT * FROM subfinder_scans ORDER BY start_time DESC');
+    return stmt.all() as SubfinderScanRecord[];
+}
+
+export function getSubfinderResults(scanId: string): string[] {
+    const db = getDatabase(); // Ensure db is retrieved
+    if (!db) return [];
+    const rows = db.prepare("SELECT subdomain FROM subfinder_results WHERE scan_id = ?").all(scanId) as { subdomain: string }[];
+    return rows.map(r => r.subdomain);
+}
+
+export function getRecentSubdomains(limit: number = 100): { subdomain: string; last_seen: string; scan_target: string }[] {
+    const db = getDatabase();
+    if (!db) return [];
+    const stmt = db.prepare(`
+        SELECT r.subdomain, r.last_seen, s.target as scan_target
+        FROM subfinder_results r
+        JOIN subfinder_scans s ON r.scan_id = s.id
+        ORDER BY r.id DESC
+        LIMIT ?
+    `);
+    return stmt.all(limit) as { subdomain: string; last_seen: string; scan_target: string }[];
+}
+
+export function saveSubfinderResults(scanId: string, subdomains: string[]) {
+    const db = getDatabase();
+    if (!db) return;
+
+    const now = new Date().toISOString();
+
+    // Use INSERT OR IGNORE to skip duplicates within the same scan if unique index exists
+    const insertStmt = db.prepare(`
+        INSERT OR IGNORE INTO subfinder_results (scan_id, subdomain, first_seen, last_seen)
+        VALUES (?, ?, ?, ?)
+    `);
+
+    const transaction = db.transaction((items: string[]) => {
+        for (const sub of items) {
+            insertStmt.run(scanId, sub, now, now);
+        }
+    });
+
+    try {
+        transaction(subdomains);
+    } catch (e) {
+        console.error("Error inserting subfinder results", e);
+    }
+}
+
+export function deleteSubfinderScan(id: string) {
+    const db = getDatabase();
+    if (!db) return;
+
+    const deleteResults = db.prepare("DELETE FROM subfinder_results WHERE scan_id = ?");
+    const deleteScan = db.prepare("DELETE FROM subfinder_scans WHERE id = ?");
+
+    const transaction = db.transaction(() => {
+        deleteResults.run(id);
+        deleteScan.run(id);
+    });
+
+    try {
+        transaction();
+    } catch (e) {
+        console.error("Error deleting scan", e);
+        throw e;
+    }
+}
+// End of DB helpers

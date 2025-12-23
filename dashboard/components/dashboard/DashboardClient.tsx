@@ -10,16 +10,23 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { ScanHistory } from "@/components/scan/History";
 import { Settings } from "@/components/settings/Settings";
 import { TemplateList } from "@/components/templates/List";
+import { SubfinderPanel } from "@/components/subfinder/SubfinderPanel";
 
 export function DashboardClient({ initialStats }: { initialStats: any }) {
     const [activeScanId, setActiveScanId] = useState<string | null>(null);
     const [selectedTemplate, setSelectedTemplate] = useState<string>("");
+    const [scanTarget, setScanTarget] = useState<string>("");
     const [activeView, setActiveView] = useState("overview");
     const [templateRefresh, setTemplateRefresh] = useState(0);
 
     const startScan = (id: string) => {
         setActiveScanId(id);
-        setActiveView("activity"); // Auto switch to activity
+        setActiveView("activity");
+    };
+
+    const startMainScan = (target: string) => {
+        setScanTarget(target);
+        setActiveView("scan");
     };
 
     return (
@@ -33,6 +40,7 @@ export function DashboardClient({ initialStats }: { initialStats: any }) {
                             {activeView.replace("-", " ")}
                         </h1>
                         <div className="flex items-center gap-2">
+                            {/* ... System Status ... */}
                             <div className="text-right mr-4">
                                 <div className="text-[10px] text-zinc-500 uppercase tracking-widest">System Status</div>
                                 <div className="text-emerald-400 font-medium text-xs flex items-center justify-end gap-2">
@@ -46,13 +54,15 @@ export function DashboardClient({ initialStats }: { initialStats: any }) {
                         </div>
                     </header>
 
-                    {/* Views */}
+                    {/* ... Overview ... */}
                     {activeView === "overview" && (
                         <div className="space-y-8 animate-in fade-in duration-500">
+                            {/* ... Stats ... */}
                             <DashboardStats
                                 totalScans={initialStats.totalScans}
                                 lastScan={initialStats.lastScan}
                             />
+                            {/* ... Content ... */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="p-6 rounded-xl border border-border bg-card shadow-sm">
                                     <h3 className="text-lg font-medium text-foreground mb-2">Quick Actions</h3>
@@ -63,7 +73,6 @@ export function DashboardClient({ initialStats }: { initialStats: any }) {
                                     </div>
                                 </div>
 
-                                {/* Mini Activity Feed if active */}
                                 {activeScanId && (
                                     <div className="p-6 rounded-xl border border-emerald-500/20 bg-emerald-500/5">
                                         <div className="flex justify-between items-center mb-2">
@@ -79,7 +88,11 @@ export function DashboardClient({ initialStats }: { initialStats: any }) {
 
                     {activeView === "scan" && (
                         <div className="max-w-3xl animate-in fade-in slide-in-from-bottom-4 duration-500">
-                            <ScanWizard onScanStart={startScan} initialTemplate={selectedTemplate} />
+                            <ScanWizard
+                                onScanStart={startScan}
+                                initialTemplate={selectedTemplate}
+                                initialTarget={scanTarget}
+                            />
                         </div>
                     )}
 
@@ -89,8 +102,6 @@ export function DashboardClient({ initialStats }: { initialStats: any }) {
                         </div>
                     )}
 
-                    {/* Activity Monitor - Hidden when not active to preserve state if needed, or just re-render */}
-                    {/* We use display:none trick if we want to keep logs, BUT LiveConsole re-fetches logs on mount so it is fine to unmount */}
                     {activeView === "activity" && (
                         <div className="animate-in fade-in duration-500 h-[calc(100vh-200px)]">
                             <LiveConsole scanId={activeScanId} />
@@ -99,11 +110,8 @@ export function DashboardClient({ initialStats }: { initialStats: any }) {
 
                     {activeView === "templates" && (
                         <div className="animate-in fade-in duration-500">
-                            <div className="mb-6 flex justify-between items-center">
-                                <p className="text-zinc-400">Manage your custom Nuclei templates here.</p>
-                                <TemplateManager onSaved={() => setTemplateRefresh(prev => prev + 1)} />
-                            </div>
-
+                            <TemplateManager onSaved={() => setTemplateRefresh(prev => prev + 1)} />
+                            <div className="mt-6"></div>
                             <TemplateList
                                 refreshTrigger={templateRefresh}
                                 onRun={(path) => {
@@ -118,6 +126,10 @@ export function DashboardClient({ initialStats }: { initialStats: any }) {
                         <div className="animate-in fade-in duration-500">
                             <ScanHistory />
                         </div>
+                    )}
+
+                    {activeView === "subfinder" && (
+                        <SubfinderPanel onScanTarget={startMainScan} />
                     )}
 
                     {activeView === "settings" && (

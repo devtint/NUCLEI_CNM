@@ -10,7 +10,8 @@ import {
     FileCode,
     Settings,
     History,
-    Star
+    Star,
+    Network
 } from "lucide-react";
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -26,6 +27,7 @@ export function Sidebar({ className, activeView, onChangeView }: SidebarProps) {
         { id: "activity", label: "Activity Monitor", icon: Activity },
         { id: "history", label: "Scan History", icon: History },
         { id: "templates", label: "Templates", icon: FileCode },
+        { id: "subfinder", label: "Subfinder", icon: Network },
         { id: "settings", label: "Settings", icon: Settings },
     ];
 

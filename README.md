@@ -58,6 +58,12 @@ Configure rate limiting and concurrency settings
 - **Historical Tracking**: First seen / last seen timestamps for all findings
 - **Status Preservation**: User-assigned statuses persist across rescans
 
+### 🌐 **Subdomain Discovery** (*Powered by Subfinder*)
+- **Integrated Workflow**: Discover subdomains and instantly pivot to vulnerability scanning
+- **One-Click Presets**: Standard, Recursive, All Sources, and Deep & Active scan modes
+- **Results Feed**: Searchable history of all discovered subdomains with "Scan" actions
+- **Activity Monitor**: Real-time log monitoring for long-running discovery jobs
+
 ---
 
 ## 🚀 Quick Start

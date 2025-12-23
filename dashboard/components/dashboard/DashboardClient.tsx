@@ -11,6 +11,7 @@ import { ScanHistory } from "@/components/scan/History";
 import { Settings } from "@/components/settings/Settings";
 import { TemplateList } from "@/components/templates/List";
 import { SubfinderPanel } from "@/components/subfinder/SubfinderPanel";
+import { SystemStatus } from "@/components/dashboard/SystemStatus";
 
 export function DashboardClient({ initialStats }: { initialStats: any }) {
     const [activeScanId, setActiveScanId] = useState<string | null>(null);
@@ -40,17 +41,7 @@ export function DashboardClient({ initialStats }: { initialStats: any }) {
                             {activeView.replace("-", " ")}
                         </h1>
                         <div className="flex items-center gap-2">
-                            {/* ... System Status ... */}
-                            <div className="text-right mr-4">
-                                <div className="text-[10px] text-zinc-500 uppercase tracking-widest">System Status</div>
-                                <div className="text-emerald-400 font-medium text-xs flex items-center justify-end gap-2">
-                                    <span className="relative flex h-2 w-2">
-                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                                    </span>
-                                    Online
-                                </div>
-                            </div>
+                            <SystemStatus />
                         </div>
                     </header>
 

@@ -64,7 +64,7 @@ Subfinder v2.6.0+ (installed and in PATH)
 git clone https://github.com/devtint/NUCLEI_CNM.git
 
 # Navigate to dashboard
-cd NCNC/dashboard
+cd NUCLEI_CNM/dashboard
 
 # Install dependencies
 npm install

@@ -83,7 +83,42 @@ function initializeSchema() {
             subdomain TEXT NOT NULL,
             first_seen INTEGER,
             last_seen INTEGER,
+            is_new BOOLEAN DEFAULT 0,
             FOREIGN KEY (scan_id) REFERENCES subfinder_scans(id) ON DELETE CASCADE
+        )
+    `);
+
+    // Migration for existing tables: Add is_new column if not exists
+    try {
+        db.exec("ALTER TABLE subfinder_results ADD COLUMN is_new BOOLEAN DEFAULT 0");
+    } catch (e: any) {
+        // Ignore error if column already exists (Duplicate column name)
+        if (!e.message.includes("duplicate column name")) {
+            // console.log("Migration note:", e.message); 
+        }
+    }
+
+    // Create monitored targets table (Inventory)
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS monitored_targets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            target TEXT UNIQUE NOT NULL,
+            last_scan_date INTEGER,
+            total_count INTEGER DEFAULT 0,
+            created_at INTEGER DEFAULT (strftime('%s', 'now'))
+        )
+    `);
+
+    // Create monitored subdomains table (Global List)
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS monitored_subdomains (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            target_id INTEGER NOT NULL,
+            subdomain TEXT NOT NULL,
+            first_seen INTEGER,
+            last_seen INTEGER,
+            FOREIGN KEY (target_id) REFERENCES monitored_targets(id) ON DELETE CASCADE,
+            UNIQUE(target_id, subdomain)
         )
     `);
 
@@ -424,35 +459,91 @@ export function getRecentSubdomains(limit: number = 100): { subdomain: string; l
         SELECT r.subdomain, r.last_seen, s.target as scan_target
         FROM subfinder_results r
         JOIN subfinder_scans s ON r.scan_id = s.id
+        WHERE r.is_new = 1
         ORDER BY r.id DESC
         LIMIT ?
     `);
     return stmt.all(limit) as { subdomain: string; last_seen: string; scan_target: string }[];
 }
 
-export function saveSubfinderResults(scanId: string, subdomains: string[]) {
+export function saveSubfinderResults(scanId: string, target: string, subdomains: string[]) {
+    console.log(`[DB] Saving ${subdomains.length} subdomains for ${target}`);
     const db = getDatabase();
     if (!db) return;
 
-    const now = new Date().toISOString();
+    const now = Math.floor(Date.now() / 1000);
 
-    // Use INSERT OR IGNORE to skip duplicates within the same scan if unique index exists
-    const insertStmt = db.prepare(`
-        INSERT OR IGNORE INTO subfinder_results (scan_id, subdomain, first_seen, last_seen)
-        VALUES (?, ?, ?, ?)
+    // 1. Update/Insert Parent Target (Inventory)
+    // We use INSERT OR IGNORE then UPDATE to handle the UPSERT manually for SQLite compat or just simple logic
+    let targetId: number | bigint;
+
+    const getTarget = db.prepare("SELECT id FROM monitored_targets WHERE target = ?");
+    const existingTarget = getTarget.get(target) as { id: number | bigint } | undefined;
+
+    if (existingTarget) {
+        targetId = existingTarget.id;
+        db.prepare("UPDATE monitored_targets SET last_scan_date = ? WHERE id = ?")
+            .run(now, targetId);
+    } else {
+        const insertTarget = db.prepare("INSERT INTO monitored_targets (target, last_scan_date, total_count) VALUES (?, ?, ?)");
+        const info = insertTarget.run(target, now, 0); // Init with 0, update later
+        targetId = info.lastInsertRowid;
+    }
+
+    // 2. Process Subdomains
+    const insertResult = db.prepare(`
+        INSERT INTO subfinder_results (scan_id, subdomain, first_seen, last_seen, is_new)
+        VALUES (?, ?, ?, ?, ?)
     `);
+
+    const checkGlobal = db.prepare("SELECT id FROM monitored_subdomains WHERE target_id = ? AND subdomain = ?");
+    const insertGlobal = db.prepare("INSERT INTO monitored_subdomains (target_id, subdomain, first_seen, last_seen) VALUES (?, ?, ?, ?)");
+    const updateGlobal = db.prepare("UPDATE monitored_subdomains SET last_seen = ? WHERE id = ?");
 
     const transaction = db.transaction((items: string[]) => {
         for (const sub of items) {
-            insertStmt.run(scanId, sub, now, now);
+            let isNew = false;
+
+            // Check Global Inventory
+            const existingGlobal = checkGlobal.get(targetId, sub) as { id: number } | undefined;
+
+            if (existingGlobal) {
+                // Known subdomain: Update last_seen
+                updateGlobal.run(now, existingGlobal.id);
+                isNew = false;
+            } else {
+                // New discovery!
+                insertGlobal.run(targetId, sub, now, now);
+                isNew = true;
+            }
+
+            // Record in this specific scan result
+            insertResult.run(scanId, sub, now, now, isNew ? 1 : 0);
         }
     });
 
     try {
         transaction(subdomains);
+
+        // Update total_count with actual count from DB (handling accumulation)
+        const countResult = db.prepare("SELECT COUNT(*) as count FROM monitored_subdomains WHERE target_id = ?").get(targetId) as { count: number };
+        const realCount = countResult.count;
+
+        db.prepare("UPDATE monitored_targets SET total_count = ? WHERE id = ?").run(realCount, targetId);
+
     } catch (e) {
         console.error("Error inserting subfinder results", e);
     }
+}
+
+export function deleteMonitoredTarget(id: number) {
+    const db = getDatabase();
+    if (!db) return;
+    db.prepare("DELETE FROM monitored_targets WHERE id = ?").run(id);
+    // Cascade should handle subdomains, but let's be safe if FK support isn't perfect in all sqlite versions (though we enabled WAL, did we enable FKs?)
+    // Better-sqlite3 enables FKs by default if using 'pragma foreign_keys = ON'.
+    // Let's manually delete to be sure.
+    db.prepare("DELETE FROM monitored_subdomains WHERE target_id = ?").run(id);
 }
 
 export function deleteSubfinderScan(id: string) {

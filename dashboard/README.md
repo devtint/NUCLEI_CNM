@@ -1,157 +1,149 @@
-# Nuclei Command Center - Dashboard
+# 📟 Dashboard Technical Documentation
 
-A modern, feature-rich web dashboard for managing Nuclei vulnerability scans with real-time monitoring, database storage, and comprehensive finding management.
+This document provides a deep dive into the technical architecture, component structure, and database schema of the **Nuclei Command Center Dashboard**.
 
-## Features
+It is intended for developers, contributors, and power users who want to understand "how it works" under the hood.
 
-### 🎯 Core Functionality
-- **One-Click Scan Presets**: 7 pre-configured scan profiles including Full Scan, Critical/High severity, Tech Detection, CVEs, Misconfigurations, and Login Panels
-- **Custom Command Builder**: Advanced scan configuration with custom Nuclei flags
-- **Real-Time Activity Monitor**: Live scan tracking with status, duration, and exit codes
-- **Database-Backed Storage**: SQLite database for persistent scan history and findings
-- **Finding Status Management**: Track findings as New, Confirmed, False Positive, Fixed, or Closed
+---
 
-### 📊 Dashboard & Analytics
-- **Overview Dashboard**: Total scans, findings count, and last activity
-- **Severity Breakdown**: Visual breakdown of findings by severity (Critical, High, Medium, Low, Info)
-- **Multi-Select Filtering**: Filter vulnerabilities by multiple severity levels simultaneously
-- **Scan History**: Complete history of all scans with metadata and file downloads
+## 🏗️ Architecture Overview
 
-### 🔍 Vulnerability Management
-- **Findings Table**: Comprehensive view of all vulnerabilities with severity badges
-- **Status Tracking**: Update finding status with color-coded badges
-- **Detailed View**: Click any finding for full details including template info, matched URL, and raw JSON
-- **Export Options**: Export findings to CSV (all, or filtered by severity)
-- **Delete & Rescan**: Remove false positives or re-verify findings
+The application uses a **Hybrid Architecture** combining:
+1.  **Server-Side Logic (Next.js API Routes)**: Handles CLI execution, file system access, and SQLite operations.
+2.  **Client-Side UI (React)**: Handles real-time state, polling, and interactivity.
 
-### ⚙️ Advanced Features
-- **Custom Templates**: Create and manage custom Nuclei templates
-- **Settings Management**: Configure rate limits, concurrency, and bulk size
-- **Response Caching**: Optimized API performance with intelligent caching
-- **File Metadata Storage**: Scan results and logs stored with size and path information
+### Data Flow
+1.  **Trigger**: User clicks "Start Scan".
+2.  **API**: `/api/scan` spawns a `child_process` (Nuclei/Subfinder).
+3.  **Stream**: The process stdout/stderr is piped to a `.log` file and a `.json` file.
+4.  **Parsing**: On process exit (or during stream), JSON output is parsed and **UPSERTED** into `nuclei.db`.
+5.  **UI**: The frontend polls `/api/scan?id=...` and `/api/findings` to update the interface live.
 
-## Getting Started
+---
 
-### Prerequisites
-- Node.js 18+ 
-- Nuclei binary installed and in PATH
-- Windows/Linux/macOS
+## 🗄️ Database Schema (SQLite)
 
-### Installation
+We use `better-sqlite3` for synchronous, high-performance database access. The database is located at `dashboard/nuclei.db`.
 
-1. Install dependencies:
-```bash
-npm install
-```
+### 1. Unified Scanning Tables
+These tables track the execution of scans.
 
-2. Run the development server:
-```bash
-npm run dev
-```
+| Table | Description | Key Fields |
+|-------|-------------|------------|
+| `scans` | Nuclei scan metadata. | `id`, `target`, `status`, `exit_code`, `json_file_path` |
+| `subfinder_scans` | Subfinder scan metadata. | `id`, `target`, `status`, `count` |
 
-3. Open [http://localhost:3000](http://localhost:3000)
+### 2. Findings & Vulnerabilities
+The core intelligence tables.
 
-### First Scan
+| Table | Description | Key Fields |
+|-------|-------------|------------|
+| `findings` | Stores individual vulnerability occurrences. | `scan_id`, `template_id`, `severity`, `status` (New, Fixed...), `raw_json` |
 
-1. Navigate to **New Operation**
-2. Enter a target URL (e.g., `testhtml5.vulnweb.com`)
-3. Choose a preset or enter custom flags
-4. Click **Run** and monitor in **Activity Monitor**
-5. View results in **Vulnerabilities**
+> **Unique Constraint**: findings are deduplicated using a hash of `template_id + host + matched_at`. This allows us to track the *same* vulnerability across multiple scans.
 
-## Database Schema
+### 3. Asset Inventory (Subfinder)
+The continuous monitoring layer.
 
-### Scans Table
-- `id`: Unique scan identifier
-- `target`: Target URL/domain
-- `config`: JSON configuration
-- `start_time`, `end_time`: Timestamps
-- `status`: running/completed/stopped/failed
-- `exit_code`: Nuclei exit code
-- `json_file_path`, `json_file_size`: Result file metadata
-- `log_file_path`: Log file path
+| Table | Description | Key Fields |
+|-------|-------------|------------|
+| `monitored_targets` | Distinct parent domains being tracked. | `target`, `last_scan_date`, `total_count` |
+| `monitored_subdomains` | Global list of unique subdomains per target. | `subdomain`, `first_seen`, `last_seen` |
+| `subfinder_results` | Results specific to a single execution. | `scan_id`, `subdomain`, `is_new` (Boolean) |
 
-### Findings Table
-- `id`: Auto-increment ID
-- `scan_id`: Foreign key to scans
-- `template_id`: Nuclei template identifier
-- `severity`: critical/high/medium/low/info
-- `name`: Vulnerability name
-- `matched_at`: Target URL
-- `status`: New/Confirmed/False Positive/Fixed/Closed
-- `raw_json`: Complete finding data
-- `timestamp`: Detection time
+---
 
-## API Endpoints
+## 🔌 API Reference
 
-- `GET /api/scan` - List recent scans (last 20)
-- `POST /api/scan` - Start new scan
-- `DELETE /api/scan?id={id}` - Stop running scan
-- `GET /api/findings` - Get all findings (cached 20s)
-- `GET /api/findings?scanId={id}` - Get findings for specific scan
-- `PATCH /api/findings` - Update finding status
-- `DELETE /api/findings` - Delete finding
-- `GET /api/history` - Get scan history (cached 30s)
-- `DELETE /api/history?id={id}` - Delete scan and files
-- `GET /api/templates` - List available templates
-- `POST /api/templates` - Create custom template
+### Core Scanner
+*   `POST /api/scan`: Start a Nuclei scan. Accepts `target` and `template` presets.
+*   `DELETE /api/scan`: Kill a running scan process.
+*   `GET /api/scan`: Retrieve scan history or status.
 
-## Technology Stack
+### Findings
+*   `GET /api/findings`: Retrieve filtered vulnerabilities. Supports query params: `status`, `severity`, `host`.
+*   `PATCH /api/findings`: Update status (e.g., mark as False Positive).
+*   `POST /api/rescan`: Trigger a single-template rescan for verification.
 
-- **Frontend**: Next.js 14, React, TypeScript, Tailwind CSS
-- **UI Components**: shadcn/ui, Radix UI
-- **Database**: SQLite with better-sqlite3
-- **Backend**: Next.js API Routes
-- **Caching**: In-memory with TTL
-- **Scanner**: Nuclei (native binary)
+### Subfinder
+*   `POST /api/subfinder`: Start enumeration.
+*   `GET /api/subfinder/inventory`: Get Asset Inventory & Subdomain details.
+*   `DELETE /api/subfinder/inventory`: Remove a target from inventory.
 
-## Project Structure
+---
+
+## 🧩 Component Library
+
+The UI is built using modular, reusable components in `dashboard/components/`.
+
+### `dashboard/`
+*   `DashboardClient.tsx`: The main layout controller. Handles view switching (Overview <-> Scan <-> Findings).
+*   `Stats.tsx`: Statistic cards (Total Scans, Critical Findings, etc).
+
+### `findings/`
+*   `Table.tsx`: The massive Data Table component. Handles:
+    *   Sorting & Pagination.
+    *   Multi-select Severity filtering.
+    *   Excel/PDF Export logic.
+*   `FindingDetails.tsx`: The Modal/Dialog view showing Request/Response tabs.
+
+### `subfinder/`
+*   `SubfinderPanel.tsx`: The container for the Subfinder module.
+*   `ResultsFeed.tsx`: The "New Discoveries" UI.
+    *   **Logic**: Compares `first_seen` vs `last_seen` to display "New" badges.
+
+### `scan/`
+*   `Wizard.tsx`: The "New Operation" form.
+*   `LiveConsole.tsx`: A real-time log viewer that tails the `.log` file of scanning processes.
+
+---
+
+## 🤖 AI Integration (Gemini)
+
+The AI logic is located in `dashboard/lib/ai.ts`.
+*   **Model**: `gemini-1.5-flash`
+*   **Prompt Engineering**: The system prompt instructs Gemini to act as a Senior Security Engineer.
+*   **Input**: It receives the Finding Name, Description, and HTTP Request/Response snippet.
+*   **Output**: A structured markdown summary with "Impact", "Analysis", and "Remediation".
+
+---
+
+## 📂 File Structure
 
 ```
 dashboard/
-├── app/
-│   ├── api/           # API routes
-│   │   ├── scan/      # Scan management
-│   │   ├── findings/  # Finding operations
-│   │   ├── history/   # Scan history
-│   │   └── templates/ # Template management
-│   └── page.tsx       # Main page
-├── components/
-│   ├── dashboard/     # Dashboard components
-│   ├── findings/      # Finding table & details
-│   ├── scan/          # Scan wizard & console
-│   └── templates/     # Template manager
-├── lib/
-│   ├── db.ts          # Database operations
-│   ├── cache.ts       # Response caching
-│   ├── errors.ts      # Error handling
-│   └── nuclei/        # Nuclei configuration
-├── scans/             # Scan output files
-└── nuclei.db          # SQLite database
+├── app/                  # Next.js App Router
+│   ├── api/              # Backend API Endpoints
+│   └── page.tsx          # Entry Point
+├── components/           # React Components
+│   ├── ui/               # Shadcn UI primitives (Button, Card, etc.)
+│   └── findings/         # Business logic components
+├── lib/                  # Utilities
+│   ├── db.ts             # Database Connection & Helpers
+│   ├── ai.ts             # Gemini Integration
+│   └── utils.ts          # Helper functions
+├── public/               # Static assets
+└── scans/                # Runtime folder for logs & JSON outputs
 ```
 
-## Configuration
+---
 
-### Settings (via UI)
-- **Rate Limit**: Requests per second
-- **Concurrency**: Parallel template execution
-- **Bulk Size**: Targets per template
+## ⚡ Performance Optimizations
 
-### Environment
-- Custom template directory: `~/nuclei-custom-templates`
-- Scan output: `dashboard/scans/`
-- Database: `dashboard/nuclei.db`
+1.  **WAL Mode**: SQLite Write-Ahead Logging is enabled for better concurrency.
+2.  **Optimistic UI**: Use `useTransition` and local state for instant feedback on deletions/updates.
+3.  **Dynamic Routes**: Usage of `export const dynamic = 'force-dynamic'` ensures APIs are not stale cached by Next.js.
+4.  **Lazy Loading**: Heavy components (like Charts) are lazy loaded.
 
-## Development
+---
 
-Built with Next.js and TypeScript. Hot reload enabled for rapid development.
+## 🛠️ Debugging
 
-```bash
-npm run dev    # Development server
-npm run build  # Production build
-npm run start  # Production server
-```
+If you encounter issues:
+1.  **Check Logs**: Look at the terminal output where `npm run dev` is running.
+2.  **Database**: You can open `nuclei.db` with any SQLite viewer (e.g., *DB Browser for SQLite*) to inspect raw data.
+3.  **Scan Artifacts**: Check `dashboard/scans/` to see if the raw CLI tool actually produced output files.
 
-## License
+---
 
-MIT
+*Written by the Antigravity Team*

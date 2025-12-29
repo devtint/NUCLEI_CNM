@@ -72,6 +72,7 @@ export async function POST(req: NextRequest) {
                                     response = ?,
                                     timestamp = ?,
                                     raw_json = ?,
+                                    status = 'Confirmed',
                                     created_at = strftime('%s', 'now')
                                 WHERE id = ?
                             `);
@@ -102,8 +103,16 @@ export async function POST(req: NextRequest) {
                                 updated: true
                             }));
                         } else {
-                            // No findings in rescan - vulnerability might be fixed
-                            console.log(`Rescan found no vulnerabilities for finding ${findingId}`);
+                            // No findings in rescan - vulnerability is likely fixed
+                            console.log(`Rescan found no vulnerabilities for finding ${findingId}. Marking as Fixed.`);
+
+                            const db = getDatabase();
+                            const stmt = db.prepare(`
+                                UPDATE findings 
+                                SET status = 'Fixed'
+                                WHERE id = ?
+                            `);
+                            stmt.run(parseInt(findingId));
 
                             // Clean up temp file
                             if (fs.existsSync(outputPath)) {
@@ -112,7 +121,7 @@ export async function POST(req: NextRequest) {
 
                             resolve(NextResponse.json({
                                 success: true,
-                                message: "Rescan completed - no vulnerabilities found (possibly fixed)",
+                                message: "Rescan clean - Status updated to Fixed",
                                 updated: false,
                                 fixed: true
                             }));

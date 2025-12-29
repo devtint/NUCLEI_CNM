@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Download, RefreshCw, Filter, Trash2 } from "lucide-react";
+import { Download, RefreshCw, Filter, Trash2, Sparkles } from "lucide-react";
+import { toast } from "sonner";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -104,7 +105,7 @@ export function FindingsTable() {
     const [findings, setFindings] = useState<Finding[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null);
-    const [severityFilters, setSeverityFilters] = useState<string[]>([]);
+    const [severityFilters, setSeverityFilters] = useState<string[]>(["critical", "high", "medium", "low", "unknown"]);
     const [statusFilters, setStatusFilters] = useState<string[]>([]);
     const [hostFilters, setHostFilters] = useState<string[]>([]);
 
@@ -233,17 +234,28 @@ export function FindingsTable() {
 
             if (result.success) {
                 if (result.updated) {
-                    alert(`✅ Finding updated with new rescan results!`);
+                    toast.success("Vulnerability Still Active", {
+                        description: "Rescan confirmed the issue exists. Status set to 'Confirmed'.",
+                        duration: 4000,
+                    });
                 } else if (result.fixed) {
-                    alert(`✅ Rescan completed - No vulnerabilities found! The issue may be fixed.`);
+                    toast.success("Vulnerability Fixed! 🛡️", {
+                        description: "Rescan clean. Status auto-updated to 'Fixed'.",
+                        duration: 5000,
+                    });
                 }
                 fetchFindings(); // Refresh the list
             } else {
-                alert(`❌ Rescan failed: ${result.message}`);
+                toast.error("Rescan Failed", {
+                    description: result.message,
+                    duration: 5000,
+                });
             }
         } catch (e) {
             console.error(e);
-            alert("❌ Rescan failed");
+            toast.error("Rescan failed", {
+                description: "An unexpected error occurred."
+            });
         }
     };
 
@@ -337,11 +349,131 @@ export function FindingsTable() {
         return matchesSeverity && matchesStatus && matchesHost;
     });
 
+    const [summary, setSummary] = useState<string | null>(null);
+    const [summaryLoading, setSummaryLoading] = useState(false);
+    const [aiEnabled, setAiEnabled] = useState(true);
+
+    useEffect(() => {
+        const stored = localStorage.getItem("nuclei_settings");
+        if (stored) {
+            try {
+                const parsed = JSON.parse(stored);
+                if (parsed.aiSummary !== undefined) {
+                    setAiEnabled(parsed.aiSummary);
+                }
+            } catch (e) {
+                console.error("Failed to parse settings", e);
+            }
+        }
+    }, [findings]); // Re-check when findings change (implied refresh usually) or just once on mount/interaction if we had a global event. For now, simple check.
+
+    const summarizeFindings = async () => {
+        if (filteredFindings.length === 0) {
+            alert("No findings to summarize.");
+            return;
+        }
+
+        setSummaryLoading(true);
+        try {
+            const res = await fetch("/api/summarize", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ findings: filteredFindings })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                setSummary(data.summary);
+            } else {
+                alert("Summary failed: " + data.message);
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Failed to generate summary.");
+        } finally {
+            setSummaryLoading(false);
+        }
+    };
+
+    const exportToPDF = async () => {
+        setLoading(true);
+        try {
+            const jsPDF = (await import('jspdf')).default;
+            const autoTable = (await import('jspdf-autotable')).default;
+
+            const doc = new jsPDF();
+
+            // Add title
+            doc.setFontSize(16);
+            doc.text("Nuclei Findings Report", 14, 15);
+            doc.setFontSize(10);
+            doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 22);
+
+            const tableColumn = ["ID", "Name", "Severity", "URL", "Time", "Status"];
+            const tableRows: any[] = [];
+
+            filteredFindings.forEach(f => {
+                const findingData = [
+                    f["template-id"],
+                    f.info.name,
+                    f.info.severity,
+                    f["matched-at"] || f.host,
+                    f.timestamp,
+                    f._status || "New"
+                ];
+                tableRows.push(findingData);
+            });
+
+            autoTable(doc, {
+                head: [tableColumn],
+                body: tableRows,
+                startY: 30,
+                styles: { fontSize: 8 },
+                headStyles: { fillColor: [22, 163, 74] }, // Emerald-600
+                didParseCell: (data) => {
+                    if (data.section === 'body' && data.column.index === 2) {
+                        const severity = data.cell.raw?.toString().toLowerCase();
+                        if (severity === 'critical') {
+                            data.cell.styles.textColor = [220, 38, 38]; // Red
+                            data.cell.styles.fontStyle = 'bold';
+                        } else if (severity === 'high') {
+                            data.cell.styles.textColor = [234, 88, 12]; // Orange
+                            data.cell.styles.fontStyle = 'bold';
+                        } else if (severity === 'medium') {
+                            data.cell.styles.textColor = [234, 179, 8]; // Yellow
+                        } else if (severity === 'low') {
+                            data.cell.styles.textColor = [37, 99, 235]; // Blue
+                        }
+                    }
+                }
+            });
+
+            doc.save(`findings_export_${Date.now()}.pdf`);
+        } catch (error) {
+            console.error(error);
+            alert("Failed to export PDF");
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <div className="space-y-4 bg-card p-4 rounded-xl border border-border shadow-sm">
             <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-foreground">Vulnerability Feed</h3>
                 <div className="flex gap-2">
+                    {aiEnabled && (
+                        <Button
+                            variant="default"
+                            size="sm"
+                            onClick={summarizeFindings}
+                            disabled={summaryLoading}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-500/50"
+                        >
+                            <Sparkles className={`mr-2 h-4 w-4 ${summaryLoading ? 'animate-spin' : ''}`} />
+                            {summaryLoading ? "Thinking..." : "Summarize"}
+                        </Button>
+                    )}
                     {/* Severity Filter */}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -412,8 +544,12 @@ export function FindingsTable() {
                         <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                     </Button>
 
+                    <Button variant="outline" size="sm" onClick={exportToPDF} title="Export current view to PDF">
+                        <Download className="mr-2 h-4 w-4" /> PDF
+                    </Button>
+
                     <Button variant="outline" size="sm" onClick={exportData} title="Export current view to Excel">
-                        <Download className="mr-2 h-4 w-4" /> Export XLS
+                        <Download className="mr-2 h-4 w-4" /> XLS
                     </Button>
                 </div>
             </div>
@@ -523,6 +659,25 @@ export function FindingsTable() {
                             </ScrollArea>
                         </TabsContent>
                     </Tabs>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={!!summary} onOpenChange={(open) => !open && setSummary(null)}>
+                <DialogContent className="max-w-2xl bg-card border-border text-foreground max-h-[80vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-indigo-400">
+                            <Sparkles className="w-5 h-5" />
+                            AI Security Summary
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="mt-4 prose prose-invert prose-sm max-w-none">
+                        {/* Simple markdown rendering */}
+                        {summary?.split('\n').map((line, i) => (
+                            <p key={i} className={line.startsWith('#') ? "font-bold text-lg mt-4 mb-2 text-black" : "mb-2 text-zinc-900 font-medium"}>
+                                {line.replace(/^#+\s/, '').replace(/\*\*/g, '')}
+                            </p>
+                        ))}
+                    </div>
                 </DialogContent>
             </Dialog>
 

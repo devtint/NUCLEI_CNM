@@ -104,7 +104,7 @@ export function FindingsTable() {
     const [findings, setFindings] = useState<Finding[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null);
-    const [severityFilters, setSeverityFilters] = useState<string[]>([]);
+    const [severityFilters, setSeverityFilters] = useState<string[]>(["critical", "high", "medium", "low", "unknown"]);
     const [statusFilters, setStatusFilters] = useState<string[]>([]);
     const [hostFilters, setHostFilters] = useState<string[]>([]);
 

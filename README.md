@@ -16,62 +16,33 @@
 
 ---
 
-## ✨ Features
+## ✨ Key Features
 
-<table>
-<tr>
-<td width="50%">
+### 🚀 Core Scanning
+- **One-Click Presets**: 7 pre-configured scan modes (Critical, Full, Tech Detect, etc).
+- **Native Engine**: Wraps the official Nuclei binary for maximum performance and compatibility.
+- **Custom Templates**: Full support for running your own YAML-based Nuclei templates.
 
-### 🎯 **One-Click Presets**
-7 pre-configured scans including Full Scan with no filters
+### 📊 Data & Analysis
+- **Real-Time Analytics**: "Total Scans" and findings counts update instantly without refresh.
+- **Smart Deduplication**: Intelligent hash-based system prevents duplicate findings across scans.
+- **Deep Inspection**: View raw HTTP Request/Response data for every finding.
+- **Advanced Filtering**: Filter by Status (New, Fixed, etc.) and search specifically by Host.
+- **Excel Export**: Professional `.xlsx` export with severity color coding.
 
-### 🔴 **Real-Time Monitoring**
-Database-backed activity monitor with scan history
+### 🛡️ System & Security
+- **Secure Authentication**: Built-in Admin login (NextAuth.js) with secure password protection.
+- **System Health**: Live status checks for Nuclei and Subfinder binaries.
+- **High Contrast UI**: Optimized "Black" mode for maximum readability in SOC environments.
 
-### 📊 **Vulnerability Feed**
-Multi-select severity filtering and status management
+### 🌐 Subdomain Discovery
+*(Powered by Subfinder)*
+- **Integrated Workflow**: seamless pivot from discovery to vulnerability scanning.
+- **Results Feed**: Searchable history of all discovered subdomains.
 
-</td>
-<td width="50%">
 
-### 📝 **Custom Templates**
-Create and manage your own Nuclei templates
 
-### 💾 **Database Storage**
-SQLite database with intelligent deduplication
 
-### 🔄 **Smart Deduplication**
-Hash-based system prevents duplicate findings
-
-### ⚙️ **Performance Tuning**
-Configure rate limiting and concurrency settings
-
-</td>
-</tr>
-</table>
-
-### 🎯 Key Features
-
-- **Real-Time Analytics**: Dashboard statistics now update instantly when scans are launched, providing immediate feedback on system activity.
-- **Finding Deduplication**: Intelligent hash-based system prevents duplicate findings across scans
-- **Advanced Filtering**: Filter by **Status** (New, Confirmed, etc.) and specific **Host** with search support
-- **Deep-Dive Inspection**: View raw **HTTP Request** and **Response** data for every finding
-- **Professional Export**: Export findings to **.xlsx** with severity-based color coding
-- **Status Management**: Track findings as New, Confirmed, False Positive, Fixed, Closed, or Regression  
-- **Regression Detection**: Automatically detects when fixed vulnerabilities reappear
-- **High Contrast UI**: Optimized visual design for maximum readability
-- **Historical Tracking**: First seen / last seen timestamps for all findings
-
-### 🌐 **Subdomain Discovery** (*Powered by Subfinder*)
-- **Integrated Workflow**: Discover subdomains and instantly pivot to vulnerability scanning
-- **One-Click Presets**: Standard, Recursive, All Sources, and Deep & Active scan modes
-- **Results Feed**: Searchable history of all discovered subdomains with "Scan" actions
-- **Activity Monitor**: Real-time log monitoring for long-running discovery jobs
-
-### 🛡️ **System Health**
-- **Live Status Checks**: Real-time installation and path verification for Nuclei and Subfinder
-- **Visual Feedback**: Instant green/red status indicators with version details on hover
-- **Diagnostic Tooltips**: Clear troubleshooting messages for missing or broken tools
 
 ---
 
@@ -100,6 +71,18 @@ npm install
 
 # Start development server
 npm run dev
+```
+
+### 🔐 Configuration (Secure Login)
+
+Create a `.env.local` file in the `dashboard` directory:
+
+```env
+# Random 32-character string for cookie encryption
+AUTH_SECRET="your-super-secret-key-at-least-32-chars"
+
+# The password to login to the dashboard
+ADMIN_PASSWORD="your-secure-password"
 ```
 
 🌐 Open **http://localhost:3000** in your browser

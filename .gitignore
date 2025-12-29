@@ -61,6 +61,11 @@ Refrencce and Usage And Guide/*.mhtml
 tags_output.txt
 tags_list.txt
 
+# Database
+*.db
+*.db-shm
+*.db-wal
+
 # User-specific Nuclei paths (will vary per machine)
 # Note: The application dynamically resolves these at runtime
 # C:\Users\<username>\AppData\Roaming\nuclei

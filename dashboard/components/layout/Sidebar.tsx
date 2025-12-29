@@ -14,6 +14,9 @@ import {
     Network
 } from "lucide-react";
 
+import { handleSignOut } from "@/app/lib/actions";
+import { LogOut } from "lucide-react";
+
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
     activeView: string;
     onChangeView: (view: string) => void;
@@ -56,8 +59,18 @@ export function Sidebar({ className, activeView, onChangeView }: SidebarProps) {
                     </div>
                 </div>
 
-                {/* Star the Repo Button */}
-                <div className="absolute bottom-4 left-4 right-4">
+                {/* Bottom Actions Container */}
+                <div className="absolute bottom-4 left-4 right-4 space-y-2">
+                    <form action={handleSignOut}>
+                        <Button
+                            variant="ghost"
+                            className="w-full justify-start text-red-400 hover:text-red-300 hover:bg-red-900/10 group"
+                        >
+                            <LogOut className="mr-2 h-4 w-4 group-hover:scale-110 transition-transform" />
+                            Log Out
+                        </Button>
+                    </form>
+
                     <a
                         href="https://github.com/devtint/NUCLEI_CNM"
                         target="_blank"

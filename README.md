@@ -1,149 +1,159 @@
 <div align="center">
 
-# 🛡️ Nuclei Command Center
+# 🛡️ Nuclei Command Center (CNM)
+### The Ultimate Self-Hosted Vulnerability Management Platform
 
-### The Modern, Smart Interface for Nuclei Vulnerability Scanner
-
-[![License](https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge)](LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-emerald.svg?style=for-the-badge)](LICENSE)
 [![Next.js](https://img.shields.io/badge/Next.js-15-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react)](https://reactjs.org/)
-[![Gemini AI](https://img.shields.io/badge/Gemini-AI-8E75B2?style=for-the-badge&logo=google)](https://deepmind.google/technologies/gemini/)
+[![Gemini AI](https://img.shields.io/badge/Gemini-1.5_Flash-8E75B2?style=for-the-badge&logo=google)](https://deepmind.google/technologies/gemini/)
 
-[Features](#-features) • [Smart Rescan](#-smart-rescan) • [Installation](#-installation) • [Configuration](#-configuration)
+**Turn your Nuclei & Subfinder CLI tools into a sophisticated Security Operations Center.**
+
+[Features](#-features) • [Smart Workflow](#-smart-workflow) • [Installation](#-installation) • [Configuration](#-configuration)
 
 </div>
 
 ---
 
-## ✨ Features
+## 🚀 Overview
 
-### 🧠 Smart & AI-Powered
-- **AI Executive Summaries**: One-click generation of professional executive summaries for your findings using **Google Gemini AI**.
-- **Smart Rescan**: 
-    - **Auto-Fix Detection**: Automatically marks findings as "Fixed" if a rescan returns clean.
-    - **Regression Handling**: Automatically re-opens "Fixed" findings to "Confirmed" if the vulnerability reappears.
-- **Intelligent Deduplication**: Hash-based system prevents duplicate findings across multiple scans.
+**Nuclei Command Center** isn't just a UI wrapper; it's an intelligent layer on top of ProjectDiscovery's most powerful tools. It solves the chaos of managing thousands of CLI outputs by providing a unified, persistent database and a smart triage workflow.
 
-### 🚀 High-Performance Scanning
-- **One-Click Presets**: Pre-configured modes for common workflows (Critical Only, Full Scan, Tech Detect, etc).
-- **Native Engine**: Wraps the official Nuclei binary for maximum speed and compatibility.
-- **Real-Time Analytics**: Live finding counts and status updates without page refreshes.
+Whether you are a **Bug Bounty Hunter**, **Pentester**, or **SOC Analyst**, this dashboard organizes your chaos into actionable insights.
 
-### 📊 Professional Reporting
-- **Instant PDF Export**: Generate client-ready PDF reports with severity color coding.
-- **Excel Export**: Detailed `.xlsx` exports for data analysis.
-- **Advanced Filtering**: Filter by Status, Severity, or search specifically by Host.
+---
 
-### 🛡️ Secure & Enterprise Ready
-- **Secure Authentication**: Built-in Admin login loop protected by NextAuth.js.
-- **Environment Isolation**: Activity logs are kept clean by isolating single-target rescans from the main history.
-- **High Contrast UI**: Optimized "Black" mode for readability in SOC environments.
+## ✨ Features In-Depth
+
+### 🧠 1. Smart Vulnerability Management
+Stop drowning in duplicate CSVs. We treat findings as *living objects*.
+*   **Live Ingestion**: Vulnerabilities appear in the dashboard the second they are found.
+*   **Intelligent Deduplication**: Uses deterministic hashing (Template ID + Host + Matcher) to ensure unique findings.
+*   **Lifecycle Tracking**:
+    *   🔵 **New**: Freshly discovered.
+    *   🟢 **Fixed**: Automatically detected when a rescan finds the issue is gone.
+    *   🔴 **Regression**: Automatically flagged if a "Fixed" issue reappears.
+    *   ⚪ **Closed/False Positive**: Manually mark findings to hide them from reports.
+
+### 🌐 2. Asset Inventory & Monitoring (Subfinder)
+Know your attack surface.
+*   **Continuous Inventory**: Keeps a persistent database of every target you've ever scanned.
+*   **"New Discoveries" Feed**: Automatically diffs scan results against history.
+    *   *Example*: Scanning `Uber.com` today vs yesterday? It will **only** show you the 5 new subdomains found today.
+*   **One-Click pivot**: Click any asset in your inventory to instantly launch a Nuclei scan against it.
+
+### 🤖 3. AI-Powered Triage (Gemini)
+Don't just find bugs; understand them.
+*   **Executive Summaries**: One-click generation of professional risk assessments for any finding.
+*   **Context Aware**: AI analyzes the specific request/response and template description to explain *why* it matters.
+*   **Remediation Advice**: Get instant, actionable fix context without leaving the dashboard.
+
+### 📊 4. Professional Reporting
+Deliver value instantly.
+*   **Instant PDF Reports**: Client-ready reports with:
+    *   Executive Summary & Scorecard.
+    *   Severity Distribution Charts.
+    *   Color-coded finding details.
+*   **Excel (.xlsx) Export**: Fully colorized spreadsheets for audit logs or data analysis.
+*   **Search & Filter**: Powerful boolean filtering by Host, Severity, Status, or Template Name.
+
+### 🛡️ 5. Enterprise-Grade Security
+Built to be safe.
+*   **Secure Authentication**: NextAuth.js protection loop (Username/Password).
+*   **Environment Isolation**: Development logs distinct from production findings.
+*   **Dark Mode UI**: "Black & Emerald" theme optimized for low-light SOC environments.
+
+---
+
+## 🔄 Smart Workflows
+
+### The "Fix & Verify" Loop
+1.  **Detect**: Run a **Full Scan** preset on `example.com`.
+2.  **Triage**: Finding marked as `Critical` (SQL Injection). AI Summary generated.
+3.  **Remediate**: Developer patches the code.
+4.  **Verify**: Click **"Rescan"** on the specific finding.
+    *   *Scenario A*: Vulnerability is gone ➡️ Status updates to **Fixed**.
+    *   *Scenario B*: Vulnerability persists ➡️ Status remains **Confirmed** (Timestamp updated).
+
+### The "Continuous Monitoring" Loop
+1.  **Monitor**: Run **Subfinder** on `target.com`.
+2.  **Diff**: Dashboard highlights **3 New Subdomains** in the "New Discoveries" feed.
+3.  **Scan**: Click the 🎯 **Scan** button on the new assets to run Nuclei.
+4.  **Alert**: If vulnerabilities are found, they populate the main feed.
+
+---
+
+## 🛠️ Technology Stack
+
+This project is built on the bleeding edge of modern web development:
+
+| Layer | Tech | Why? |
+|-------|------|------|
+| **Core** | **Next.js 15 (App Router)** | Server-side stability & speed. |
+| **Engine** | **React 19** | Latest hooks and state management. |
+| **Database** | **SQLite (better-sqlite3)** | Local, fast, zero-config persistence. WAL mode enabled. |
+| **UI** | **Tailwind CSS + Shadcn** | Beautiful, accessible, responsive components. |
+| **Scanners** | **Nuclei & Subfinder** | Native binary wrappers for raw performance. |
+| **Log/Stream** | **Node.js Streams** | Handles large outputs without memory leaks. |
 
 ---
 
 ## 🚀 Installation
 
 ### Prerequisites
-- **Node.js** v18+
-- **Nuclei** v3.6.0+ (Must be in system PATH)
-- **Subfinder** v2.6.0+ (Must be in system PATH)
+1.  **Node.js** v18+ 
+2.  **Nuclei** & **Subfinder** installed and added to system PATH.
 
 ### Quick Start
 
 ```bash
-# 1. Clone the repository
+# 1. Clone the repo
 git clone https://github.com/devtint/NUCLEI_CNM.git
-
-# 2. Navigate to dashboard
 cd NUCLEI_CNM/dashboard
 
-# 3. Install dependencies
+# 2. Install dependencies (Approx. 30s)
 npm install
 
-# 4. Start development server
+# 3. Setup Environment
+cp .env.example .env.local
+# (Edit .env.local with your passwords/API keys)
+
+# 4. Ignite 🚀
 npm run dev
 ```
+
+Visit `http://localhost:3000` to access your command center.
 
 ---
 
 ## 🔐 Configuration
 
-Create a `.env.local` file in the `dashboard` directory to secure your instance and enable AI features.
+**File**: `dashboard/.env.local`
 
-```env
-# 1. Security (Required)
-# Random 32-character string for cookie encryption
-AUTH_SECRET="your-super-secret-key-at-least-32-chars"
-ADMIN_PASSWORD="your-secure-password"
-
-# 2. AI Features (Optional)
-# Get your key from https://aistudio.google.com/
-GEMINI_API_KEY="your-gemini-api-key"
-```
-
-> **Note**: If `GEMINI_API_KEY` is missing, the "Summarize" button will simply be hidden.
+| Variable | Description |
+|----------|-------------|
+| `AUTH_SECRET` | 32-char random string for session encryption. |
+| `ADMIN_PASSWORD` | The password to access the dashboard. |
+| `GEMINI_API_KEY` | (Optional) Google Gemini API Key for AI features. |
 
 ---
 
-## 🔄 Smart Rescan Workflow
+## 🤝 Contributing
 
-The dashboard features an intelligent rescan system designed to save time:
-
-1.  **Click "Rescan"** on any finding in the Vulnerability Feed.
-2.  **The System verifies the finding** against the target using the specific template.
-3.  **Auto-Action**:
-    *   **✅ Fixed**: If the vulnerability is gone, the status updates to **Fixed**.
-    *   **⚠️ Regression**: If it was previously fixed but returned, the status updates to **Confirmed**.
-    *   **ℹ️ Updated**: If details changed (e.g., different response size), the finding is updated.
-
----
-
-## 📖 Scanning Presets
-
-| Preset | Command Flags | Best For |
-|--------|---------------|----------|
-| **Full Scan** | `none` | Comprehensive security assessment. |
-| **Critical Only** | `-s critical` | Quick triage of most dangerous issues. |
-| **Tech Detect** | `-tags tech` | Identifying stack technologies (fingerprinting). |
-| **CVEs (2023-24)** | `-tags cve2023,cve2024` | Checking for recent critical vulnerabilities. |
-| **Misconfig** | `-tags misconfig` | Finding security header/server issues. |
-| **Exposed Panels** | `-tags panel` | Locating admin interfaces and login pages. |
-
----
-
-## 🛠️ Tech Stack
-
-<div align="center">
-
-| Component | Technology |
-|-----------|------------|
-| **Framework** | Next.js 15 (App Router) |
-| **UI Library** | React 19 + Tailwind CSS |
-| **Components** | shadcn/ui + Lucide Icons |
-| **Notifications** | Sonner (Toast) |
-| **Database** | SQLite (better-sqlite3) |
-| **Auth** | NextAuth.js v5 |
-| **AI Model** | Google Gemini 1.5 Flash |
-
-</div>
-
----
-
-## 📢 Contributing
-
-Contributions are welcome!
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+We love builders! If you have a feature idea:
+1.  Fork the repo.
+2.  Create a feature branch (`git checkout -b feature/EpicMod`).
+3.  Commit your changes.
+4.  Push to the branch.
+5.  Open a Pull Request.
 
 ---
 
 ## 📜 License
 
-Distributed under the MIT License. See `LICENSE` for more information.
+Distributed under the **MIT License**. Free for everyone.
 
 <div align="center">
-Built with ❤️ for the security community
+<i>"Information is power. But like all power, there are those who want to keep it for themselves."</i>
 </div>

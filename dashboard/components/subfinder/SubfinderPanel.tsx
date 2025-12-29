@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SubdomainTable } from "@/components/subfinder/SubdomainTable";
+import { ResultsFeed } from "@/components/subfinder/ResultsFeed";
 
 // We need to define or import SubfinderScan type
 interface SubfinderScan {
@@ -365,7 +366,7 @@ export function SubfinderPanel({ onScanTarget }: SubfinderPanelProps) {
                         <CardHeader className="pb-3 border-b border-border/50">
                             <CardTitle className="flex items-center gap-2 text-lg">
                                 <List className="h-5 w-5 text-emerald-500" />
-                                Latest Discoveries
+                                New Discoveries (latest 50)
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="p-0 flex-1 overflow-hidden">
@@ -374,8 +375,8 @@ export function SubfinderPanel({ onScanTarget }: SubfinderPanelProps) {
                                     {recentResults.length === 0 ? (
                                         <div className="text-center text-muted-foreground py-12 flex flex-col items-center justify-center h-full">
                                             <Activity className="h-12 w-12 mb-3 opacity-20" />
-                                            <p>No recent discoveries.</p>
-                                            <p className="text-sm opacity-50 mt-1">Start a scan to find subdomains.</p>
+                                            <p>No new subdomains found recently.</p>
+                                            <p className="text-sm opacity-50 mt-1">Start a scan to find new assets.</p>
                                         </div>
                                     ) : (
                                         <div className="divide-y divide-border/50">
@@ -404,7 +405,7 @@ export function SubfinderPanel({ onScanTarget }: SubfinderPanelProps) {
                                                         </span>
                                                     </div>
                                                     <span className="text-xs text-muted-foreground tabular-nums opacity-60 group-hover:opacity-100 transition-opacity">
-                                                        {new Date(r.last_seen || Date.now()).toLocaleDateString()}
+                                                        {new Date((Number(r.last_seen) || 0) * 1000).toLocaleDateString()}
                                                     </span>
                                                 </div>
                                             ))}
@@ -504,7 +505,10 @@ export function SubfinderPanel({ onScanTarget }: SubfinderPanelProps) {
                 </TabsContent>
 
                 <TabsContent value="results" className="flex-1 min-h-0 m-0">
-                    <SubdomainTable scanId={selectedScanId} onScan={onScanTarget} />
+                    <ResultsFeed
+                        initialTarget={history.find(s => s.id === selectedScanId)?.target}
+                        onScanTarget={onScanTarget}
+                    />
                 </TabsContent>
             </Tabs>
         </div>

@@ -103,27 +103,36 @@ export async function POST(req: NextRequest) {
                     end_time: Date.now()
                 });
             } else {
-                // Parse JSONL results
-                const subdomains: string[] = [];
-                const lines = jsonOutput.split("\n");
-                for (const line of lines) {
-                    if (!line.trim()) continue;
-                    try {
-                        const parsed = JSON.parse(line);
-                        if (parsed.host) {
-                            subdomains.push(parsed.host);
+                try {
+                    // Parse JSONL results
+                    const subdomains: string[] = [];
+                    const lines = jsonOutput.split("\n");
+                    for (const line of lines) {
+                        if (!line.trim()) continue;
+                        try {
+                            const parsed = JSON.parse(line);
+                            if (parsed.host) {
+                                subdomains.push(parsed.host);
+                            }
+                        } catch (e) {
+                            // ignore invalid json lines
                         }
-                    } catch (e) {
-                        // ignore invalid json lines
                     }
-                }
 
-                saveSubfinderResults(scanId, subdomains);
-                updateSubfinderScan(scanId, {
-                    status: 'completed',
-                    end_time: Date.now(),
-                    count: subdomains.length
-                });
+                    console.log(`[API] Parsed ${subdomains.length} subdomains:`, subdomains);
+                    saveSubfinderResults(scanId, domain, subdomains);
+                    updateSubfinderScan(scanId, {
+                        status: 'completed',
+                        end_time: Date.now(),
+                        count: subdomains.length
+                    });
+                } catch (error: any) {
+                    console.error("Error processing scan results:", error);
+                    updateSubfinderScan(scanId, {
+                        status: 'failed',
+                        end_time: Date.now()
+                    });
+                }
             }
         });
 
@@ -192,7 +201,7 @@ export async function GET(req: NextRequest) {
     const recent = searchParams.get("recent");
 
     if (recent) {
-        const results = getRecentSubdomains(100);
+        const results = getRecentSubdomains(50);
         return NextResponse.json(results);
     }
 

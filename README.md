@@ -10,7 +10,7 @@
 [![Next.js](https://img.shields.io/badge/Next.js-15-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react)](https://reactjs.org/)
 
-[Features](#-features) • [Quick Start](#-quick-start) • [Documentation](#-documentation) • [Screenshots](#-screenshots)
+[Features](#-features) • [Quick Start](#-quick-start) • [Documentation](#-documentation)
 
 </div>
 
@@ -52,6 +52,7 @@ Configure rate limiting and concurrency settings
 
 ### 🎯 Key Features
 
+- **Real-Time Analytics**: Dashboard statistics now update instantly when scans are launched, providing immediate feedback on system activity.
 - **Finding Deduplication**: Intelligent hash-based system prevents duplicate findings across scans
 - **Advanced Filtering**: Filter by **Status** (New, Confirmed, etc.) and specific **Host** with search support
 - **Deep-Dive Inspection**: View raw **HTTP Request** and **Response** data for every finding
@@ -82,6 +83,7 @@ Configure rate limiting and concurrency settings
 # Required
 Node.js v18+
 Nuclei v3.6.0+ (installed and in PATH)
+Subfinder v2.6.0+ (installed and in PATH)
 ```
 
 ### Installation
@@ -120,7 +122,7 @@ npm run dev
 | Preset | Flags | Description |
 |--------|-------|-------------|
 | ⚡ **Full Scan** | `none` | All templates - comprehensive scan |
-| 🔴 **Full Scan (Critical)** | `-s critical` | Critical severity vulnerabilities only |
+| 🔴 **Critical Only** | `-s critical` | Critical severity vulnerabilities only |
 | 🟠 **Full Scan (High/Crit)** | `-s critical,high` | High and critical vulnerabilities |
 | 🔍 **Tech Detect** | `-tags tech` | Technology detection and fingerprinting |
 | 🆕 **CVEs (2023-2024)** | `-tags cve2023,cve2024` | Recent CVE vulnerabilities |
@@ -160,8 +162,8 @@ NCNC/
 │   │   ├── page.tsx                 # Main dashboard
 │   │   └── globals.css              # Global styles
 │   ├── 📂 components/               # React Components
-│   │   ├── dashboard/               # Dashboard views
-│   │   ├── findings/                # Vulnerability feed
+│   │   ├── dashboard/               # Dashboard views (Stats, SystemStatus, etc.)
+│   │   ├── findings/                # Vulnerability feed (Table, HostFilter)
 │   │   ├── scan/                    # Scan management
 │   │   ├── templates/               # Template management
 │   │   └── ui/                      # shadcn/ui components

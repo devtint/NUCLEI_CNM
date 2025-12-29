@@ -14,6 +14,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -32,13 +33,80 @@ interface Finding {
     _sourceFile?: string; // For deletion
     _status?: string; // Status from database
     _dbId?: number; // Database ID
+    request?: string;
+    response?: string;
 }
+
+interface HostFilterProps {
+    hosts: string[];
+    selectedHosts: string[];
+    onToggle: (host: string) => void;
+    onClear: () => void;
+}
+
+const HostFilter = ({ hosts, selectedHosts, onToggle, onClear }: HostFilterProps) => {
+    const [search, setSearch] = useState("");
+
+    const filteredHosts = hosts.filter(host =>
+        host.toLowerCase().includes(search.toLowerCase())
+    );
+
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                    <Filter className="mr-2 h-4 w-4" />
+                    {selectedHosts.length === 0 ? "Host" : `${selectedHosts.length} selected`}
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="bg-black/90 border-white/10 text-zinc-300 max-h-[300px] overflow-y-auto w-[250px]">
+                <DropdownMenuLabel>Filter by Host</DropdownMenuLabel>
+
+                <div className="px-2 py-1 sticky top-0 bg-black/90 z-10" onKeyDown={(e) => e.stopPropagation()}>
+                    <input
+                        type="text"
+                        placeholder="Search hosts..."
+                        className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-slate-500"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        // Prevent dropdown from closing when clicking input
+                        onClick={(e) => e.stopPropagation()}
+                    />
+                </div>
+
+                <DropdownMenuSeparator className="bg-white/10" />
+
+                <DropdownMenuItem onClick={onClear}>
+                    <span className={selectedHosts.length === 0 ? "font-bold" : ""}>All Hosts</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-white/10" />
+
+                {filteredHosts.map((host) => (
+                    <DropdownMenuItem key={host} onClick={(e) => { e.preventDefault(); onToggle(host); }}>
+                        <input
+                            type="checkbox"
+                            checked={selectedHosts.includes(host)}
+                            onChange={() => { }}
+                            className="mr-2"
+                        />
+                        <span className="truncate max-w-[200px]" title={host}>{host}</span>
+                    </DropdownMenuItem>
+                ))}
+                {filteredHosts.length === 0 && (
+                    <div className="p-2 text-xs text-muted-foreground text-center">No matching hosts</div>
+                )}
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+};
 
 export function FindingsTable() {
     const [findings, setFindings] = useState<Finding[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null);
     const [severityFilters, setSeverityFilters] = useState<string[]>([]);
+    const [statusFilters, setStatusFilters] = useState<string[]>([]);
+    const [hostFilters, setHostFilters] = useState<string[]>([]);
 
     const fetchFindings = async () => {
         setLoading(true);
@@ -64,30 +132,89 @@ export function FindingsTable() {
         }
     };
 
-    const exportData = (filterSeverity?: string) => {
-        const filtered = filterSeverity
-            ? findings.filter(f => f.info.severity.toLowerCase() === filterSeverity.toLowerCase())
-            : findings;
+    const exportData = async () => {
+        setLoading(true);
+        try {
+            // Dynamically import exceljs to avoid server-side issues
+            const ExcelJS = (await import('exceljs')).default;
+            const workbook = new ExcelJS.Workbook();
+            const worksheet = workbook.addWorksheet('Findings');
 
-        const headers = ["ID", "Name", "Severity", "URL", "Time"];
-        const rows = filtered.map(f => [
-            f["template-id"],
-            f.info.name,
-            f.info.severity,
-            f["matched-at"] || f.host,
-            f.timestamp
-        ]);
-        const csv = [
-            headers.join(","),
-            ...rows.map(r => r.map(c => `"${c}"`).join(","))
-        ].join("\n");
+            // Define columns
+            worksheet.columns = [
+                { header: 'ID', key: 'id', width: 25 },
+                { header: 'Name', key: 'name', width: 40 },
+                { header: 'Severity', key: 'severity', width: 15 },
+                { header: 'URL', key: 'url', width: 40 },
+                { header: 'Time', key: 'time', width: 25 },
+                { header: 'Status', key: 'status', width: 20 }
+            ];
 
-        const blob = new Blob([csv], { type: "text/csv" });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `findings_${filterSeverity || 'all'}_${Date.now()}.csv`;
-        a.click();
+            // Define colors (ARGB format)
+            const severityColors: Record<string, string> = {
+                critical: 'FFFFCCCC', // Light Red
+                high: 'FFFFE5CC',     // Light Orange
+                medium: 'FFFFFFCC',   // Light Yellow
+                low: 'FFE5F2FF',      // Light Blue
+                info: 'FFFFFFFF',     // White
+                unknown: 'FFF2F2F2'   // Light Gray
+            };
+
+            // Add rows and style them
+            filteredFindings.forEach(f => {
+                const sev = f.info.severity.toLowerCase();
+                const color = severityColors[sev] || severityColors.unknown;
+
+                const row = worksheet.addRow({
+                    id: f["template-id"],
+                    name: f.info.name,
+                    severity: f.info.severity,
+                    url: f["matched-at"] || f.host,
+                    time: f.timestamp,
+                    status: f._status || "New"
+                });
+
+                // Apply fill to each cell in the row
+                row.eachCell((cell) => {
+                    cell.fill = {
+                        type: 'pattern',
+                        pattern: 'solid',
+                        fgColor: { argb: color }
+                    };
+                    cell.border = {
+                        top: { style: 'thin', color: { argb: 'FFDDDDDD' } },
+                        left: { style: 'thin', color: { argb: 'FFDDDDDD' } },
+                        bottom: { style: 'thin', color: { argb: 'FFDDDDDD' } },
+                        right: { style: 'thin', color: { argb: 'FFDDDDDD' } }
+                    };
+                });
+            });
+
+            // Style header row
+            worksheet.getRow(1).eachCell((cell) => {
+                cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+                cell.fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: 'FF333333' }
+                };
+            });
+
+            // Generate buffer
+            const buffer = await workbook.xlsx.writeBuffer();
+            const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `findings_export_${Date.now()}.xlsx`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Export failed:', error);
+            alert('Failed to export Excel file');
+        } finally {
+            setLoading(false);
+        }
     };
 
     const rescan = async (f: Finding) => {
@@ -171,6 +298,9 @@ export function FindingsTable() {
         }
     };
 
+    // Get unique hosts
+    const uniqueHosts = Array.from(new Set(findings.map(f => f.host || f["matched-at"] || "Unknown").filter(Boolean))).sort();
+
     // Toggle severity filter
     const toggleSeverityFilter = (severity: string) => {
         setSeverityFilters(prev =>
@@ -180,21 +310,44 @@ export function FindingsTable() {
         );
     };
 
-    // Filter findings by severity
-    const filteredFindings = severityFilters.length === 0
-        ? findings
-        : findings.filter(f => severityFilters.includes(f.info.severity.toLowerCase()));
+    // Toggle status filter
+    const toggleStatusFilter = (status: string) => {
+        setStatusFilters(prev =>
+            prev.includes(status)
+                ? prev.filter(s => s !== status)
+                : [...prev, status]
+        );
+    };
+
+    // Toggle host filter
+    const toggleHostFilter = (host: string) => {
+        setHostFilters(prev =>
+            prev.includes(host)
+                ? prev.filter(h => h !== host)
+                : [...prev, host]
+        );
+    };
+
+    // Filter findings by severity, status, and host
+    const filteredFindings = findings.filter(f => {
+        const matchesSeverity = severityFilters.length === 0 || severityFilters.includes(f.info.severity.toLowerCase());
+        const matchesStatus = statusFilters.length === 0 || statusFilters.includes(f._status || "New");
+        const host = f.host || f["matched-at"] || "Unknown";
+        const matchesHost = hostFilters.length === 0 || hostFilters.includes(host);
+        return matchesSeverity && matchesStatus && matchesHost;
+    });
 
     return (
         <div className="space-y-4 bg-card p-4 rounded-xl border border-border shadow-sm">
             <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-foreground">Vulnerability Feed</h3>
                 <div className="flex gap-2">
+                    {/* Severity Filter */}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="outline" size="sm">
                                 <Filter className="mr-2 h-4 w-4" />
-                                {severityFilters.length === 0 ? "All Severities" : `${severityFilters.length} selected`}
+                                {severityFilters.length === 0 ? "Severity" : `${severityFilters.length} selected`}
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="bg-black/90 border-white/10 text-zinc-300">
@@ -204,86 +357,64 @@ export function FindingsTable() {
                                 <span className={severityFilters.length === 0 ? "font-bold" : ""}>All Severities</span>
                             </DropdownMenuItem>
                             <DropdownMenuSeparator className="bg-white/10" />
-                            <DropdownMenuItem onClick={(e) => { e.preventDefault(); toggleSeverityFilter("critical"); }}>
-                                <input
-                                    type="checkbox"
-                                    checked={severityFilters.includes("critical")}
-                                    onChange={() => { }}
-                                    className="mr-2"
-                                />
-                                Critical
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={(e) => { e.preventDefault(); toggleSeverityFilter("high"); }}>
-                                <input
-                                    type="checkbox"
-                                    checked={severityFilters.includes("high")}
-                                    onChange={() => { }}
-                                    className="mr-2"
-                                />
-                                High
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={(e) => { e.preventDefault(); toggleSeverityFilter("medium"); }}>
-                                <input
-                                    type="checkbox"
-                                    checked={severityFilters.includes("medium")}
-                                    onChange={() => { }}
-                                    className="mr-2"
-                                />
-                                Medium
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={(e) => { e.preventDefault(); toggleSeverityFilter("low"); }}>
-                                <input
-                                    type="checkbox"
-                                    checked={severityFilters.includes("low")}
-                                    onChange={() => { }}
-                                    className="mr-2"
-                                />
-                                Low
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={(e) => { e.preventDefault(); toggleSeverityFilter("info"); }}>
-                                <input
-                                    type="checkbox"
-                                    checked={severityFilters.includes("info")}
-                                    onChange={() => { }}
-                                    className="mr-2"
-                                />
-                                Info
-                            </DropdownMenuItem>
+                            {["critical", "high", "medium", "low", "info"].map((sev) => (
+                                <DropdownMenuItem key={sev} onClick={(e) => { e.preventDefault(); toggleSeverityFilter(sev); }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={severityFilters.includes(sev)}
+                                        onChange={() => { }}
+                                        className="mr-2"
+                                    />
+                                    <span className="capitalize">{sev}</span>
+                                </DropdownMenuItem>
+                            ))}
                         </DropdownMenuContent>
                     </DropdownMenu>
+
+                    {/* Status Filter */}
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm">
+                                <Filter className="mr-2 h-4 w-4" />
+                                {statusFilters.length === 0 ? "Status" : `${statusFilters.length} selected`}
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="bg-black/90 border-white/10 text-zinc-300">
+                            <DropdownMenuLabel>Filter by Status</DropdownMenuLabel>
+                            <DropdownMenuSeparator className="bg-white/10" />
+                            <DropdownMenuItem onClick={() => setStatusFilters([])}>
+                                <span className={statusFilters.length === 0 ? "font-bold" : ""}>All Statuses</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator className="bg-white/10" />
+                            {["New", "Confirmed", "False Positive", "Fixed", "Closed", "Regression"].map((status) => (
+                                <DropdownMenuItem key={status} onClick={(e) => { e.preventDefault(); toggleStatusFilter(status); }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={statusFilters.includes(status)}
+                                        onChange={() => { }}
+                                        className="mr-2"
+                                    />
+                                    {status}
+                                </DropdownMenuItem>
+                            ))}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    {/* Host Filter */}
+                    <HostFilter
+                        hosts={uniqueHosts}
+                        selectedHosts={hostFilters}
+                        onToggle={toggleHostFilter}
+                        onClear={() => setHostFilters([])}
+                    />
+
                     <Button variant="outline" size="sm" onClick={fetchFindings} disabled={loading}>
                         <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                     </Button>
 
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm">
-                                <Download className="mr-2 h-4 w-4" /> Export
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="bg-black/90 border-white/10 text-zinc-300">
-                            <DropdownMenuLabel>Export Options</DropdownMenuLabel>
-                            <DropdownMenuSeparator className="bg-white/10" />
-                            <DropdownMenuItem onClick={() => exportData()}>
-                                All Findings (CSV)
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => exportData("critical")} className="text-red-400">
-                                Critical Only
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => exportData("high")} className="text-orange-400">
-                                High Only
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => exportData("medium")} className="text-yellow-400">
-                                Medium Only
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => exportData("low")} className="text-blue-400">
-                                Low Only
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => exportData("info")}>
-                                Info Only
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                    <Button variant="outline" size="sm" onClick={exportData} title="Export current view to Excel">
+                        <Download className="mr-2 h-4 w-4" /> Export XLS
+                    </Button>
                 </div>
             </div>
 
@@ -298,72 +429,100 @@ export function FindingsTable() {
                             Detection Details
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="mt-4 space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <Card className="bg-muted/50 border-border">
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Template ID</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <p className="font-mono text-sm text-foreground">{selectedFinding?.["template-id"]}</p>
-                                </CardContent>
-                            </Card>
-                            <Card className="bg-muted/50 border-border">
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Severity</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <Badge variant="outline" className={`${getSeverityColor(selectedFinding?.info.severity || "")} uppercase`}>
-                                        {selectedFinding?.info.severity}
-                                    </Badge>
-                                </CardContent>
-                            </Card>
-                            <Card className="bg-muted/50 border-border col-span-1 md:col-span-2">
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Matched At</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <p className="font-mono text-sm text-foreground break-all">{selectedFinding?.["matched-at"] || selectedFinding?.host}</p>
-                                </CardContent>
-                            </Card>
-                            {selectedFinding?.["template-path"] && (
-                                <Card className="bg-muted/50 border-border col-span-1 md:col-span-2">
+
+                    <Tabs defaultValue="overview" className="w-full mt-4">
+                        <TabsList className="grid w-full grid-cols-4 bg-muted/50">
+                            <TabsTrigger value="overview">Overview</TabsTrigger>
+                            <TabsTrigger value="request">Request</TabsTrigger>
+                            <TabsTrigger value="response">Response</TabsTrigger>
+                            <TabsTrigger value="raw">Raw JSON</TabsTrigger>
+                        </TabsList>
+
+                        <TabsContent value="overview" className="mt-4 space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <Card className="bg-muted/50 border-border">
                                     <CardHeader className="pb-2">
-                                        <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Template Path</CardTitle>
+                                        <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Template ID</CardTitle>
                                     </CardHeader>
                                     <CardContent>
-                                        <p className="font-mono text-sm text-muted-foreground break-all">{selectedFinding?.["template-path"]}</p>
+                                        <p className="font-mono text-sm text-foreground">{selectedFinding?.["template-id"]}</p>
                                     </CardContent>
                                 </Card>
-                            )}
-                            <Card className="bg-muted/50 border-border col-span-1 md:col-span-2">
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Description</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <p className="text-sm text-muted-foreground">{selectedFinding?.info.description || "No description provided."}</p>
-                                </CardContent>
-                            </Card>
-                        </div>
+                                <Card className="bg-muted/50 border-border">
+                                    <CardHeader className="pb-2">
+                                        <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Severity</CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <Badge variant="outline" className={`${getSeverityColor(selectedFinding?.info.severity || "")} uppercase`}>
+                                            {selectedFinding?.info.severity}
+                                        </Badge>
+                                    </CardContent>
+                                </Card>
+                                <Card className="bg-muted/50 border-border col-span-1 md:col-span-2">
+                                    <CardHeader className="pb-2">
+                                        <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Matched At</CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <p className="font-mono text-sm text-foreground break-all">{selectedFinding?.["matched-at"] || selectedFinding?.host}</p>
+                                    </CardContent>
+                                </Card>
+                                {selectedFinding?.["template-path"] && (
+                                    <Card className="bg-muted/50 border-border col-span-1 md:col-span-2">
+                                        <CardHeader className="pb-2">
+                                            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Template Path</CardTitle>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <p className="font-mono text-sm text-muted-foreground break-all">{selectedFinding?.["template-path"]}</p>
+                                        </CardContent>
+                                    </Card>
+                                )}
+                                <Card className="bg-muted/50 border-border col-span-1 md:col-span-2">
+                                    <CardHeader className="pb-2">
+                                        <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Description</CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <p className="text-sm text-muted-foreground">{selectedFinding?.info.description || "No description provided."}</p>
+                                    </CardContent>
+                                </Card>
+                            </div>
 
-                        <div className="pt-4 border-t border-border mt-4 flex justify-between items-center">
-                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Full Raw Data</p>
-                            <Button
-                                variant="destructive"
-                                size="sm"
-                                onClick={() => selectedFinding && deleteFinding(selectedFinding)}
-                                className="bg-red-500/10 text-red-500 hover:bg-red-500/20 border-red-500/20"
-                            >
-                                <Trash2 className="w-4 h-4 mr-2" />
-                                Delete Finding
-                            </Button>
-                        </div>
-                        <ScrollArea className="h-[200px] w-full rounded-md border border-border bg-black/50 p-4">
-                            <pre className="text-xs font-mono text-emerald-400 whitespace-pre-wrap break-all">
-                                {JSON.stringify(selectedFinding, null, 2)}
-                            </pre>
-                        </ScrollArea>
-                    </div>
+                            <div className="pt-4 border-t border-border mt-4 flex justify-end">
+                                <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => selectedFinding && deleteFinding(selectedFinding)}
+                                    className="bg-red-500/10 text-red-500 hover:bg-red-500/20 border-red-500/20"
+                                >
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    Delete Finding
+                                </Button>
+                            </div>
+                        </TabsContent>
+
+                        <TabsContent value="request" className="mt-4">
+                            <ScrollArea className="h-[400px] w-full rounded-md border border-border bg-black/50 p-4">
+                                <pre className="text-xs font-mono text-blue-300 whitespace-pre-wrap break-all">
+                                    {selectedFinding?.request || "No request data available."}
+                                </pre>
+                            </ScrollArea>
+                        </TabsContent>
+
+                        <TabsContent value="response" className="mt-4">
+                            <ScrollArea className="h-[400px] w-full rounded-md border border-border bg-black/50 p-4">
+                                <pre className="text-xs font-mono text-orange-300 whitespace-pre-wrap break-all">
+                                    {selectedFinding?.response || "No response data available."}
+                                </pre>
+                            </ScrollArea>
+                        </TabsContent>
+
+                        <TabsContent value="raw" className="mt-4">
+                            <ScrollArea className="h-[400px] w-full rounded-md border border-border bg-black/50 p-4">
+                                <pre className="text-xs font-mono text-emerald-400 whitespace-pre-wrap break-all">
+                                    {JSON.stringify(selectedFinding, null, 2)}
+                                </pre>
+                            </ScrollArea>
+                        </TabsContent>
+                    </Tabs>
                 </DialogContent>
             </Dialog>
 
@@ -371,12 +530,12 @@ export function FindingsTable() {
                 <Table>
                     <TableHeader className="bg-white/5">
                         <TableRow className="hover:bg-transparent border-white/10">
-                            <TableHead className="text-zinc-400">Severity</TableHead>
-                            <TableHead className="text-zinc-400">Status</TableHead>
-                            <TableHead className="text-zinc-400">Vulnerability</TableHead>
-                            <TableHead className="text-zinc-400">Host</TableHead>
-                            <TableHead className="text-zinc-400">Template ID</TableHead>
-                            <TableHead className="text-zinc-400">Action</TableHead>
+                            <TableHead className="text-black font-bold">Severity</TableHead>
+                            <TableHead className="text-black font-bold">Status</TableHead>
+                            <TableHead className="text-black font-bold">Vulnerability</TableHead>
+                            <TableHead className="text-black font-bold">Host</TableHead>
+                            <TableHead className="text-black font-bold">Template ID</TableHead>
+                            <TableHead className="text-black font-bold">Action</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -422,11 +581,11 @@ export function FindingsTable() {
                                             </DropdownMenuContent>
                                         </DropdownMenu>
                                     </TableCell>
-                                    <TableCell className="font-medium text-zinc-200 group-hover:text-emerald-400 transition-colors">
+                                    <TableCell className="font-bold text-black group-hover:text-emerald-700 transition-colors">
                                         {f.info.name}
                                     </TableCell>
-                                    <TableCell className="text-zinc-400 font-mono text-xs">{f["matched-at"] || f.host}</TableCell>
-                                    <TableCell className="text-muted-foreground font-mono text-xs">{f["template-id"]}</TableCell>
+                                    <TableCell className="text-black font-mono text-xs">{f["matched-at"] || f.host}</TableCell>
+                                    <TableCell className="text-zinc-900 font-mono text-xs">{f["template-id"]}</TableCell>
                                     <TableCell>
                                         <div className="flex gap-2">
                                             <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); rescan(f); }} className="text-emerald-400 hover:text-emerald-300">

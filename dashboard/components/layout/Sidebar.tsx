@@ -45,7 +45,7 @@ export function Sidebar({ className, activeView, onChangeView }: SidebarProps) {
                                 variant={activeView === item.id ? "secondary" : "ghost"}
                                 className={cn(
                                     "w-full justify-start",
-                                    activeView === item.id ? "bg-emerald-900/20 text-emerald-600 hover:bg-emerald-900/30" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                                    activeView === item.id ? "bg-emerald-900/20 text-emerald-600 hover:bg-emerald-900/30" : "text-black hover:text-foreground hover:bg-muted"
                                 )}
                                 onClick={() => onChangeView(item.id)}
                             >

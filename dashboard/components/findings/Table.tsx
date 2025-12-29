@@ -5,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Download, RefreshCw, Filter, Trash2, Sparkles } from "lucide-react";
+import { toast } from "sonner";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -233,17 +234,28 @@ export function FindingsTable() {
 
             if (result.success) {
                 if (result.updated) {
-                    alert(`✅ Finding updated with new rescan results!`);
+                    toast.success("Vulnerability Still Active", {
+                        description: "Rescan confirmed the issue exists. Status set to 'Confirmed'.",
+                        duration: 4000,
+                    });
                 } else if (result.fixed) {
-                    alert(`✅ Rescan completed - No vulnerabilities found! The issue may be fixed.`);
+                    toast.success("Vulnerability Fixed! 🛡️", {
+                        description: "Rescan clean. Status auto-updated to 'Fixed'.",
+                        duration: 5000,
+                    });
                 }
                 fetchFindings(); // Refresh the list
             } else {
-                alert(`❌ Rescan failed: ${result.message}`);
+                toast.error("Rescan Failed", {
+                    description: result.message,
+                    duration: 5000,
+                });
             }
         } catch (e) {
             console.error(e);
-            alert("❌ Rescan failed");
+            toast.error("Rescan failed", {
+                description: "An unexpected error occurred."
+            });
         }
     };
 

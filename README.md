@@ -2,299 +2,148 @@
 
 # 🛡️ Nuclei Command Center
 
-### Modern Web Interface for Nuclei Vulnerability Scanner
+### The Modern, Smart Interface for Nuclei Vulnerability Scanner
 
-[![GitHub Stars](https://img.shields.io/github/stars/devtint/NUCLEI_CNM?style=for-the-badge&logo=github&color=yellow)](https://github.com/devtint/NUCLEI_CNM/stargazers)
-[![GitHub Forks](https://img.shields.io/github/forks/devtint/NUCLEI_CNM?style=for-the-badge&logo=github&color=blue)](https://github.com/devtint/NUCLEI_CNM/network/members)
 [![License](https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge)](LICENSE)
 [![Next.js](https://img.shields.io/badge/Next.js-15-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react)](https://reactjs.org/)
+[![Gemini AI](https://img.shields.io/badge/Gemini-AI-8E75B2?style=for-the-badge&logo=google)](https://deepmind.google/technologies/gemini/)
 
-[Features](#-features) • [Quick Start](#-quick-start) • [Documentation](#-documentation)
+[Features](#-features) • [Smart Rescan](#-smart-rescan) • [Installation](#-installation) • [Configuration](#-configuration)
 
 </div>
 
 ---
 
-## ✨ Key Features
+## ✨ Features
 
-### 🚀 Core Scanning
-- **One-Click Presets**: 7 pre-configured scan modes (Critical, Full, Tech Detect, etc).
-- **Native Engine**: Wraps the official Nuclei binary for maximum performance and compatibility.
-- **Custom Templates**: Full support for running your own YAML-based Nuclei templates.
-- **AI Analysis**: One-click Executive Summary of vulnerabilities powered by Google Gemini AI.
+### 🧠 Smart & AI-Powered
+- **AI Executive Summaries**: One-click generation of professional executive summaries for your findings using **Google Gemini AI**.
+- **Smart Rescan**: 
+    - **Auto-Fix Detection**: Automatically marks findings as "Fixed" if a rescan returns clean.
+    - **Regression Handling**: Automatically re-opens "Fixed" findings to "Confirmed" if the vulnerability reappears.
+- **Intelligent Deduplication**: Hash-based system prevents duplicate findings across multiple scans.
 
-### 📊 Data & Analysis
-- **Real-Time Analytics**: "Total Scans" and findings counts update instantly without refresh.
-- **Smart Deduplication**: Intelligent hash-based system prevents duplicate findings across scans.
-- **Deep Inspection**: View raw HTTP Request/Response data for every finding.
-- **Advanced Filtering**: Filter by Status (New, Fixed, etc.) and search specifically by Host.
-- **Professional Reports**: Export findings to **PDF** (Instant) or **Excel** (.xlsx) with severity color coding.
+### 🚀 High-Performance Scanning
+- **One-Click Presets**: Pre-configured modes for common workflows (Critical Only, Full Scan, Tech Detect, etc).
+- **Native Engine**: Wraps the official Nuclei binary for maximum speed and compatibility.
+- **Real-Time Analytics**: Live finding counts and status updates without page refreshes.
 
-### 🛡️ System & Security
-- **Secure Authentication**: Built-in Admin login (NextAuth.js) with secure password protection.
-- **System Health**: Live status checks for Nuclei and Subfinder binaries.
-- **High Contrast UI**: Optimized "Black" mode for maximum readability in SOC environments.
+### 📊 Professional Reporting
+- **Instant PDF Export**: Generate client-ready PDF reports with severity color coding.
+- **Excel Export**: Detailed `.xlsx` exports for data analysis.
+- **Advanced Filtering**: Filter by Status, Severity, or search specifically by Host.
 
-### 🌐 Subdomain Discovery
-*(Powered by Subfinder)*
-- **Integrated Workflow**: seamless pivot from discovery to vulnerability scanning.
-- **Results Feed**: Searchable history of all discovered subdomains.
-
-
-
-
+### 🛡️ Secure & Enterprise Ready
+- **Secure Authentication**: Built-in Admin login loop protected by NextAuth.js.
+- **Environment Isolation**: Activity logs are kept clean by isolating single-target rescans from the main history.
+- **High Contrast UI**: Optimized "Black" mode for readability in SOC environments.
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Installation
 
 ### Prerequisites
+- **Node.js** v18+
+- **Nuclei** v3.6.0+ (Must be in system PATH)
+- **Subfinder** v2.6.0+ (Must be in system PATH)
+
+### Quick Start
 
 ```bash
-# Required
-Node.js v18+
-Nuclei v3.6.0+ (installed and in PATH)
-Subfinder v2.6.0+ (installed and in PATH)
-```
-
-### Installation
-
-```bash
-# Clone the repository
+# 1. Clone the repository
 git clone https://github.com/devtint/NUCLEI_CNM.git
 
-# Navigate to dashboard
+# 2. Navigate to dashboard
 cd NUCLEI_CNM/dashboard
 
-# Install dependencies
+# 3. Install dependencies
 npm install
 
-# Start development server
+# 4. Start development server
 npm run dev
 ```
 
-### 🔐 Configuration (Secure Login)
+---
 
-Create a `.env.local` file in the `dashboard` directory:
+## 🔐 Configuration
+
+Create a `.env.local` file in the `dashboard` directory to secure your instance and enable AI features.
 
 ```env
+# 1. Security (Required)
 # Random 32-character string for cookie encryption
 AUTH_SECRET="your-super-secret-key-at-least-32-chars"
-
-# The password to login to the dashboard
 ADMIN_PASSWORD="your-secure-password"
 
-# [Optional] Gemini API Key for AI Summaries
+# 2. AI Features (Optional)
+# Get your key from https://aistudio.google.com/
 GEMINI_API_KEY="your-gemini-api-key"
 ```
 
-🌐 Open **http://localhost:3000** in your browser
+> **Note**: If `GEMINI_API_KEY` is missing, the "Summarize" button will simply be hidden.
 
 ---
 
-## 📖 Documentation
+## 🔄 Smart Rescan Workflow
 
-| Document | Description |
-|----------|-------------|
-| 🚀 [**Getting Started**](./Refrencce%20and%20Usage%20And%20Guide/GETTING_STARTED.md) | Installation and first scan tutorial |
-| 🏗️ [**Architecture**](./Refrencce%20and%20Usage%20And%20Guide/ARCHITECTURE.md) | System design and data flow |
-| 🔌 [**API Reference**](./Refrencce%20and%20Usage%20And%20Guide/API_REFERENCE.md) | Complete API documentation |
-| 🧩 [**Components**](./Refrencce%20and%20Usage%20And%20Guide/COMPONENTS.md) | React component documentation |
+The dashboard features an intelligent rescan system designed to save time:
 
----
-
-## 🎯 One-Click Presets
-
-| Preset | Flags | Description |
-|--------|-------|-------------|
-| ⚡ **Full Scan** | `none` | All templates - comprehensive scan |
-| 🔴 **Critical Only** | `-s critical` | Critical severity vulnerabilities only |
-| 🟠 **Full Scan (High/Crit)** | `-s critical,high` | High and critical vulnerabilities |
-| 🔍 **Tech Detect** | `-tags tech` | Technology detection and fingerprinting |
-| 🆕 **CVEs (2023-2024)** | `-tags cve2023,cve2024` | Recent CVE vulnerabilities |
-| ⚙️ **Misconfigurations** | `-tags misconfig` | Security misconfigurations |
-| 🔐 **Panels & Logins** | `-tags panel,login` | Exposed admin panels and login pages |
+1.  **Click "Rescan"** on any finding in the Vulnerability Feed.
+2.  **The System verifies the finding** against the target using the specific template.
+3.  **Auto-Action**:
+    *   **✅ Fixed**: If the vulnerability is gone, the status updates to **Fixed**.
+    *   **⚠️ Regression**: If it was previously fixed but returned, the status updates to **Confirmed**.
+    *   **ℹ️ Updated**: If details changed (e.g., different response size), the finding is updated.
 
 ---
 
-## 💻 Technology Stack
+## 📖 Scanning Presets
+
+| Preset | Command Flags | Best For |
+|--------|---------------|----------|
+| **Full Scan** | `none` | Comprehensive security assessment. |
+| **Critical Only** | `-s critical` | Quick triage of most dangerous issues. |
+| **Tech Detect** | `-tags tech` | Identifying stack technologies (fingerprinting). |
+| **CVEs (2023-24)** | `-tags cve2023,cve2024` | Checking for recent critical vulnerabilities. |
+| **Misconfig** | `-tags misconfig` | Finding security header/server issues. |
+| **Exposed Panels** | `-tags panel` | Locating admin interfaces and login pages. |
+
+---
+
+## 🛠️ Tech Stack
 
 <div align="center">
 
-| Frontend | Backend | UI/UX |
-|----------|---------|-------|
-| ![Next.js](https://img.shields.io/badge/Next.js-15-black?style=flat-square&logo=next.js) | ![Node.js](https://img.shields.io/badge/Node.js-API-339933?style=flat-square&logo=node.js) | ![Tailwind](https://img.shields.io/badge/Tailwind-CSS-38B2AC?style=flat-square&logo=tailwind-css) |
-| ![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react) | ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript) | ![shadcn/ui](https://img.shields.io/badge/shadcn/ui-Components-000000?style=flat-square) |
-
-</div>
-
-**Scanning Engine:** Native Nuclei Binary Integration
-
----
-
-## 📁 Project Structure
-
-```
-NCNC/
-├── 📂 dashboard/                    # Next.js Application
-│   ├── 📂 app/                      # App Router
-│   │   ├── 📂 api/                  # API Routes (Backend)
-│   │   │   ├── findings/            # Vulnerability findings API
-│   │   │   ├── history/             # Scan history API
-│   │   │   ├── scan/                # Scan execution API
-│   │   │   ├── stream/              # Real-time log streaming
-│   │   │   └── templates/           # Template management API
-│   │   ├── layout.tsx               # Root layout
-│   │   ├── page.tsx                 # Main dashboard
-│   │   └── globals.css              # Global styles
-│   ├── 📂 components/               # React Components
-│   │   ├── dashboard/               # Dashboard views (Stats, SystemStatus, etc.)
-│   │   ├── findings/                # Vulnerability feed (Table, HostFilter)
-│   │   ├── scan/                    # Scan management
-│   │   ├── templates/               # Template management
-│   │   └── ui/                      # shadcn/ui components
-│   ├── 📂 lib/                      # Utilities
-│   │   ├── db.ts                    # Database operations
-│   │   ├── cache.ts                 # Response caching
-│   │   ├── errors.ts                # Error handling
-│   │   └── nuclei/                  # Nuclei configuration
-│   ├── 📂 scans/                    # Scan results (gitignored)
-│   └── 📄 nuclei.db                 # SQLite database (gitignored)
-├── 📂 Refrencce and Usage And Guide/ # Documentation
-└── 📄 guide.txt                     # Original requirements
-```
-
----
-
-## ⚡ Performance Settings
-
-Configure in **Settings** panel:
-
-| Setting | Range | Default | Recommended |
-|---------|-------|---------|-------------|
-| **Rate Limit** | 50-1000 req/s | 150 | 300-500 |
-| **Concurrency** | 25-300 templates | 25 | 75-100 |
-| **Bulk Size** | 25-100 hosts | 25 | 50 |
-
-> ⚠️ **Note:** Higher values = faster scans, but may trigger WAF/rate limiting
-
----
-
-## 🔒 Security
-
-<div align="center">
-
-| ⚠️ Important Security Notes |
-|----------------------------|
-| **Local Use Only** - No authentication implemented |
-| **Scan Permissions** - Only scan targets you own or have permission to test |
-| **Rate Limiting** - High rates can be considered DoS attacks |
-| **Data Privacy** - Scan results contain sensitive information |
+| Component | Technology |
+|-----------|------------|
+| **Framework** | Next.js 15 (App Router) |
+| **UI Library** | React 19 + Tailwind CSS |
+| **Components** | shadcn/ui + Lucide Icons |
+| **Notifications** | Sonner (Toast) |
+| **Database** | SQLite (better-sqlite3) |
+| **Auth** | NextAuth.js v5 |
+| **AI Model** | Google Gemini 1.5 Flash |
 
 </div>
 
 ---
 
-## 🛠️ Development
+## 📢 Contributing
 
-### Running in Development
-```bash
-cd dashboard
-npm run dev
-```
-
-### Building for Production
-```bash
-cd dashboard
-npm run build
-npm start
-```
-
-### Linting
-```bash
-npm run lint
-```
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
+Contributions are welcome!
+1. Fork the Project
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
-
----
-
-## 🐛 Troubleshooting
-
-<details>
-<summary><b>Scan Stuck in "Running"</b></summary>
-
-Restart the dashboard server. This usually happens when the Nuclei process is waiting for input.
-</details>
-
-<details>
-<summary><b>No Findings Shown</b></summary>
-
-Check scan history to confirm the scan completed with 0 vulnerabilities. This is normal for secure targets.
-</details>
-
-<details>
-<summary><b>Nuclei Command Not Found</b></summary>
-
-Ensure Nuclei is installed and added to your system PATH. Run `nuclei -version` to verify.
-</details>
-
-For more troubleshooting, see [Getting Started Guide](./Refrencce%20and%20Usage%20And%20Guide/GETTING_STARTED.md#troubleshooting).
 
 ---
 
 ## 📜 License
 
-This project wraps the Nuclei binary. Nuclei is licensed under the MIT License.
-
----
-
-## 🙏 Acknowledgments
+Distributed under the MIT License. See `LICENSE` for more information.
 
 <div align="center">
-
-Built with amazing open-source tools:
-
-[![Nuclei](https://img.shields.io/badge/Nuclei-ProjectDiscovery-blue?style=flat-square)](https://github.com/projectdiscovery/nuclei)
-[![Next.js](https://img.shields.io/badge/Next.js-Vercel-black?style=flat-square&logo=next.js)](https://nextjs.org/)
-[![shadcn/ui](https://img.shields.io/badge/shadcn/ui-Components-black?style=flat-square)](https://ui.shadcn.com/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind-CSS-38B2AC?style=flat-square&logo=tailwind-css)](https://tailwindcss.com/)
-
-</div>
-
----
-
-## 💬 Support
-
-For issues or questions:
-1. 📋 Check the [Troubleshooting](#-troubleshooting) section
-2. 📚 Review the [documentation](./Refrencce%20and%20Usage%20And%20Guide/)
-3. 🔗 Check [Nuclei's official documentation](https://docs.projectdiscovery.io/tools/nuclei/overview)
-4. ⭐ Star this repo if you find it helpful!
-
----
-
-<div align="center">
-
-### ⭐ Star the Repository
-
-If you find this project useful, please consider giving it a star!
-
-[![GitHub stars](https://img.shields.io/github/stars/devtint/NUCLEI_CNM?style=social)](https://github.com/devtint/NUCLEI_CNM/stargazers)
-
-**Built with ❤️ for the security community**
-
-[⬆ Back to Top](#-nuclei-command-center)
-
+Built with ❤️ for the security community
 </div>

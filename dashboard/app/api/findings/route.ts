@@ -33,7 +33,9 @@ export async function GET(req: NextRequest) {
                             id: f.id,
                             _sourceFile: `${f.scan_id}.json`,
                             _dbId: f.id,
-                            _status: f.status || 'New' // Include status
+                            _status: f.status || 'New', // Include status
+                            request: f.request,
+                            response: f.response
                         };
                     });
                 }, "Failed to fetch findings");

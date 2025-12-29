@@ -19,10 +19,13 @@ export function DashboardClient({ initialStats }: { initialStats: any }) {
     const [scanTarget, setScanTarget] = useState<string>("");
     const [activeView, setActiveView] = useState("overview");
     const [templateRefresh, setTemplateRefresh] = useState(0);
+    const [statsRefresh, setStatsRefresh] = useState(0);
 
     const startScan = (id: string) => {
         setActiveScanId(id);
         setActiveView("activity");
+        // Refresh stats when scan starts to update count immediately
+        setStatsRefresh(prev => prev + 1);
     };
 
     const startMainScan = (target: string) => {
@@ -50,8 +53,7 @@ export function DashboardClient({ initialStats }: { initialStats: any }) {
                         <div className="space-y-8 animate-in fade-in duration-500">
                             {/* ... Stats ... */}
                             <DashboardStats
-                                totalScans={initialStats.totalScans}
-                                lastScan={initialStats.lastScan}
+                                refreshTrigger={statsRefresh}
                             />
                             {/* ... Content ... */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

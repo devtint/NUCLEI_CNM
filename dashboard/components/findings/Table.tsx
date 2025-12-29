@@ -337,6 +337,68 @@ export function FindingsTable() {
         return matchesSeverity && matchesStatus && matchesHost;
     });
 
+    const exportToPDF = async () => {
+        setLoading(true);
+        try {
+            const jsPDF = (await import('jspdf')).default;
+            const autoTable = (await import('jspdf-autotable')).default;
+
+            const doc = new jsPDF();
+
+            // Add title
+            doc.setFontSize(16);
+            doc.text("Nuclei Findings Report", 14, 15);
+            doc.setFontSize(10);
+            doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 22);
+
+            const tableColumn = ["ID", "Name", "Severity", "URL", "Time", "Status"];
+            const tableRows: any[] = [];
+
+            filteredFindings.forEach(f => {
+                const findingData = [
+                    f["template-id"],
+                    f.info.name,
+                    f.info.severity,
+                    f["matched-at"] || f.host,
+                    f.timestamp,
+                    f._status || "New"
+                ];
+                tableRows.push(findingData);
+            });
+
+            autoTable(doc, {
+                head: [tableColumn],
+                body: tableRows,
+                startY: 30,
+                styles: { fontSize: 8 },
+                headStyles: { fillColor: [22, 163, 74] }, // Emerald-600
+                didParseCell: (data) => {
+                    if (data.section === 'body' && data.column.index === 2) {
+                        const severity = data.cell.raw?.toString().toLowerCase();
+                        if (severity === 'critical') {
+                            data.cell.styles.textColor = [220, 38, 38]; // Red
+                            data.cell.styles.fontStyle = 'bold';
+                        } else if (severity === 'high') {
+                            data.cell.styles.textColor = [234, 88, 12]; // Orange
+                            data.cell.styles.fontStyle = 'bold';
+                        } else if (severity === 'medium') {
+                            data.cell.styles.textColor = [234, 179, 8]; // Yellow
+                        } else if (severity === 'low') {
+                            data.cell.styles.textColor = [37, 99, 235]; // Blue
+                        }
+                    }
+                }
+            });
+
+            doc.save(`findings_export_${Date.now()}.pdf`);
+        } catch (error) {
+            console.error(error);
+            alert("Failed to export PDF");
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <div className="space-y-4 bg-card p-4 rounded-xl border border-border shadow-sm">
             <div className="flex items-center justify-between">
@@ -412,8 +474,12 @@ export function FindingsTable() {
                         <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                     </Button>
 
+                    <Button variant="outline" size="sm" onClick={exportToPDF} title="Export current view to PDF">
+                        <Download className="mr-2 h-4 w-4" /> PDF
+                    </Button>
+
                     <Button variant="outline" size="sm" onClick={exportData} title="Export current view to Excel">
-                        <Download className="mr-2 h-4 w-4" /> Export XLS
+                        <Download className="mr-2 h-4 w-4" /> XLS
                     </Button>
                 </div>
             </div>

@@ -6,7 +6,7 @@ export const PREDEFINED_COMMANDS = [
         config: {}
     },
     {
-        name: "Full Scan (Critical)",
+        name: "Critical Only",
         description: "Scans for all critical severity vulnerabilities",
         flags: "-s critical",
         config: { severity: ["critical"] }

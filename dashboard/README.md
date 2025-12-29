@@ -10,6 +10,7 @@ A modern, feature-rich web dashboard for managing Nuclei vulnerability scans wit
 - **Real-Time Activity Monitor**: Live scan tracking with status, duration, and exit codes
 - **Database-Backed Storage**: SQLite database for persistent scan history and findings
 - **Finding Status Management**: Track findings as New, Confirmed, False Positive, Fixed, or Closed
+- **AI-Powered Analysis**: Integrated Gemini AI to generate executive summaries of security findings
 
 ### 📊 Dashboard & Analytics
 - **Overview Dashboard**: Total scans, findings count, and last activity
@@ -21,7 +22,7 @@ A modern, feature-rich web dashboard for managing Nuclei vulnerability scans wit
 - **Findings Table**: Comprehensive view of all vulnerabilities with severity badges
 - **Status Tracking**: Update finding status with color-coded badges
 - **Detailed View**: Click any finding for full details including template info, matched URL, and raw JSON
-- **Export Options**: Export findings to CSV (all, or filtered by severity)
+- **Export Options**: Export findings to PDF (Instant) or Excel (.xlsx)
 - **Delete & Rescan**: Remove false positives or re-verify findings
 
 ### ⚙️ Advanced Features

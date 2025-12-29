@@ -22,13 +22,14 @@
 - **One-Click Presets**: 7 pre-configured scan modes (Critical, Full, Tech Detect, etc).
 - **Native Engine**: Wraps the official Nuclei binary for maximum performance and compatibility.
 - **Custom Templates**: Full support for running your own YAML-based Nuclei templates.
+- **AI Analysis**: One-click Executive Summary of vulnerabilities powered by Google Gemini AI.
 
 ### 📊 Data & Analysis
 - **Real-Time Analytics**: "Total Scans" and findings counts update instantly without refresh.
 - **Smart Deduplication**: Intelligent hash-based system prevents duplicate findings across scans.
 - **Deep Inspection**: View raw HTTP Request/Response data for every finding.
 - **Advanced Filtering**: Filter by Status (New, Fixed, etc.) and search specifically by Host.
-- **Excel Export**: Professional `.xlsx` export with severity color coding.
+- **Professional Reports**: Export findings to **PDF** (Instant) or **Excel** (.xlsx) with severity color coding.
 
 ### 🛡️ System & Security
 - **Secure Authentication**: Built-in Admin login (NextAuth.js) with secure password protection.
@@ -83,6 +84,9 @@ AUTH_SECRET="your-super-secret-key-at-least-32-chars"
 
 # The password to login to the dashboard
 ADMIN_PASSWORD="your-secure-password"
+
+# [Optional] Gemini API Key for AI Summaries
+GEMINI_API_KEY="your-gemini-api-key"
 ```
 
 🌐 Open **http://localhost:3000** in your browser

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Download, RefreshCw, Filter, Trash2 } from "lucide-react";
+import { Download, RefreshCw, Filter, Trash2, Sparkles } from "lucide-react";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -337,6 +337,52 @@ export function FindingsTable() {
         return matchesSeverity && matchesStatus && matchesHost;
     });
 
+    const [summary, setSummary] = useState<string | null>(null);
+    const [summaryLoading, setSummaryLoading] = useState(false);
+    const [aiEnabled, setAiEnabled] = useState(true);
+
+    useEffect(() => {
+        const stored = localStorage.getItem("nuclei_settings");
+        if (stored) {
+            try {
+                const parsed = JSON.parse(stored);
+                if (parsed.aiSummary !== undefined) {
+                    setAiEnabled(parsed.aiSummary);
+                }
+            } catch (e) {
+                console.error("Failed to parse settings", e);
+            }
+        }
+    }, [findings]); // Re-check when findings change (implied refresh usually) or just once on mount/interaction if we had a global event. For now, simple check.
+
+    const summarizeFindings = async () => {
+        if (filteredFindings.length === 0) {
+            alert("No findings to summarize.");
+            return;
+        }
+
+        setSummaryLoading(true);
+        try {
+            const res = await fetch("/api/summarize", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ findings: filteredFindings })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                setSummary(data.summary);
+            } else {
+                alert("Summary failed: " + data.message);
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Failed to generate summary.");
+        } finally {
+            setSummaryLoading(false);
+        }
+    };
+
     const exportToPDF = async () => {
         setLoading(true);
         try {
@@ -404,6 +450,18 @@ export function FindingsTable() {
             <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-foreground">Vulnerability Feed</h3>
                 <div className="flex gap-2">
+                    {aiEnabled && (
+                        <Button
+                            variant="default"
+                            size="sm"
+                            onClick={summarizeFindings}
+                            disabled={summaryLoading}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-500/50"
+                        >
+                            <Sparkles className={`mr-2 h-4 w-4 ${summaryLoading ? 'animate-spin' : ''}`} />
+                            {summaryLoading ? "Thinking..." : "Summarize"}
+                        </Button>
+                    )}
                     {/* Severity Filter */}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -589,6 +647,25 @@ export function FindingsTable() {
                             </ScrollArea>
                         </TabsContent>
                     </Tabs>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={!!summary} onOpenChange={(open) => !open && setSummary(null)}>
+                <DialogContent className="max-w-2xl bg-card border-border text-foreground max-h-[80vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-indigo-400">
+                            <Sparkles className="w-5 h-5" />
+                            AI Security Summary
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="mt-4 prose prose-invert prose-sm max-w-none">
+                        {/* Simple markdown rendering */}
+                        {summary?.split('\n').map((line, i) => (
+                            <p key={i} className={line.startsWith('#') ? "font-bold text-lg mt-4 mb-2 text-black" : "mb-2 text-zinc-900 font-medium"}>
+                                {line.replace(/^#+\s/, '').replace(/\*\*/g, '')}
+                            </p>
+                        ))}
+                    </div>
                 </DialogContent>
             </Dialog>
 

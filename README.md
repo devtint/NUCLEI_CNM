@@ -53,10 +53,13 @@ Configure rate limiting and concurrency settings
 ### 🎯 Key Features
 
 - **Finding Deduplication**: Intelligent hash-based system prevents duplicate findings across scans
+- **Advanced Filtering**: Filter by **Status** (New, Confirmed, etc.) and specific **Host** with search support
+- **Deep-Dive Inspection**: View raw **HTTP Request** and **Response** data for every finding
+- **Professional Export**: Export findings to **.xlsx** with severity-based color coding
 - **Status Management**: Track findings as New, Confirmed, False Positive, Fixed, Closed, or Regression  
 - **Regression Detection**: Automatically detects when fixed vulnerabilities reappear
+- **High Contrast UI**: Optimized visual design for maximum readability
 - **Historical Tracking**: First seen / last seen timestamps for all findings
-- **Status Preservation**: User-assigned statuses persist across rescans
 
 ### 🌐 **Subdomain Discovery** (*Powered by Subfinder*)
 - **Integrated Workflow**: Discover subdomains and instantly pivot to vulnerability scanning

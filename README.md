@@ -58,7 +58,15 @@ Deliver value instantly.
 *   **Excel (.xlsx) Export**: Fully colorized spreadsheets for audit logs or data analysis.
 *   **Search & Filter**: Powerful boolean filtering by Host, Severity, Status, or Template Name.
 
-### 🛡️ 5. Enterprise-Grade Security
+### 🛡️ 5. Advanced Target Management
+Stop manually typing URLs.
+*   **Target List Manager**: A built-in file manager for your scope.
+    *   **Upload**: Drag & drop `.txt` lists directly into the dashboard.
+    *   **Create**: Paste raw domains and save them as reusable lists.
+    *   **Select**: One-click switching between "Single Target" and "Bulk List" modes.
+*   **Auto-persistence**: All lists are saved server-side (`scans/uploads/`) and available for future scans.
+
+### 🔐 6. Enterprise-Grade Security
 Built to be safe.
 *   **Secure Authentication**: NextAuth.js protection loop (Username/Password).
 *   **Environment Isolation**: Development logs distinct from production findings.

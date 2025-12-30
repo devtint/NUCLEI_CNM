@@ -95,6 +95,9 @@ The UI is built using modular, reusable components in `dashboard/components/`.
 ### `scan/`
 *   `Wizard.tsx`: The "New Operation" form.
 *   `LiveConsole.tsx`: A real-time log viewer that tails the `.log` file of scanning processes.
+*   `TargetListManager.tsx`: A dialog text-editor & uploader for managing `.txt` target lists.
+    *   **Features**: Drag & drop upload, manual creation (copy-paste), and persistent file storage in `scans/uploads/`.
+
 
 ---
 

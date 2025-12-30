@@ -5,13 +5,15 @@ import { writeFile, readdir } from "fs/promises";
 
 const UPLOAD_DIR = path.join(process.cwd(), "scans", "uploads");
 
-// Ensure directory exists
-if (!fs.existsSync(UPLOAD_DIR)) {
-    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+async function ensureUploadDir() {
+    if (!fs.existsSync(UPLOAD_DIR)) {
+        await fs.promises.mkdir(UPLOAD_DIR, { recursive: true });
+    }
 }
 
 export async function GET(req: NextRequest) {
     try {
+        await ensureUploadDir();
         const files = await readdir(UPLOAD_DIR);
         // Return full objects so frontend can use name and path
         const fileList = files.map(name => ({
@@ -28,6 +30,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
     try {
+        await ensureUploadDir();
         const contentType = req.headers.get("content-type") || "";
 
         let filename = "";

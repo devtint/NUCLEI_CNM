@@ -22,6 +22,8 @@ export function TargetListManager({ onSelect, children }: TargetListManagerProps
     // Create Mode State
     const [newContent, setNewContent] = useState("");
     const [newName, setNewName] = useState("");
+    const [isDragging, setIsDragging] = useState(false);
+    const [activeTab, setActiveTab] = useState("select");
 
     const fetchFiles = async () => {
         try {
@@ -38,6 +40,7 @@ export function TargetListManager({ onSelect, children }: TargetListManagerProps
     useEffect(() => {
         if (open) {
             fetchFiles();
+            setActiveTab("select");
         }
     }, [open]);
 
@@ -56,8 +59,11 @@ export function TargetListManager({ onSelect, children }: TargetListManagerProps
             });
             const data = await res.json();
             if (data.success) {
-                onSelect(data.filepath);
-                setOpen(false);
+                await fetchFiles();
+                setActiveTab("select");
+                // Optional: Auto-select but keep open? 
+                // onSelect(data.filepath); 
+                // Let's letting user select it explicitly to avoid confusion.
             }
         } catch (error) {
             console.error('Upload failed:', error);
@@ -78,8 +84,8 @@ export function TargetListManager({ onSelect, children }: TargetListManagerProps
             });
             const data = await res.json();
             if (data.success) {
-                onSelect(data.filepath);
-                setOpen(false);
+                await fetchFiles();
+                setActiveTab("select");
                 setNewContent("");
                 setNewName("");
             }
@@ -103,7 +109,7 @@ export function TargetListManager({ onSelect, children }: TargetListManagerProps
                     </DialogDescription>
                 </DialogHeader>
 
-                <Tabs defaultValue="select" className="w-full">
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                     <TabsList className="grid w-full grid-cols-3">
                         <TabsTrigger value="select">Select</TabsTrigger>
                         <TabsTrigger value="upload">Upload</TabsTrigger>
@@ -148,7 +154,41 @@ export function TargetListManager({ onSelect, children }: TargetListManagerProps
                     </TabsContent>
 
                     <TabsContent value="upload" className="mt-4">
-                        <div className="flex flex-col items-center justify-center h-[300px] border-2 border-dashed rounded-md relative hover:bg-muted/10 transition-colors">
+                        <div
+                            className={`flex flex-col items-center justify-center h-[300px] border-2 border-dashed rounded-md relative transition-colors ${isDragging ? 'border-emerald-500 bg-emerald-500/10' : 'hover:bg-muted/10'}`}
+                            onDragOver={(e) => {
+                                e.preventDefault();
+                                setIsDragging(true);
+                            }}
+                            onDragLeave={() => setIsDragging(false)}
+                            onDrop={async (e) => {
+                                e.preventDefault();
+                                setIsDragging(false);
+                                const file = e.dataTransfer.files?.[0];
+                                if (!file) return;
+
+                                // Reuse logic
+                                setLoading(true);
+                                const formData = new FormData();
+                                formData.append('file', file);
+
+                                try {
+                                    const res = await fetch('/api/upload', {
+                                        method: 'POST',
+                                        body: formData,
+                                    });
+                                    const data = await res.json();
+                                    if (data.success) {
+                                        await fetchFiles();
+                                        setActiveTab("select");
+                                    }
+                                } catch (error) {
+                                    console.error('Upload failed:', error);
+                                } finally {
+                                    setLoading(false);
+                                }
+                            }}
+                        >
                             <Input
                                 type="file"
                                 accept=".txt"
@@ -156,7 +196,7 @@ export function TargetListManager({ onSelect, children }: TargetListManagerProps
                                 onChange={handleUpload}
                                 disabled={loading}
                             />
-                            <Upload className="h-10 w-10 text-muted-foreground mb-4" />
+                            <Upload className={`h-10 w-10 mb-4 ${isDragging ? 'text-emerald-500' : 'text-muted-foreground'}`} />
                             <p className="text-sm font-medium">Click or Drag file here</p>
                             <p className="text-xs text-muted-foreground mt-2">.txt files only (one target per line)</p>
                             {loading && <p className="text-xs text-emerald-500 mt-4 animate-pulse">Uploading...</p>}

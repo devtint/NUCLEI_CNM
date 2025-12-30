@@ -23,7 +23,14 @@ export async function POST(req: NextRequest) {
         const scanId = crypto.randomUUID();
         const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
         const filename = `${scanId}_${timestamp}.json`;
-        const outputPath = path.join(process.cwd(), "scans", filename);
+        const scansDir = path.join(process.cwd(), "scans");
+
+        // Ensure scans directory exists
+        if (!fs.existsSync(scansDir)) {
+            fs.mkdirSync(scansDir, { recursive: true });
+        }
+
+        const outputPath = path.join(scansDir, filename);
 
         const config = {
             target,

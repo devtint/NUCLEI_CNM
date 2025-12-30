@@ -29,6 +29,7 @@ export const NUCLEI_BINARY = "nuclei"; // Assuming it is in PATH as per guide
 
 export interface ScanConfig {
     target: string;
+    targetMode?: 'url' | 'list';
     templateId?: string; // For searching specific CVEs
     tags?: string[]; // e.g., ["cve", "panel"]
     severity?: string[]; // e.g., ["critical", "high"]
@@ -39,7 +40,14 @@ export interface ScanConfig {
 }
 
 export function constructCommand(config: ScanConfig, outputFile: string): string[] {
-    const args = ["-u", config.target];
+    const args = [];
+
+    // Choose flag based on mode
+    if (config.targetMode === 'list') {
+        args.push("-l", config.target);
+    } else {
+        args.push("-u", config.target);
+    }
 
     // Output format
     args.push("-json-export", outputFile);

@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Terminal, Zap } from "lucide-react";
 import { PREDEFINED_COMMANDS } from "@/lib/nuclei/presets";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TargetListManager } from "./TargetListManager";
 
 interface WizardProps {
     onScanStart: (scanId: string) => void;
@@ -16,6 +17,7 @@ interface WizardProps {
 
 export function ScanWizard({ onScanStart, initialTemplate, initialTarget }: WizardProps) {
     const [target, setTarget] = useState(initialTarget || "");
+    const [targetMode, setTargetMode] = useState<'url' | 'list'>('url');
     const [customArgs, setCustomArgs] = useState(initialTemplate ? `-t "${initialTemplate}"` : "");
     const [loading, setLoading] = useState(false);
 
@@ -37,7 +39,7 @@ export function ScanWizard({ onScanStart, initialTemplate, initialTarget }: Wiza
             const res = await fetch("/api/scan", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ target, ...config, ...settings }),
+                body: JSON.stringify({ target, targetMode, ...config, ...settings }),
             });
             const data = await res.json();
             if (data.scanId) {
@@ -53,14 +55,42 @@ export function ScanWizard({ onScanStart, initialTemplate, initialTarget }: Wiza
     return (
         <Card className="bg-card border-border shadow-none">
             <CardContent className="p-6 space-y-4">
-                <div className="space-y-2">
-                    <label className="text-xs text-muted-foreground uppercase tracking-widest font-mono">Target</label>
-                    <Input
-                        placeholder="Enter target URL (e.g. example.com)"
-                        value={target}
-                        onChange={(e) => setTarget(e.target.value)}
-                        className="bg-input border-border text-foreground placeholder:text-muted-foreground font-mono"
-                    />
+                <div className="space-y-4">
+                    <div className="flex items-center space-x-4">
+                        <button
+                            onClick={() => setTargetMode('url')}
+                            className={`text-sm font-medium transition-colors ${targetMode === 'url' ? 'text-emerald-500' : 'text-muted-foreground hover:text-foreground'
+                                }`}
+                        >
+                            Single Target
+                        </button>
+                        <div className="h-4 w-[1px] bg-border" />
+                        <button
+                            onClick={() => setTargetMode('list')}
+                            className={`text-sm font-medium transition-colors ${targetMode === 'list' ? 'text-emerald-500' : 'text-muted-foreground hover:text-foreground'
+                                }`}
+                        >
+                            Target List
+                        </button>
+                    </div>
+
+                    <div className="space-y-2">
+                        <div className="flex gap-2">
+                            <Input
+                                placeholder={targetMode === 'url' ? "Enter target URL (e.g. example.com)" : "Select a target list via Manage Lists ->"}
+                                value={target}
+                                onChange={(e) => setTarget(e.target.value)}
+                                readOnly={targetMode === 'list'}
+                                className={`bg-input border-border text-foreground font-mono ${targetMode === 'list' ? 'cursor-default opacity-80 focus-visible:ring-0 text-emerald-500' : 'placeholder:text-muted-foreground'}`}
+                            />
+                            {targetMode === 'list' && (
+                                <TargetListManager onSelect={(path) => setTarget(path)} />
+                            )}
+                        </div>
+                        {targetMode === 'list' && (
+                            null
+                        )}
+                    </div>
                 </div>
 
                 <Tabs defaultValue={initialTemplate ? "custom" : "presets"} className="w-full">

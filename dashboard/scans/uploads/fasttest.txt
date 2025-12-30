@@ -1,0 +1,2 @@
+fast.com
+api.fast.com

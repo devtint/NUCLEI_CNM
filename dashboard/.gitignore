@@ -43,3 +43,4 @@ nuclei.db-wal
 # scan results (keep folder, exclude files)
 scans/*.json
 scans/*.log
+scans/uploads/

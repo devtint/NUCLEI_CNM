@@ -14,7 +14,7 @@ const activeScans = new Map<string, any>();
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const { target, tags, severity, templateId, rateLimit, concurrency, bulkSize, customArgs } = body;
+        const { target, targetMode, tags, severity, templateId, rateLimit, concurrency, bulkSize, customArgs } = body;
 
         if (!target) {
             return NextResponse.json({ error: "Target is required" }, { status: 400 });
@@ -27,6 +27,7 @@ export async function POST(req: NextRequest) {
 
         const config = {
             target,
+            targetMode: targetMode || 'url', // Default to 'url'
             tags,
             severity,
             templateId,

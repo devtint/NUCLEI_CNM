@@ -1,47 +1,51 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
+# Dependencies
 /node_modules
 /.pnp
 .pnp.js
-.yarn/install-state.gz
 
-# testing
+# Testing
 /coverage
 
-# next.js
+# Next.js build output
 /.next/
 /out/
 
-# production
+# Production
 /build
+/dist
 
-# misc
+# Misc
 .DS_Store
 *.pem
 
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# local env files
+# Local env files
+.env
 .env*.local
 
-# vercel
+# Vercel
 .vercel
 
-# typescript
+# TypeScript
 *.tsbuildinfo
 next-env.d.ts
 
-# database
+# Database (SQLite)
+*.db
+*.db-shm
+*.db-wal
 nuclei.db
-nuclei.db-shm
-nuclei.db-wal
 
-# scan results (keep folder, exclude files)
+# Scan Artifacts (Runtime Generated)
+# Logs, JSON results, and uploaded target lists
 scans/*.json
 scans/*.log
-scans/uploads/
-public/screenshots/
+scans/uploads/*
+!scans/uploads/.gitkeep
+
+# Screenshots (HTTPX)
+public/screenshots/*
+!public/screenshots/.gitkeep
+
+# IDE
+.vscode/
+.idea/

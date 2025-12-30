@@ -15,6 +15,13 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+} from "@/components/ui/dialog";
+import {
     Table,
     TableBody,
     TableCell,
@@ -39,6 +46,14 @@ interface HttpxResult {
     web_server?: string;
     response_time?: string;
     change_status?: 'new' | 'old' | 'changed';
+    screenshot_path?: string;
+    host?: string;
+    port?: string;
+    ip?: string;
+    cname?: string; // JSON or string
+    cdn_name?: string;
+    content_length?: number;
+    content_type?: string;
 }
 
 interface HttpxScan {
@@ -50,10 +65,24 @@ interface HttpxScan {
     pid?: number;
 }
 
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+// ... imports
+
 export function HttpxPanel() {
     const [scans, setScans] = useState<HttpxScan[]>([]);
     const [selectedScanId, setSelectedScanId] = useState<string | null>(null);
     const [results, setResults] = useState<HttpxResult[]>([]);
+    const [selectedAsset, setSelectedAsset] = useState<HttpxResult | null>(null);
     const [loading, setLoading] = useState(false);
     const [activeTab, setActiveTab] = useState("scanner");
     const [domainSummary, setDomainSummary] = useState<{ domain: string; count: number }[]>([]);
@@ -75,6 +104,11 @@ export function HttpxPanel() {
     const [filterDomain, setFilterDomain] = useState("");
     const [filterCode, setFilterCode] = useState<string[]>([]); // Multi-select for codes
     const [filterChangeStatus, setFilterChangeStatus] = useState<string[]>([]); // Empty = All
+
+    // Delete Dialog State
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [scanToDelete, setScanToDelete] = useState<string | null>(null);
+    const [isDeletingAll, setIsDeletingAll] = useState(false);
 
     // Fetch scans list
     const fetchScans = async () => {
@@ -126,6 +160,172 @@ export function HttpxPanel() {
         }
     }, [activeTab, selectedScanId, selectedDomain]);
 
+    // Full Screen Detail View
+    if (selectedAsset) {
+        return (
+            <div className="flex flex-col h-full animate-in fade-in slide-in-from-bottom-2 duration-200">
+                <div className="flex items-center gap-2 mb-4 pb-2 border-b">
+                    <Button variant="ghost" size="sm" onClick={() => setSelectedAsset(null)} className="gap-2">
+                        <ArrowLeft className="h-4 w-4" />
+                        Back to Assets
+                    </Button>
+                    <div className="h-4 w-px bg-border mx-2" />
+                    <h2 className="text-lg font-semibold truncate flex-1">{selectedAsset.url}</h2>
+                    <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" onClick={() => window.open(selectedAsset.url, '_blank')}>
+                            Open <Globe className="h-3 w-3 ml-2" />
+                        </Button>
+                    </div>
+                </div>
+
+                <ScrollArea className="flex-1">
+                    <div className="space-y-6 pb-20 pr-4">
+                        {/* Header Stats */}
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <CardDescription>Status Code</CardDescription>
+                                    <CardTitle className={cn(
+                                        "text-2xl",
+                                        selectedAsset.status_code >= 200 && selectedAsset.status_code < 300 ? "text-emerald-500" :
+                                            selectedAsset.status_code >= 300 && selectedAsset.status_code < 400 ? "text-amber-500" :
+                                                "text-red-500"
+                                    )}>{selectedAsset.status_code}</CardTitle>
+                                </CardHeader>
+                            </Card>
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <CardDescription>Response Time</CardDescription>
+                                    <CardTitle className="text-2xl">{selectedAsset.response_time ? selectedAsset.response_time.split('.')[0] + "ms" : "0ms"}</CardTitle>
+                                </CardHeader>
+                            </Card>
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <CardDescription>Content Type</CardDescription>
+                                    <CardTitle className="text-xl truncate" title={selectedAsset.content_type}>{selectedAsset.content_type || "-"}</CardTitle>
+                                </CardHeader>
+                            </Card>
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <CardDescription>Web Server</CardDescription>
+                                    <CardTitle className="text-xl truncate" title={selectedAsset.web_server}>{selectedAsset.web_server || "-"}</CardTitle>
+                                </CardHeader>
+                            </Card>
+                        </div>
+
+                        {/* Title & Screenshot */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <div className="lg:col-span-2 space-y-6">
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle>Page Title</CardTitle>
+                                        <CardDescription className="text-base text-foreground">{selectedAsset.title || "No Title Detected"}</CardDescription>
+                                    </CardHeader>
+                                </Card>
+
+                                {selectedAsset.screenshot_path ? (
+                                    <Card className="overflow-hidden">
+                                        <div className="aspect-video relative bg-muted/50 flex items-center justify-center">
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img
+                                                src={selectedAsset.screenshot_path}
+                                                alt="Full Page Screenshot"
+                                                className="w-full h-full object-contain"
+                                            />
+                                        </div>
+                                    </Card>
+                                ) : (
+                                    <Card className="h-64 flex items-center justify-center bg-muted/20 border-dashed">
+                                        <div className="text-center text-muted-foreground">
+                                            <Activity className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                                            <p>No Screenshot Available</p>
+                                        </div>
+                                    </Card>
+                                )}
+                            </div>
+
+                            <div className="space-y-6">
+                                {/* Tech Stack */}
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="flex items-center gap-2">
+                                            <Zap className="h-4 w-4 text-amber-500" />
+                                            Technologies
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="flex flex-wrap gap-2">
+                                            {(() => {
+                                                try {
+                                                    const t = JSON.parse(selectedAsset.technologies || "[]");
+                                                    if (t.length === 0) return <span className="text-muted-foreground italic">None detected</span>;
+                                                    return t.map((tech: string, i: number) => (
+                                                        <Badge key={i} variant="secondary" className="px-2 py-1">{tech}</Badge>
+                                                    ));
+                                                } catch { return <span className="text-muted-foreground">Error parsing technologies</span>; }
+                                            })()}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+
+                                {/* Network Info */}
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="flex items-center gap-2">
+                                            <Globe className="h-4 w-4 text-blue-500" />
+                                            Network Info
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-4">
+                                        <div>
+                                            <p className="text-xs font-medium text-muted-foreground uppercase mb-1">IP Address</p>
+                                            <div className="font-mono text-sm bg-muted p-2 rounded break-all select-all">
+                                                {selectedAsset.ip || selectedAsset.host || "-"}
+                                            </div>
+                                        </div>
+                                        {selectedAsset.cname && (
+                                            <div>
+                                                <p className="text-xs font-medium text-muted-foreground uppercase mb-1">CNAME</p>
+                                                <div className="font-mono text-sm bg-muted p-2 rounded break-all select-all">
+                                                    {selectedAsset.cname}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {selectedAsset.cdn_name && (
+                                            <div>
+                                                <p className="text-xs font-medium text-muted-foreground uppercase mb-1">CDN Detected</p>
+                                                <Badge variant="outline" className="border-blue-500/50 text-blue-500">{selectedAsset.cdn_name}</Badge>
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="flex items-center gap-2">
+                                            <FileText className="h-4 w-4" />
+                                            Raw Data
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <ScrollArea className="h-[200px] w-full rounded-md border bg-muted p-4">
+                                            <pre className="text-xs font-mono text-muted-foreground">
+                                                {JSON.stringify(selectedAsset, null, 2)}
+                                            </pre>
+                                        </ScrollArea>
+                                    </CardContent>
+                                </Card>
+                            </div>
+                        </div>
+                    </div>
+                </ScrollArea>
+            </div>
+        );
+    }
+
+
+
+
     const startScan = async (overrideFlags?: string) => {
         if (!targetDomain) { toast.error("Enter a target"); return; }
 
@@ -170,19 +370,50 @@ export function HttpxPanel() {
         } catch (e) { toast.error("Error stopping scan"); }
     };
 
-    const deleteScan = async (id: string, e: React.MouseEvent) => {
+    const confirmDeleteScan = (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
-        if (!confirm("Are you sure you want to delete this scan history?")) return;
+        setScanToDelete(id);
+        setIsDeletingAll(false);
+        setDeleteDialogOpen(true);
+    };
+
+    const confirmClearAll = () => {
+        setIsDeletingAll(true);
+        setScanToDelete(null);
+        setDeleteDialogOpen(true);
+    }
+
+
+    const handleExecuteDelete = async () => {
         try {
-            const res = await fetch(`/api/httpx?id=${id}`, { method: 'DELETE' });
-            if (res.ok) {
-                toast.success("Scan deleted");
-                if (selectedScanId === id) setSelectedScanId(null);
-                fetchScans();
-            } else {
-                toast.error("Failed to delete scan");
+            if (isDeletingAll) {
+                const res = await fetch("/api/httpx?action=clear_all", { method: "DELETE" });
+                const data = await res.json();
+                if (data.success) {
+                    toast.success("History cleared");
+                    fetchScans();
+                    setResults([]);
+                    setDomainSummary([]);
+                } else {
+                    toast.error(data.error);
+                }
+            } else if (scanToDelete) {
+                const res = await fetch(`/api/httpx?id=${scanToDelete}`, { method: 'DELETE' });
+                if (res.ok) {
+                    toast.success("Scan deleted");
+                    if (selectedScanId === scanToDelete) setSelectedScanId(null);
+                    fetchScans();
+                } else {
+                    toast.error("Failed to delete scan");
+                }
             }
-        } catch (e) { toast.error("Error deleting scan"); }
+        } catch (e: any) {
+            toast.error(e.message || "Error deleting");
+        } finally {
+            setDeleteDialogOpen(false);
+            setScanToDelete(null);
+            setIsDeletingAll(false);
+        }
     };
 
     // Helper to format tech stack
@@ -224,7 +455,11 @@ export function HttpxPanel() {
         return true;
     });
 
-    // Extract unique status codes for the filter dropdown
+    const clearHttpxHistory = async () => {
+        confirmClearAll();
+    };
+
+    // Helper to get unique status codes for filter
     const uniqueCodes = Array.from(new Set(results.map(r => r.status_code.toString()))).sort();
 
     const exportTxt = () => {
@@ -272,6 +507,31 @@ export function HttpxPanel() {
         const content = filteredResults.map(r => r.url).join("\n");
         navigator.clipboard.writeText(content);
         toast.success("Copied " + filteredResults.length + " URLs");
+    };
+
+    const exportHosts = () => {
+        const content = filteredResults.map(r => {
+            try {
+                return new URL(r.url).hostname;
+            } catch { return r.url; }
+        }).join("\n");
+        navigator.clipboard.writeText(content);
+        toast.success("Copied " + filteredResults.length + " hostnames");
+    };
+
+    const exportFullCsv = () => {
+        const headers = "URL,Status,Title,Tech,Latency";
+        const rows = filteredResults.map(r => {
+            const title = (r.title || "").replace(/"/g, '""'); // Escape quotes
+            const tech = (r.technologies || "").replace(/"/g, "'");
+            return `${r.url},${r.status_code},"${title}","${tech}",${r.response_time || ""}`;
+        }).join("\n");
+        const blob = new Blob([headers + "\n" + rows], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `httpx_full_${Date.now()}.csv`;
+        a.click();
     };
 
     return (
@@ -454,7 +714,7 @@ export function HttpxPanel() {
                                                         variant="ghost"
                                                         size="icon"
                                                         className="h-5 w-5 hover:text-red-500 hover:bg-red-500/20"
-                                                        onClick={(e) => deleteScan(scan.id, e)}
+                                                        onClick={(e) => confirmDeleteScan(scan.id, e)}
                                                         title="Delete Scan"
                                                     >
                                                         <Trash2 className="h-4 w-4" />
@@ -648,69 +908,124 @@ export function HttpxPanel() {
                                                     </Button>
                                                 )}
                                                 <div className="ml-auto flex gap-2">
-                                                    <Button variant="outline" size="sm" className="h-8 gap-2" onClick={copyList}>
-                                                        <Copy className="h-3 w-3" /> Copy
+                                                    <Button variant="outline" size="sm" onClick={exportHosts} className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground">
+                                                        <Copy className="h-3.5 w-3.5" /> Hostnames
                                                     </Button>
-                                                    <Button variant="outline" size="sm" className="h-8 gap-2" onClick={exportTxt}>
-                                                        <Download className="h-3 w-3" /> List
+                                                    <Button variant="outline" size="sm" onClick={exportFullCsv} className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground">
+                                                        <Download className="h-3.5 w-3.5" /> Export CSV
                                                     </Button>
-                                                    <Button variant="outline" size="sm" className="h-8 gap-2" onClick={exportDomains}>
-                                                        <Globe className="h-3 w-3" /> Hostnames
+                                                    <Button variant="outline" size="sm" onClick={clearHttpxHistory} className="h-8 gap-1.5 text-xs text-red-500 hover:text-red-600 border-red-500/20 hover:bg-red-500/5">
+                                                        <Trash2 className="h-3.5 w-3.5" /> Delete All
                                                     </Button>
-                                                    <Button variant="outline" size="sm" className="h-8 gap-2" onClick={exportCsv}>
-                                                        <List className="h-3 w-3" /> CSV
-                                                    </Button>
+                                                    <span className="text-[10px] text-muted-foreground ml-2 bg-muted/50 px-2 py-1 rounded border border-border/50">
+                                                        {filteredResults.length} Assets
+                                                    </span>
                                                 </div>
                                             </div>
 
                                             <div className="grid grid-cols-1 gap-3 p-4">
                                                 {filteredResults.map((r) => (
-                                                    <Card key={r.id} className={cn(
-                                                        "bg-card text-card-foreground shadow-sm h-full flex flex-col border transition-all hover:bg-muted/10",
-                                                        r.change_status === 'new' ? "border-emerald-500/50 shadow-emerald-500/5" :
-                                                            r.change_status === 'changed' ? "border-amber-500/50 shadow-amber-500/5" :
-                                                                "border-white/10"
-                                                    )}>
-                                                        <CardContent className="p-3 flex flex-col gap-2 h-full">
-                                                            {/* Top Row: URL & Status */}
-                                                            <div className="flex justify-between items-start gap-2">
-                                                                <div className="min-w-0 flex-1">
-                                                                    <div className="flex items-center gap-2 mb-0.5">
-                                                                        <a href={r.url} target="_blank" className="text-sm font-semibold text-blue-400 hover:underline truncate block" title={r.url}>
-                                                                            {r.url}
-                                                                        </a>
-                                                                    </div>
-                                                                    <div className="flex items-center gap-2">
-                                                                        <Badge variant="outline" className={cn(
-                                                                            "text-[10px] px-1 h-5",
-                                                                            r.status_code >= 200 && r.status_code < 300 ? "text-emerald-500 border-emerald-500/30 bg-emerald-500/5" :
-                                                                                r.status_code >= 300 && r.status_code < 400 ? "text-amber-500 border-amber-500/30 bg-amber-500/5" :
-                                                                                    "text-red-500 border-red-500/30 bg-red-500/5"
-                                                                        )}>{r.status_code}</Badge>
+                                                    <div key={r.id} onClick={() => setSelectedAsset(r)} className="cursor-pointer h-full">
+                                                        <Card className={cn(
+                                                            "bg-card text-card-foreground shadow-sm h-full flex flex-col border transition-all hover:bg-muted/10 active:scale-[0.99] duration-200",
+                                                            r.change_status === 'new' ? "border-emerald-500/50 shadow-emerald-500/5" :
+                                                                r.change_status === 'changed' ? "border-amber-500/50 shadow-amber-500/5" :
+                                                                    "border-white/10"
+                                                        )}>
+                                                            <CardContent className="p-4 flex flex-col gap-3">
+                                                                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
 
-                                                                        {r.change_status === 'new' && <Badge className="text-[9px] px-1 h-4 bg-emerald-500/20 text-emerald-500 border-emerald-500/30">NEW</Badge>}
-                                                                        {r.change_status === 'changed' && <Badge className="text-[9px] px-1 h-4 bg-amber-500/20 text-amber-500 border-amber-500/30">CHG</Badge>}
-                                                                        {r.change_status === 'old' && <Badge variant="outline" className="text-[9px] px-1 h-4 text-muted-foreground border-zinc-500/20">OLD</Badge>}
+                                                                    {/* LEFT COLUMN: URL and Title */}
+                                                                    <div className="flex-1 min-w-0 space-y-1.5">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <a href={r.url} target="_blank" className="text-base font-bold text-blue-400 hover:text-blue-300 hover:underline truncate" title={r.url}>
+                                                                                {r.url}
+                                                                            </a>
+                                                                            <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground shrink-0" onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                navigator.clipboard.writeText(r.url);
+                                                                                toast.success("Copied to clipboard");
+                                                                            }}>
+                                                                                <Copy className="h-3 w-3" />
+                                                                            </Button>
+                                                                            {/* Status Badges Mobile/Inline */}
+                                                                            <div className="flex md:hidden items-center gap-2">
+                                                                                <Badge variant="outline" className={cn(
+                                                                                    "text-[10px] px-1.5 h-5 font-mono",
+                                                                                    r.status_code >= 200 && r.status_code < 300 ? "text-emerald-500 border-emerald-500/30 bg-emerald-500/5" :
+                                                                                        r.status_code >= 300 && r.status_code < 400 ? "text-amber-500 border-amber-500/30 bg-amber-500/5" :
+                                                                                            "text-red-500 border-red-500/30 bg-red-500/5"
+                                                                                )}>{r.status_code}</Badge>
+                                                                            </div>
+                                                                        </div>
+
+                                                                        <div className="text-sm text-foreground/80 font-medium truncate" title={r.title || "No Title"}>
+                                                                            {r.title || <span className="text-muted-foreground italic">No Title</span>}
+                                                                        </div>
+
+                                                                        {/* Screenshot Thumbnail (if available) - Rendered nicely here */}
+                                                                        {r.screenshot_path && (
+                                                                            <div className="mt-2 border rounded-md overflow-hidden bg-muted/50 w-fit max-w-[300px] group relative">
+                                                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                                                <img
+                                                                                    src={r.screenshot_path}
+                                                                                    alt="Screenshot"
+                                                                                    className="w-full h-auto object-cover max-h-[150px] transition-transform duration-300 group-hover:scale-105 cursor-pointer"
+                                                                                    onClick={() => window.open(r.screenshot_path, '_blank')}
+                                                                                />
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+
+                                                                    {/* RIGHT COLUMN: Meta, Tech, Timings */}
+                                                                    <div className="flex flex-col items-start md:items-end gap-3 min-w-[200px]">
+                                                                        {/* Top Row Right: Badges & Response Time */}
+                                                                        <div className="flex items-center gap-3">
+                                                                            <span className="text-xs font-mono text-muted-foreground tabular-nums">
+                                                                                {r.response_time || "0ms"}
+                                                                            </span>
+
+                                                                            <div className="hidden md:flex items-center gap-2">
+                                                                                <Badge variant="outline" className={cn(
+                                                                                    "text-xs px-2 h-6 font-mono font-bold",
+                                                                                    r.status_code >= 200 && r.status_code < 300 ? "text-emerald-500 border-emerald-500/30 bg-emerald-500/10" :
+                                                                                        r.status_code >= 300 && r.status_code < 400 ? "text-amber-500 border-amber-500/30 bg-amber-500/10" :
+                                                                                            "text-red-500 border-red-500/30 bg-red-500/10"
+                                                                                )}>{r.status_code}</Badge>
+
+                                                                                {r.change_status === 'new' && <Badge className="text-[10px] px-1.5 h-6 bg-emerald-500/20 text-emerald-500 border border-emerald-500/30">NEW</Badge>}
+                                                                                {r.change_status === 'changed' && <Badge className="text-[10px] px-1.5 h-6 bg-amber-500/20 text-amber-500 border border-amber-500/30">CHANGED</Badge>}
+                                                                                {r.change_status === 'old' && <Badge variant="outline" className="text-[10px] px-1.5 h-6 text-muted-foreground border-zinc-500/20">OLD</Badge>}
+                                                                            </div>
+                                                                        </div>
+
+                                                                        {/* Tech Stack - Right Aligned or Wrapped */}
+                                                                        <div className="flex flex-wrap justify-end gap-1.5 max-w-full md:max-w-xs">
+                                                                            {(() => {
+                                                                                let techs: string[] = [];
+                                                                                try {
+                                                                                    techs = r.technologies ? JSON.parse(r.technologies) : [];
+                                                                                } catch { techs = []; }
+
+                                                                                // Also show server if distinct
+                                                                                if (r.web_server && !techs.includes(r.web_server)) {
+                                                                                    techs.unshift(r.web_server);
+                                                                                }
+
+                                                                                if (techs.length === 0) return <span className="text-xs text-muted-foreground/50 italic">No Tech Detected</span>;
+
+                                                                                return techs.map((t, i) => (
+                                                                                    <Badge key={i} variant="secondary" className="text-[10px] px-1.5 h-5 bg-secondary/50 text-secondary-foreground hover:bg-secondary">
+                                                                                        {t}
+                                                                                    </Badge>
+                                                                                ));
+                                                                            })()}
+                                                                        </div>
                                                                     </div>
                                                                 </div>
-                                                            </div>
-
-                                                            {/* Middle Row: Title */}
-                                                            <div className="text-xs text-muted-foreground truncate font-medium" title={r.title || "No Title"}>
-                                                                {r.title || <span className="opacity-50 italic">No Title</span>}
-                                                            </div>
-
-                                                            {/* Bottom Row: Tech & Latency */}
-                                                            <div className="mt-auto pt-2 border-t border-border/50 flex items-center justify-between text-[10px] text-muted-foreground">
-                                                                <div className="flex gap-1 flex-wrap max-h-[40px] overflow-hidden">
-                                                                    {renderTech(r.technologies)}
-                                                                </div>
-                                                                <span className="font-mono text-zinc-500 bg-zinc-500/10 px-1 rounded ml-2 whitespace-nowrap">
-                                                                    {r.response_time}
-                                                                </span>
-                                                            </div>
-                                                        </CardContent>
-                                                    </Card>
+                                                            </CardContent>
+                                                        </Card>
+                                                    </div>
                                                 ))}
                                             </div>
                                         </ScrollArea>
@@ -721,7 +1036,27 @@ export function HttpxPanel() {
                     </Card>
                 </TabsContent>
             </Tabs >
-        </div >
+            {/* Delete Confirmation Dialog */}
+            <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {isDeletingAll
+                                ? "This will permanently delete ALL scan history and results. This action cannot be undone."
+                                : "This will permanently delete this scan history. This action cannot be undone."}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleExecuteDelete} className="bg-red-600 hover:bg-red-700">
+                            {isDeletingAll ? "Delete All" : "Delete Scan"}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </div>
+
     );
 }
 

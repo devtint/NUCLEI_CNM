@@ -145,8 +145,10 @@ function initializeSchema() {
             status TEXT NOT NULL,
             count INTEGER DEFAULT 0,
             created_at INTEGER DEFAULT (strftime('%s', 'now'))
-        );
+        )
+    `);
 
+    db.exec(`
         CREATE TABLE IF NOT EXISTS httpx_results (
             id TEXT PRIMARY KEY,
             scan_id TEXT NOT NULL,
@@ -165,13 +167,14 @@ function initializeSchema() {
             ip TEXT,
             cname TEXT,
             cdn_name TEXT,
-            is_new BOOLEAN DEFAULT 1,
             timestamp INTEGER,
+            is_new BOOLEAN DEFAULT 0,
             change_status TEXT DEFAULT 'new',
+            screenshot_path TEXT,
             FOREIGN KEY(scan_id) REFERENCES httpx_scans(id) ON DELETE CASCADE
-        );
-        CREATE INDEX IF NOT EXISTS idx_httpx_results_scan_id ON httpx_results(scan_id);
+        )
     `);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_httpx_results_scan_id ON httpx_results(scan_id);`);
 
     // Migrations for HTTPX
     try {
@@ -181,8 +184,11 @@ function initializeSchema() {
         db.exec("ALTER TABLE httpx_scans ADD COLUMN log_path TEXT");
     } catch (e: any) { if (!e.message.includes("duplicate column")) { } }
     try {
-        db.exec("ALTER TABLE httpx_results ADD COLUMN change_status TEXT DEFAULT 'new'");
-    } catch (e: any) { if (!e.message.includes("duplicate column")) { } }
+        db.prepare("ALTER TABLE httpx_results ADD COLUMN change_status TEXT DEFAULT 'new'").run();
+    } catch (e) { /* ignore */ }
+    try {
+        db.prepare("ALTER TABLE httpx_results ADD COLUMN screenshot_path TEXT").run();
+    } catch (e) { /* ignore */ }
 }
 
 
@@ -259,6 +265,21 @@ export function deleteScan(id: string) {
     const db = getDatabase();
     const stmt = db.prepare('DELETE FROM scans WHERE id = ?');
     stmt.run(id);
+}
+
+// function deleteHttpxScan is already defined above
+
+export function clearHttpxResults() {
+    const db = getDatabase();
+    // Delete all results and scans
+    try {
+        db.exec("DELETE FROM httpx_results");
+        db.exec("DELETE FROM httpx_scans");
+        // Also clean up screenshots? For now let's just clear DB.
+    } catch (e) {
+        console.error("Failed to clear httpx data", e);
+        throw e;
+    }
 }
 
 // Finding operations
@@ -706,11 +727,11 @@ export function saveHttpxResults(scanId: string, results: any[]) {
             id, scan_id, url, host, port, scheme, title, status_code,
             subdomain, technologies, web_server, content_type,
             content_length, response_time, ip, cname, cdn_name, 
-            timestamp, change_status
+            timestamp, change_status, screenshot_path
         ) VALUES (
             ?, ?, ?, ?, ?, ?, ?, ?,
             ?, ?, ?, ?,
-            ?, ?, ?, ?, ?, ?, ?
+            ?, ?, ?, ?, ?, ?, ?, ?
         )
     `);
 
@@ -741,8 +762,8 @@ export function saveHttpxResults(scanId: string, results: any[]) {
             insert.run(
                 id, scanId, item.url, item.host, item.port, item.scheme, item.title, item.status_code,
                 item.input, technologies, item.webserver, item.content_type,
-                item.content_length, item.response_time, item.host, cnames, item.cdn_name,
-                now, status
+                item.content_length, item.response_time || item.time || "0ms", item.host_ip || (Array.isArray(item.a) ? item.a[0] : item.a) || item.ip, cnames, item.cdn_name,
+                now, status, item.screenshot_path
             );
         }
     });

@@ -43,6 +43,14 @@ Know your attack surface.
     *   *Example*: Scanning `Uber.com` today vs yesterday? It will **only** show you the 5 new subdomains found today.
 *   **One-Click pivot**: Click any asset in your inventory to instantly launch a Nuclei scan against it.
 
+### ⚡ 3. Live Asset Probing (HTTPX)
+Gain real-time visibility into your infrastructure.
+*   **Visual Drill-Down**: Full-screen detail view with high-res screenshots and response metadata.
+*   **Tech Stack Detection**: Automatically identifies WAFs, CMS (WordPress, Drupal), and frameworks.
+*   **Live Metrics**: Monitors latency, Content-Length, and Status Codes (200, 403, 500) in real-time.
+*   **Change Tracking**: Flags "New", "Changed", or "Stale" endpoints between scans.
+
+
 ### 🤖 3. AI-Powered Triage (Gemini)
 Don't just find bugs; understand them.
 *   **Executive Summaries**: One-click generation of professional risk assessments for any finding.

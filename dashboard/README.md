@@ -32,6 +32,7 @@ These tables track the execution of scans.
 |-------|-------------|------------|
 | `scans` | Nuclei scan metadata. | `id`, `target`, `status`, `exit_code`, `json_file_path` |
 | `subfinder_scans` | Subfinder scan metadata. | `id`, `target`, `status`, `count` |
+| `httpx_scans` | HTTPX probing metadata. | `id`, `target`, `status`, `count`, `pid` |
 
 ### 2. Findings & Vulnerabilities
 The core intelligence tables.
@@ -50,6 +51,13 @@ The continuous monitoring layer.
 | `monitored_targets` | Distinct parent domains being tracked. | `target`, `last_scan_date`, `total_count` |
 | `monitored_subdomains` | Global list of unique subdomains per target. | `subdomain`, `first_seen`, `last_seen` |
 | `subfinder_results` | Results specific to a single execution. | `scan_id`, `subdomain`, `is_new` (Boolean) |
+
+### 4. Probing (HTTPX)
+Real-time asset validation.
+
+| Table | Description | Key Fields |
+|-------|-------------|------------|
+| `httpx_results` | Live asset data. | `scan_id`, `url`, `title`, `tech`, `response_time`, `change_status` (new/old), `screenshot_path` |
 
 ---
 
@@ -97,6 +105,15 @@ The UI is built using modular, reusable components in `dashboard/components/`.
 *   `LiveConsole.tsx`: A real-time log viewer that tails the `.log` file of scanning processes.
 *   `TargetListManager.tsx`: A dialog text-editor & uploader for managing `.txt` target lists.
     *   **Features**: Drag & drop upload, manual creation (copy-paste), and persistent file storage in `scans/uploads/`.
+
+### `httpx/`
+*   `HttpxPanel.tsx`: The real-time asset probing interface. Features:
+    *   **Full Screen Drill-down**: Detailed view with screenshots and metadata.
+    *   **Live Metrics**: Latency, content-length, and status codes.
+    *   **History**: Scan history with "Delete" capabilities (using `AlertDialog`).
+
+### `ui/`
+*   Shadcn UI primitives including the new `alert-dialog.tsx` for destructive confirmations.
 
 
 ---

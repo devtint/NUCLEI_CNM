@@ -10,13 +10,26 @@ import {
     getHttpxScans,
     getHttpxResults,
     deleteHttpxScan,
-    getHttpxDomainSummary
+    getHttpxDomainSummary,
+    clearHttpxResults
 } from "@/lib/db";
 
 
 export async function DELETE(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
+    const action = searchParams.get('action');
+
+    if (action === 'clear_all') {
+        try {
+            clearHttpxResults();
+            // Optional: clean up logs/screenshots directory if needed
+            return NextResponse.json({ success: true, message: 'All assets cleared' });
+        } catch (e: any) {
+            return NextResponse.json({ error: e.message }, { status: 500 });
+        }
+    }
+
     if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
 
     try {
@@ -130,6 +143,12 @@ export async function POST(req: NextRequest) {
             log_path: logPath
         });
 
+        // Ensure screenshots directory exists
+        const screenshotsDir = path.join(process.cwd(), "public", "screenshots");
+        if (!fs.existsSync(screenshotsDir)) {
+            fs.mkdirSync(screenshotsDir, { recursive: true });
+        }
+
         // Construct Command
         const args = ["-json"]; // JSON is mandatory for parsing
 
@@ -140,6 +159,9 @@ export async function POST(req: NextRequest) {
         } else {
             args.push("-title", "-tech-detect", "-sc", "-ip", "-cname");
         }
+
+        // Enable Screenshots
+        // args.push("-ss", "-srd", screenshotsDir);
 
         let tempFilePath = "";
 
@@ -204,6 +226,13 @@ export async function POST(req: NextRequest) {
                         if (!line.trim()) continue;
                         try {
                             const parsed = JSON.parse(line);
+                            // Map screenshot path if exists
+                            if (parsed.screenshot_path) {
+                                // parsed.screenshot_path is absolute path from httpx
+                                // We need relative path for frontend: /screenshots/filename.png
+                                const filename = path.basename(parsed.screenshot_path);
+                                parsed.screenshot_path = `/screenshots/${filename}`;
+                            }
                             results.push(parsed);
                         } catch (e) {
                             // ignore invalid json lines

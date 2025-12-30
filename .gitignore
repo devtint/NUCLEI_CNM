@@ -51,6 +51,9 @@ Thumbs.db
 # Scan Results (Generated at Runtime)
 dashboard/scans/*.json
 dashboard/scans/*.log
+**/scans/uploads/
+dashboard/scans/uploads/
+
 
 # Privacy - Exclude saved documentation pages
 Refrencce and Usage And Guide/*.mhtml

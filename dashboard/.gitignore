@@ -44,3 +44,4 @@ nuclei.db-wal
 scans/*.json
 scans/*.log
 scans/uploads/
+public/screenshots/

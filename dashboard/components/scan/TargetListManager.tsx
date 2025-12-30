@@ -12,9 +12,10 @@ import { FileText, Upload, Plus, Check } from "lucide-react";
 interface TargetListManagerProps {
     onSelect: (filepath: string) => void;
     children?: React.ReactNode;
+    defaultTab?: "select" | "upload" | "create";
 }
 
-export function TargetListManager({ onSelect, children }: TargetListManagerProps) {
+export function TargetListManager({ onSelect, children, defaultTab = "select" }: TargetListManagerProps) {
     const [open, setOpen] = useState(false);
     const [files, setFiles] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
@@ -40,9 +41,9 @@ export function TargetListManager({ onSelect, children }: TargetListManagerProps
     useEffect(() => {
         if (open) {
             fetchFiles();
-            setActiveTab("select");
+            setActiveTab(defaultTab);
         }
-    }, [open]);
+    }, [open, defaultTab]);
 
     const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];

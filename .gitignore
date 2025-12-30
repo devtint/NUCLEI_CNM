@@ -53,6 +53,7 @@ dashboard/scans/*.json
 dashboard/scans/*.log
 **/scans/uploads/
 dashboard/scans/uploads/
+dashboard/public/screenshots/
 
 
 # Privacy - Exclude saved documentation pages

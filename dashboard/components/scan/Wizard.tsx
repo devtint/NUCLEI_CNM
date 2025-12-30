@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Terminal, Zap } from "lucide-react";
+import { Terminal, Zap, Upload, Plus, List } from "lucide-react";
 import { PREDEFINED_COMMANDS } from "@/lib/nuclei/presets";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TargetListManager } from "./TargetListManager";
@@ -83,12 +83,25 @@ export function ScanWizard({ onScanStart, initialTemplate, initialTarget }: Wiza
                                 readOnly={targetMode === 'list'}
                                 className={`bg-input border-border text-foreground font-mono ${targetMode === 'list' ? 'cursor-default opacity-80 focus-visible:ring-0 text-emerald-500' : 'placeholder:text-muted-foreground'}`}
                             />
-                            {targetMode === 'list' && (
-                                <TargetListManager onSelect={(path) => setTarget(path)} />
-                            )}
                         </div>
                         {targetMode === 'list' && (
-                            null
+                            <div className="mt-2 flex gap-2">
+                                <TargetListManager onSelect={(path) => setTarget(path)} defaultTab="select">
+                                    <Button variant="outline" className="flex-1 h-9 gap-2 border-emerald-500/20 hover:border-emerald-500/50 hover:bg-emerald-500/5 text-xs">
+                                        <List className="h-3 w-3 text-emerald-500" /> Choose List
+                                    </Button>
+                                </TargetListManager>
+                                <TargetListManager onSelect={(path) => setTarget(path)} defaultTab="upload">
+                                    <Button variant="outline" className="flex-1 h-9 gap-2 border-blue-500/20 hover:border-blue-500/50 hover:bg-blue-500/5 text-xs">
+                                        <Upload className="h-3 w-3 text-blue-500" /> Upload List
+                                    </Button>
+                                </TargetListManager>
+                                <TargetListManager onSelect={(path) => setTarget(path)} defaultTab="create">
+                                    <Button variant="outline" className="flex-1 h-9 gap-2 border-amber-500/20 hover:border-amber-500/50 hover:bg-amber-500/5 text-xs">
+                                        <Plus className="h-3 w-3 text-amber-500" /> Create List
+                                    </Button>
+                                </TargetListManager>
+                            </div>
                         )}
                     </div>
                 </div>

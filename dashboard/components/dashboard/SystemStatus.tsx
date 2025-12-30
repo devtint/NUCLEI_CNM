@@ -21,6 +21,7 @@ interface ToolStatus {
 interface SystemData {
     nuclei: ToolStatus;
     subfinder: ToolStatus;
+    httpx: ToolStatus;
     timestamp: number;
 }
 
@@ -65,38 +66,42 @@ export function SystemStatus() {
         );
     }
 
-    const ToolIndicator = ({ name, status }: { name: string, status: ToolStatus }) => (
-        <TooltipProvider>
-            <Tooltip delayDuration={300}>
-                <TooltipTrigger asChild>
-                    <div className={cn(
-                        "flex items-center gap-1.5 text-xs px-2 py-1 rounded-md transition-colors border",
-                        status.installed
-                            ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20"
-                            : "bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20"
-                    )}>
+    const ToolIndicator = ({ name, status }: { name: string, status: ToolStatus | undefined }) => {
+        if (!status) return null; // Or render loading state
+
+        return (
+            <TooltipProvider>
+                <Tooltip delayDuration={300}>
+                    <TooltipTrigger asChild>
+                        <div className={cn(
+                            "flex items-center gap-1.5 text-xs px-2 py-1 rounded-md transition-colors border",
+                            status.installed
+                                ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20"
+                                : "bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20"
+                        )}>
+                            {status.installed ? (
+                                <div className="relative flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                </div>
+                            ) : (
+                                <AlertCircle className="h-3 w-3" />
+                            )}
+                            <span className="font-medium capitalize">{name}</span>
+                        </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p className="font-semibold">{name} Status</p>
                         {status.installed ? (
-                            <div className="relative flex h-2 w-2">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                            </div>
+                            <p className="text-xs text-muted-foreground">{status.version}</p>
                         ) : (
-                            <AlertCircle className="h-3 w-3" />
+                            <p className="text-xs text-red-400">Not found in PATH</p>
                         )}
-                        <span className="font-medium capitalize">{name}</span>
-                    </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                    <p className="font-semibold">{name} Status</p>
-                    {status.installed ? (
-                        <p className="text-xs text-muted-foreground">{status.version}</p>
-                    ) : (
-                        <p className="text-xs text-red-400">Not found in PATH</p>
-                    )}
-                </TooltipContent>
-            </Tooltip>
-        </TooltipProvider>
-    );
+                    </TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
+        );
+    };
 
     return (
         <div className="flex items-center gap-2">
@@ -107,6 +112,7 @@ export function SystemStatus() {
             <div className="flex gap-2">
                 <ToolIndicator name="nuclei" status={data.nuclei} />
                 <ToolIndicator name="subfinder" status={data.subfinder} />
+                <ToolIndicator name="httpx" status={data.httpx} />
 
                 <Button
                     variant="ghost"

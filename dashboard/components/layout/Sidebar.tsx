@@ -31,6 +31,7 @@ export function Sidebar({ className, activeView, onChangeView }: SidebarProps) {
         { id: "history", label: "Scan History", icon: History },
         { id: "templates", label: "Templates", icon: FileCode },
         { id: "subfinder", label: "Subfinder", icon: Network },
+        { id: "httpx", label: "Live Assets", icon: Activity },
         { id: "settings", label: "Settings", icon: Settings },
     ];
 

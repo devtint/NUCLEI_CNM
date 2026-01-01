@@ -55,6 +55,13 @@ Turn ephemeral CLI output into a permanent, intelligent asset inventory.
 *   **One-Click Updates**: Keep your engines and templates fresh with instant update actions.
 *   **Smart Detection**: Automatically finds installed versions and template snapshots, with cross-platform support for Windows/Linux paths (e.g., `~/.local`).
 
+### 5. Backup & Restore
+*   **Complete Data Export**: Create full backups of all Nuclei findings, Subfinder discoveries, and HTTPX results in a single JSON file.
+*   **Secure Format**: Proprietary backup format with version metadata prevents accidental imports of incompatible data.
+*   **Transaction-Safe Restore**: All-or-nothing restore with automatic rollback on errors ensures database integrity.
+*   **Import External Scans**: Upload Nuclei JSON output from CI/CD pipelines or remote scans for centralized management.
+*   **Duplicate Prevention**: Automatic deduplication during restore prevents data conflicts.
+
 ---
 
 ## 🔒 Security Features (Hardened)

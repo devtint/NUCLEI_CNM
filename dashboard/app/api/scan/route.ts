@@ -129,34 +129,92 @@ export async function POST(req: NextRequest) {
                 console.error("Error getting file stats:", e);
             }
 
-            // Parse and store findings in database
+            // Parse and store findings in database using streaming
             if (fs.existsSync(outputPath)) {
                 try {
-                    const jsonContent = await fs.promises.readFile(outputPath, 'utf-8');
-                    const findings = JSON.parse(jsonContent);
-
-                    if (Array.isArray(findings) && findings.length > 0) {
-                        const findingRecords: FindingRecord[] = findings.map((f: any) => ({
-                            scan_id: scanId,
-                            template_id: f['template-id'] || f.templateId,
-                            template_path: f['template-path'] || f.templatePath,
-                            name: f.info?.name,
-                            severity: f.info?.severity,
-                            type: f.type,
-                            host: f.host,
-                            matched_at: f['matched-at'] || f.matchedAt,
-                            matcher_name: f['matcher-name'] || f.matcherName,
-                            request: f.request,
-                            response: f.response,
-                            timestamp: f.timestamp,
-                            raw_json: JSON.stringify(f)
-                        }));
-
-                        insertFindings(findingRecords);
-                        console.log(`Stored ${findingRecords.length} findings for scan ${scanId}`);
-                    }
+                    // @ts-ignore - stream-json types not available
+                    const { default: StreamArray } = await import('stream-json/streamers/StreamArray');
+                    // @ts-ignore - stream-chain types not available
+                    const { chain } = await import('stream-chain');
+                    
+                    const findingRecords: FindingRecord[] = [];
+                    let processedCount = 0;
+                    
+                    await new Promise((resolve, reject) => {
+                        const pipeline = chain([
+                            fs.createReadStream(outputPath),
+                            StreamArray.withParser()
+                        ]);
+                        
+                        pipeline.on('data', (data: any) => {
+                            const f = data.value;
+                            findingRecords.push({
+                                scan_id: scanId,
+                                template_id: f['template-id'] || f.templateId,
+                                template_path: f['template-path'] || f.templatePath,
+                                name: f.info?.name,
+                                severity: f.info?.severity,
+                                type: f.type,
+                                host: f.host,
+                                matched_at: f['matched-at'] || f.matchedAt,
+                                matcher_name: f['matcher-name'] || f.matcherName,
+                                request: f.request,
+                                response: f.response,
+                                timestamp: f.timestamp,
+                                raw_json: JSON.stringify(f)
+                            });
+                            
+                            processedCount++;
+                            
+                            // Batch insert every 100 findings to manage memory
+                            if (findingRecords.length >= 100) {
+                                insertFindings([...findingRecords]);
+                                findingRecords.length = 0;
+                            }
+                        });
+                        
+                        pipeline.on('end', () => {
+                            // Insert remaining findings
+                            if (findingRecords.length > 0) {
+                                insertFindings([...findingRecords]);
+                            }
+                            console.log(`Stored ${processedCount} findings for scan ${scanId}`);
+                            resolve(true);
+                        });
+                        
+                        pipeline.on('error', (err: Error) => {
+                            console.error(`Stream parsing error for scan ${scanId}:`, err);
+                            reject(err);
+                        });
+                    });
                 } catch (e) {
                     console.error(`Failed to parse findings for scan ${scanId}:`, e);
+                    // Fallback to old method if streaming fails
+                    try {
+                        const jsonContent = await fs.promises.readFile(outputPath, 'utf-8');
+                        const findings = JSON.parse(jsonContent);
+                        if (Array.isArray(findings) && findings.length > 0) {
+                            const findingRecords: FindingRecord[] = findings.map((f: any) => ({
+                                scan_id: scanId,
+                                template_id: f['template-id'] || f.templateId,
+                                template_path: f['template-path'] || f.templatePath,
+                                name: f.info?.name,
+                                severity: f.info?.severity,
+                                type: f.type,
+                                host: f.host,
+                                matched_at: f['matched-at'] || f.matchedAt,
+                                matcher_name: f['matcher-name'] || f.matcherName,
+                                request: f.request,
+                                response: f.response,
+                                timestamp: f.timestamp,
+                                raw_json: JSON.stringify(f)
+                            }));
+                            insertFindings(findingRecords);
+                            console.log(`Stored ${findingRecords.length} findings (fallback) for scan ${scanId}`);
+                        }
+                    } catch (fallbackErr) {
+                        console.error(`Fallback parsing also failed for scan ${scanId}:`, fallbackErr);
+                    }
                 }
             } else {
                 // Create empty file if no results

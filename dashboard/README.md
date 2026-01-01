@@ -10,6 +10,24 @@ The app uses a **Hybrid Architecture** (Next.js App Router):
 1.  **Backend (API Routes)**: Handles `child_process` spawning for CLI tools (Nuclei, Subfinder, Httpx) and SQLite `better-sqlite3` operations.
 2.  **Frontend (React 19)**: Client-side polling for real-time updates using `SWR`-like patterns (custom `useEffect` hooks).
 
+### 🐳 Docker Architecture
+
+**Multi-Stage Build** (Alpine Linux base):
+*   **Stage 1 (Go Builder)**: Compiles latest ProjectDiscovery tools from source.
+*   **Stage 2 (Node Builder)**: Builds Next.js production bundle with native SQLite bindings.
+*   **Stage 3 (Runtime)**: Minimal Alpine image with Chromium for screenshots.
+
+**Volume Persistence**:
+*   `/app/data` → Database storage (survives container lifecycle)
+*   `/app/scans` → Scan results and logs
+*   `/root/.config/nuclei` → Scanner configuration
+*   `/root/nuclei-templates` → Template cache
+
+**Security**:
+*   Runs as non-root `appuser` (UID 1000)
+*   Self-signed SSL certificates generated at build time
+*   Health checks via HTTPS endpoint (`/api/system/status`)
+
 ---
 
 ## 🗄️ Database Schema

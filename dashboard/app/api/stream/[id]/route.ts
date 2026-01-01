@@ -2,8 +2,8 @@ import { NextRequest } from "next/server";
 import fs from "fs";
 import path from "path";
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-    const { id } = params;
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+    const { id } = await params;
 
     // We need to return a ReadableStream for SSE
     const stream = new ReadableStream({

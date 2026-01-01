@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  nuclei-dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nuclei-command-center
+    ports:
+      - "3000:3000"
+      - "443:3000"
+    environment:
+      - NODE_ENV=production
+      - DOCKER_ENV=true
+      - AUTH_SECRET=${AUTH_SECRET:-your-secret-key-here}
+      - ADMIN_PASSWORD_HASH=${ADMIN_PASSWORD_HASH}
+      - AUTH_TRUST_HOST=true
+    volumes:
+      # Persistent database directory
+      - nuclei-data:/app/data
+      # Scan results and logs
+      - ./scans:/app/scans
+      # Nuclei config and templates (optional, for persistence)
+      - nuclei-config:/root/.config/nuclei
+      - nuclei-templates:/root/nuclei-templates
+    restart: unless-stopped
+    # Use host network for high-throughput scanning (optional)
+    # network_mode: host
+    healthcheck:
+      test: ["CMD", "node", "-e", "const https = require('https'); https.get({hostname:'localhost',port:3000,path:'/api/system/status',rejectUnauthorized:false}, (r) => { process.exit(r.statusCode === 200 ? 0 : 1); }).on('error', () => process.exit(1));"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  nuclei-data:
+    driver: local
+  nuclei-config:
+    driver: local
+  nuclei-templates:
+    driver: local

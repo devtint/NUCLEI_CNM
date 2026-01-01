@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getFindingsByScan, deleteFinding, updateFinding, getDatabase } from "@/lib/db";
+import { getFindingsByScan, getFindingsPaginated, getFindingsTotalCount, deleteFinding, updateFinding, getDatabase } from "@/lib/db";
 import { withCache, cache } from "@/lib/cache";
 import { handleApiError, dbOperation, ErrorType, ApiError } from "@/lib/errors";
 
@@ -7,42 +7,65 @@ export async function GET(req: NextRequest) {
     try {
         const { searchParams } = new URL(req.url);
         const scanId = searchParams.get("scanId");
+        const page = parseInt(searchParams.get("page") || "1");
+        const limit = parseInt(searchParams.get("limit") || "100");
 
-        const findings = withCache(
-            scanId ? `findings-${scanId}` : "findings-all",
+        // Validate pagination params
+        if (page < 1 || limit < 1 || limit > 500) {
+            throw new ApiError(
+                ErrorType.VALIDATION_ERROR,
+                "Invalid pagination parameters (page >= 1, 1 <= limit <= 500)",
+                400
+            );
+        }
+
+        const cacheKey = scanId 
+            ? `findings-${scanId}-p${page}-l${limit}` 
+            : `findings-all-p${page}-l${limit}`;
+
+        const result = withCache(
+            cacheKey,
             20000, // 20-second TTL
             () => {
                 return dbOperation(() => {
-                    let results;
+                    // Get paginated findings
+                    const findings = getFindingsPaginated({
+                        page,
+                        limit,
+                        scanId: scanId || undefined
+                    });
 
-                    if (scanId) {
-                        // Get findings for specific scan
-                        results = getFindingsByScan(scanId);
-                    } else {
-                        // Get ALL findings from all scans
-                        const db = getDatabase();
-                        const stmt = db.prepare('SELECT * FROM findings ORDER BY created_at DESC');
-                        results = stmt.all();
-                    }
+                    // Get total count
+                    const total = getFindingsTotalCount(scanId || undefined);
 
                     // Parse raw_json for each finding and map to expected format
-                    return results.map((f: any) => {
+                    const data = findings.map((f: any) => {
                         const rawData = JSON.parse(f.raw_json);
                         return {
                             ...rawData,
                             id: f.id,
                             _sourceFile: `${f.scan_id}.json`,
                             _dbId: f.id,
-                            _status: f.status || 'New', // Include status
+                            _status: f.status || 'New',
                             request: f.request,
                             response: f.response
                         };
                     });
+
+                    return {
+                        data,
+                        pagination: {
+                            page,
+                            limit,
+                            total,
+                            totalPages: Math.ceil(total / limit)
+                        }
+                    };
                 }, "Failed to fetch findings");
             }
         );
 
-        return NextResponse.json(findings);
+        return NextResponse.json(result);
     } catch (error) {
         return handleApiError(error);
     }

@@ -1,35 +1,39 @@
 import path from "path";
 import os from "os";
 
-// We need to resolve the user's home directory dynamically to be safe,
-// or hardcode it as per the guide if strict adherence is required.
-// The guide explicitly listed: C:\Users\naing\...
-// But using os.homedir() is safer for the specific machine running this.
-
-const HOME_DIR = os.homedir();
-const isWindows = process.platform === 'win32';
+// Detect if running in Docker/production (hardcoded Linux paths) or development
+const IS_DOCKER = process.env.DOCKER_ENV === 'true' || process.platform === 'linux';
+const HOME_DIR = IS_DOCKER ? '/root' : os.homedir();
+const isWindows = !IS_DOCKER && process.platform === 'win32';
 
 export const NUCLEI_PATHS = {
     // Config:
+    // Docker/Linux: /root/.config/nuclei
     // Windows: %APPDATA%\nuclei
-    // Linux/Mac: ~/.config/nuclei
-    CONFIG_DIR: isWindows
-        ? path.join(HOME_DIR, "AppData", "Roaming", "nuclei")
-        : path.join(HOME_DIR, ".config", "nuclei"),
+    // Mac: ~/.config/nuclei
+    CONFIG_DIR: IS_DOCKER
+        ? path.join(HOME_DIR, ".config", "nuclei")
+        : isWindows
+            ? path.join(HOME_DIR, "AppData", "Roaming", "nuclei")
+            : path.join(HOME_DIR, ".config", "nuclei"),
 
     // Cache:
+    // Docker/Linux: /root/.cache/nuclei
     // Windows: %LOCALAPPDATA%\nuclei
-    // Linux/Mac: ~/.cache/nuclei
-    CACHE_DIR: isWindows
-        ? path.join(HOME_DIR, "AppData", "Local", "nuclei")
-        : path.join(HOME_DIR, ".cache", "nuclei"),
+    // Mac: ~/.cache/nuclei
+    CACHE_DIR: IS_DOCKER
+        ? path.join(HOME_DIR, ".cache", "nuclei")
+        : isWindows
+            ? path.join(HOME_DIR, "AppData", "Local", "nuclei")
+            : path.join(HOME_DIR, ".cache", "nuclei"),
 
-    // PDCP: ~/.pdcp (Same on all platforms ideally)
+    // PDCP: ~/.pdcp (Same on all platforms)
     PDCP_DIR: path.join(HOME_DIR, ".pdcp"),
 
     // Templates:
+    // Docker/Linux: /root/nuclei-templates
     // Windows: %USERPROFILE%\nuclei-templates
-    // Linux/Mac: ~/nuclei-templates
+    // Mac: ~/nuclei-templates
     TEMPLATES_DIR: path.join(HOME_DIR, "nuclei-templates"),
 };
 

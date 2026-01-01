@@ -10,7 +10,11 @@ function getManualEnv(key: string): string | undefined {
     if (!manualEnvCache) {
         manualEnvCache = {};
         try {
-            const envPath = path.join(process.cwd(), '.env.local');
+            // Try .env first, then .env.local
+            let envPath = path.join(process.cwd(), '.env');
+            if (!fs.existsSync(envPath)) {
+                envPath = path.join(process.cwd(), '.env.local');
+            }
             if (fs.existsSync(envPath)) {
                 const content = fs.readFileSync(envPath, 'utf-8');
                 content.split('\n').forEach(line => {

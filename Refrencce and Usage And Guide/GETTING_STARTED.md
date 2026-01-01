@@ -4,9 +4,47 @@ Complete guide to setting up and using the Nuclei Dashboard.
 
 ---
 
-## Prerequisites
+## Quick Start (Docker) - Recommended
 
-### Required Software
+### Prerequisites
+- Docker Desktop or Docker Engine installed
+- 2GB RAM minimum
+
+### Installation (5 minutes)
+```bash
+# 1. Clone repository
+git clone <repository-url>
+cd NUCLEI_CNM/dashboard
+
+# 2. Generate admin password
+docker run --rm -it node:20-alpine sh -c "npm install bcryptjs && node -e \"const bcrypt = require('bcryptjs'); console.log(bcrypt.hashSync('YOUR_PASSWORD', 10));\""
+
+# 3. Create environment file
+echo "AUTH_SECRET=$(openssl rand -base64 32)" > .env
+echo "ADMIN_PASSWORD_HASH=your-hash-from-step-2" >> .env
+
+# 4. Launch
+docker-compose up -d
+
+# 5. Access dashboard
+open https://localhost:3000
+```
+
+**What's included:**
+✅ Nuclei v3, Subfinder, HTTPX pre-installed  
+✅ Database persistence (survives restarts)  
+✅ SSL/HTTPS enabled  
+✅ Templates auto-updated
+
+**Skip to [First Scan](#first-scan) section below.**
+
+---
+
+## Manual Installation (Advanced)
+
+### Prerequisites
+
+#### Required Software
 1. **Node.js** (v18 or higher)
    - Download: https://nodejs.org/
    - Verify: `node --version`

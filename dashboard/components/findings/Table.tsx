@@ -118,20 +118,35 @@ export function FindingsTable() {
     const [statusFilters, setStatusFilters] = useState<string[]>([]);
     const [hostFilters, setHostFilters] = useState<string[]>([]);
     const [findingToDelete, setFindingToDelete] = useState<Finding | null>(null);
+    
+    // Pagination state
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(100);
+    const [totalItems, setTotalItems] = useState(0);
+    const [totalPages, setTotalPages] = useState(0);
 
     const fetchFindings = async () => {
         setLoading(true);
         try {
-            const res = await fetch("/api/findings");
+            const res = await fetch(`/api/findings?page=${currentPage}&limit=${itemsPerPage}`);
             const data = await res.json();
-            setFindings(data);
+            
+            // Handle paginated response
+            if (data.data && data.pagination) {
+                setFindings(data.data);
+                setTotalItems(data.pagination.total);
+                setTotalPages(data.pagination.totalPages);
+            } else {
+                // Fallback for non-paginated response
+                setFindings(Array.isArray(data) ? data : []);
+            }
         } catch (e) { console.error(e) }
         finally { setLoading(false); }
     };
 
     useEffect(() => {
         fetchFindings();
-    }, []);
+    }, [currentPage, itemsPerPage]);
 
     const getSeverityColor = (severity: string) => {
         switch (severity.toLowerCase()) {
@@ -630,6 +645,71 @@ export function FindingsTable() {
                             </CardFooter>
                         </Card>
                     ))}
+                </div>
+            )}
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+                <div className="mt-6 flex items-center justify-between border-t border-border pt-4">
+                    <div className="flex items-center gap-4">
+                        <div className="text-sm text-muted-foreground">
+                            Showing {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} findings
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm text-muted-foreground">Items per page:</span>
+                            <select
+                                value={itemsPerPage}
+                                onChange={(e) => {
+                                    setItemsPerPage(Number(e.target.value));
+                                    setCurrentPage(1);
+                                }}
+                                className="bg-background border border-border rounded px-2 py-1 text-sm"
+                            >
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                                <option value="200">200</option>
+                                <option value="500">500</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCurrentPage(1)}
+                            disabled={currentPage === 1}
+                        >
+                            First
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                            disabled={currentPage === 1}
+                        >
+                            Previous
+                        </Button>
+                        <div className="text-sm text-muted-foreground px-3">
+                            Page {currentPage} of {totalPages}
+                        </div>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                            disabled={currentPage === totalPages}
+                        >
+                            Next
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCurrentPage(totalPages)}
+                            disabled={currentPage === totalPages}
+                        >
+                            Last
+                        </Button>
+                    </div>
                 </div>
             )}
 

@@ -2,15 +2,16 @@
 
 ## Table of Contents
 1. [System Overview](#system-overview)
-2. [Technology Stack](#technology-stack)
-3. [Project Structure](#project-structure)
-4. [Architecture Patterns](#architecture-patterns)
-5. [Data Flow](#data-flow)
-6. [Component Architecture](#component-architecture)
-7. [API Architecture](#api-architecture)
-8. [Database Schema](#database-schema)
-9. [Storage Strategy](#storage-strategy)
-10. [Caching Strategy](#caching-strategy)
+2. [Deployment Options](#deployment-options)
+3. [Technology Stack](#technology-stack)
+4. [Project Structure](#project-structure)
+5. [Architecture Patterns](#architecture-patterns)
+6. [Data Flow](#data-flow)
+7. [Component Architecture](#component-architecture)
+8. [API Architecture](#api-architecture)
+9. [Database Schema](#database-schema)
+10. [Storage Strategy](#storage-strategy)
+11. [Caching Strategy](#caching-strategy)
 
 ---
 
@@ -34,6 +35,57 @@ The Nuclei Dashboard is a **Next.js-based web application** with **SQLite databa
 4. **Real-time Updates**: Database polling for scan status
 5. **Client-Side State**: React hooks for UI state management
 6. **Response Caching**: In-memory caching with TTL for API optimization
+
+---
+
+## Deployment Options
+
+### 🐳 Docker Deployment (Recommended)
+
+**Architecture:** Multi-stage Alpine Linux container
+
+**Layers:**
+1. **Go Builder Stage**: Compiles Nuclei, Subfinder, HTTPX from source
+2. **Node Builder Stage**: Builds Next.js production bundle with native SQLite bindings
+3. **Runtime Stage**: Minimal Alpine + Chromium for screenshots
+
+**Persistence:**
+- `/app/data` → SQLite database (Docker volume)
+- `/app/scans` → Scan results and logs (bind mount)
+- `/root/.config/nuclei` → Scanner config (Docker volume)
+- `/root/nuclei-templates` → Template cache (Docker volume)
+
+**Security:**
+- Non-root user (`appuser` UID 1000)
+- Self-signed SSL certificates
+- HTTPS-only with health checks
+- Isolated network namespace
+
+**Benefits:**
+✅ Zero dependencies (everything pre-installed)  
+✅ Consistent environment across platforms  
+✅ Data persists across updates  
+✅ Easy rollback and backups  
+✅ Production-ready configuration
+
+### 💻 Manual Deployment
+
+**Architecture:** Bare-metal Node.js + System-installed scanners
+
+**Requirements:**
+- Node.js v20+ runtime
+- Go 1.21+ (to install scanners)
+- System PATH configured for binaries
+
+**Benefits:**
+✅ Full customization  
+✅ Direct access to code  
+✅ Faster development iteration
+
+**Use Cases:**
+- Development and debugging
+- Custom integrations
+- Air-gapped environments
 
 ---
 

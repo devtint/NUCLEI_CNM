@@ -5,7 +5,7 @@ import fs from "fs";
 import { constructCommand, NUCLEI_BINARY } from "@/lib/nuclei/config";
 import { getDatabase, FindingRecord } from "@/lib/db";
 
-export async function POST(req: NextRequest) {
+export async function POST(req: NextRequest): Promise<NextResponse> {
     try {
         const body = await req.json();
         const { findingId, target, templateId } = body;

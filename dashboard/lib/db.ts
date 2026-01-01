@@ -2,9 +2,16 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import crypto from 'crypto';
 import { normalizeUrl } from './utils';
+import fs from 'fs';
 
-// Database file location
-const DB_PATH = path.join(process.cwd(), 'nuclei.db');
+// Database file location - use /app/data for Docker volume persistence
+const DB_DIR = process.env.DOCKER_ENV ? '/app/data' : process.cwd();
+const DB_PATH = path.join(DB_DIR, 'nuclei.db');
+
+// Ensure database directory exists
+if (!fs.existsSync(DB_DIR)) {
+    fs.mkdirSync(DB_DIR, { recursive: true });
+}
 
 // Initialize database
 let db: Database.Database | null = null;
@@ -14,6 +21,13 @@ export function getDatabase(): Database.Database {
         db = new Database(DB_PATH);
         db.pragma('journal_mode = WAL'); // Better performance for concurrent access
         initializeSchema();
+        
+        // Recover orphaned scans on startup
+        try {
+            recoverOrphanedScans();
+        } catch (err) {
+            console.error('[Database] Failed to recover orphaned scans:', err);
+        }
     }
     return db;
 }
@@ -449,6 +463,49 @@ export function getFindingsByScan(scanId: string): FindingRecord[] {
     return stmt.all(scanId) as FindingRecord[];
 }
 
+// Pagination support for findings
+export interface PaginationParams {
+    page?: number;
+    limit?: number;
+    scanId?: string;
+}
+
+export function getFindingsPaginated(params: PaginationParams = {}): FindingRecord[] {
+    const db = getDatabase();
+    const page = params.page || 1;
+    const limit = params.limit || 100;
+    const offset = (page - 1) * limit;
+
+    let query = 'SELECT * FROM findings';
+    const queryParams: any[] = [];
+
+    if (params.scanId) {
+        query += ' WHERE scan_id = ?';
+        queryParams.push(params.scanId);
+    }
+
+    query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+    queryParams.push(limit, offset);
+
+    const stmt = db.prepare(query);
+    return stmt.all(...queryParams) as FindingRecord[];
+}
+
+export function getFindingsTotalCount(scanId?: string): number {
+    const db = getDatabase();
+    let query = 'SELECT COUNT(*) as count FROM findings';
+    const queryParams: any[] = [];
+
+    if (scanId) {
+        query += ' WHERE scan_id = ?';
+        queryParams.push(scanId);
+    }
+
+    const stmt = db.prepare(query);
+    const result = stmt.get(...queryParams) as { count: number };
+    return result.count;
+}
+
 export function getFindingCount(scanId: string): number {
     const db = getDatabase();
     const stmt = db.prepare('SELECT COUNT(*) as count FROM findings WHERE scan_id = ?');
@@ -863,4 +920,34 @@ export function getAccessLogs(limit: number = 50) {
     return db.prepare(`
         SELECT * FROM access_logs ORDER BY timestamp DESC LIMIT ?
     `).all(limit);
+}
+
+// Process Recovery: Mark orphaned scans as failed on startup
+export function recoverOrphanedScans(): string[] {
+    const db = getDatabase();
+    
+    // Find all scans that were "running" but server restarted
+    const orphanedScans = db.prepare(`
+        SELECT id FROM scans WHERE status = 'running'
+    `).all() as { id: string }[];
+    
+    if (orphanedScans.length > 0) {
+        console.log(`[Recovery] Found ${orphanedScans.length} orphaned scan(s)`);
+        
+        // Mark them as failed with recovery note
+        const stmt = db.prepare(`
+            UPDATE scans 
+            SET status = 'failed', 
+                end_time = ?,
+                exit_code = -1
+            WHERE status = 'running'
+        `);
+        stmt.run(Math.floor(Date.now() / 1000));
+        
+        const ids = orphanedScans.map(s => s.id);
+        console.log(`[Recovery] Marked scans as failed: ${ids.join(', ')}`);
+        return ids;
+    }
+    
+    return [];
 }

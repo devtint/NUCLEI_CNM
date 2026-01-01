@@ -203,7 +203,43 @@ New → Confirmed → Fixed
 
 ---
 
-### 10. Performance Optimization
+### 11. Backup & Restore
+
+**Complete Data Management:**
+- Export all data (Nuclei, Subfinder, HTTPX) to a single JSON file
+- Proprietary backup format with version metadata
+- Transaction-safe restore with automatic rollback
+- Import external Nuclei JSON scans
+
+**Backup Features:**
+- One-click full database export
+- Includes all findings, scans, and metadata
+- Timestamped backup files
+- Automatic download
+
+**Restore Features:**
+- Format validation (only accepts Nuclei CC backups)
+- SQLite transaction safety (all-or-nothing)
+- Foreign key error handling
+- Duplicate prevention with INSERT OR IGNORE
+- Detailed restore statistics
+
+**Import External Scans:**
+- Upload Nuclei JSON output from CI/CD pipelines
+- Validates Nuclei format (checks required fields)
+- Automatic deduplication using hash logic
+- Creates scan records for imported data
+
+**Use Cases:**
+- Regular data backups before updates
+- Migrate data between environments
+- Centralize scans from multiple devices
+- Import automated scan results
+- Team collaboration and data sharing
+
+---
+
+### 12. Performance Optimization
 
 **Response Caching:**
 - History API: 30-second TTL
@@ -225,7 +261,7 @@ New → Confirmed → Fixed
 
 ---
 
-### 11. Settings Management
+### 13. Settings Management
 
 **Configurable Parameters:**
 - **Rate Limit** (50-1000 req/s)
@@ -239,7 +275,7 @@ New → Confirmed → Fixed
 
 ---
 
-### 12. Error Handling
+### 14. Error Handling
 
 **Centralized Error Management:**
 - Custom error types

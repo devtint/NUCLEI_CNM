@@ -187,6 +187,51 @@ Click "Export" and choose:
 
 ---
 
+## Backup & Restore
+
+### Creating a Backup
+
+1. Navigate to "Backup & Restore" in the sidebar
+2. Click the "Backup" tab
+3. Click "Download Backup" button
+4. Save the `nuclei-cc-backup_{timestamp}.json` file
+
+**What's Included:**
+- All Nuclei vulnerability findings
+- All Subfinder subdomain discoveries
+- All HTTPX live asset data
+- Scan history and metadata
+
+### Restoring from Backup
+
+1. Navigate to "Backup & Restore"
+2. Click the "Restore" tab
+3. Click "Select Backup File"
+4. Choose a Nuclei CC backup file
+5. Wait for restore to complete
+6. Review restore statistics
+
+**Important:**
+- Only Nuclei CC backup files are accepted
+- Existing data will not be overwritten (duplicate prevention)
+- Restore uses transactions (all-or-nothing)
+
+### Importing External Nuclei Scans
+
+1. Navigate to "Backup & Restore"
+2. Click the "Import Nuclei JSON" tab
+3. Click "Select JSON File"
+4. Choose a Nuclei JSON output file
+5. Wait for import to complete
+
+**Use Cases:**
+- Import scans from CI/CD pipelines
+- Centralize scans from multiple devices
+- Import historical scan data
+- Team collaboration
+
+---
+
 ## Scan History
 
 ### Viewing Past Scans

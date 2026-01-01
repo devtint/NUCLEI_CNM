@@ -14,6 +14,16 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -107,6 +117,7 @@ export function FindingsTable() {
     const [severityFilters, setSeverityFilters] = useState<string[]>(["critical", "high", "medium", "low", "unknown"]);
     const [statusFilters, setStatusFilters] = useState<string[]>([]);
     const [hostFilters, setHostFilters] = useState<string[]>([]);
+    const [findingToDelete, setFindingToDelete] = useState<Finding | null>(null);
 
     const fetchFindings = async () => {
         setLoading(true);
@@ -261,21 +272,24 @@ export function FindingsTable() {
         }
     };
 
-    const deleteFinding = async (f: Finding) => {
-        if (!confirm("Are you sure you want to delete this finding? This cannot be undone.")) return;
+    const deleteFinding = async () => {
+        if (!findingToDelete) return;
 
         try {
             await fetch("/api/findings", {
                 method: "DELETE",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    id: (f as any)._dbId || (f as any).id
+                    id: (findingToDelete as any)._dbId || (findingToDelete as any).id
                 }),
             });
+            toast.success("Finding deleted successfully");
             fetchFindings();
         } catch (e) {
-            alert("Failed to delete finding");
+            toast.error("Failed to delete finding");
             console.error(e);
+        } finally {
+            setFindingToDelete(null);
         }
     };
 
@@ -510,109 +524,110 @@ export function FindingsTable() {
                             key={i}
                             onClick={() => setSelectedFinding(f)}
                             className={cn(
-                                "cursor-pointer transition-all duration-200 hover:scale-[1.005] hover:bg-muted/10 group",
+                                "cursor-pointer transition-all duration-200 hover:scale-[1.005] hover:bg-muted/10 group flex flex-col",
                                 "border shadow-sm",
                                 getSeverityBorder(f.info.severity)
                             )}
                         >
-                            <CardContent className="p-4">
-                                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                                    <div className="flex-1 min-w-0 space-y-2">
-                                        <div className="flex items-start gap-3">
-                                            <div className="flex-1 min-w-0">
-                                                <h4 className="text-base font-bold leading-tight group-hover:text-primary transition-colors mb-1.5">
-                                                    {f.info.name}
-                                                </h4>
-                                                <div className="flex flex-wrap gap-2 items-center">
-                                                    <Badge variant="outline" className={`${getSeverityColor(f.info.severity)} text-[10px] px-1.5 h-5 uppercase tracking-wider font-bold`}>
-                                                        {f.info.severity}
-                                                    </Badge>
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                                            <Badge className={cn("cursor-pointer hover:opacity-80 text-[10px] px-2 h-5 uppercase", getStatusColor(f._status))}>
-                                                                {f._status || "New"}
-                                                            </Badge>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="start" className="bg-black/90 border-white/10 text-zinc-300">
-                                                            <DropdownMenuLabel>Change Status</DropdownMenuLabel>
-                                                            <DropdownMenuSeparator className="bg-white/10" />
-                                                            {["New", "Confirmed", "False Positive", "Fixed", "Closed"].map(s => (
-                                                                <DropdownMenuItem key={s} onClick={(e) => { e.stopPropagation(); updateStatus(f, s); }}>
-                                                                    {s}
-                                                                </DropdownMenuItem>
-                                                            ))}
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                    <p className="text-xs text-muted-foreground font-mono">
-                                                        {f["template-id"]}
-                                                    </p>
-                                                </div>
+                            <CardContent className="p-4 pb-0 flex-1">
+                                <div className="space-y-2">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="flex-1 min-w-0">
+                                            <h4 className="text-base font-bold leading-tight group-hover:text-primary transition-colors mb-1.5">
+                                                {f.info.name}
+                                            </h4>
+                                            <div className="flex flex-wrap gap-2 items-center">
+                                                <Badge variant="outline" className={`${getSeverityColor(f.info.severity)} text-[10px] px-1.5 h-5 uppercase tracking-wider font-bold`}>
+                                                    {f.info.severity}
+                                                </Badge>
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                                        <Badge className={cn("cursor-pointer hover:opacity-80 text-[10px] px-2 h-5 uppercase", getStatusColor(f._status))}>
+                                                            {f._status || "New"}
+                                                        </Badge>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="start" className="bg-black/90 border-white/10 text-zinc-300">
+                                                        <DropdownMenuLabel>Change Status</DropdownMenuLabel>
+                                                        <DropdownMenuSeparator className="bg-white/10" />
+                                                        {["New", "Confirmed", "False Positive", "Fixed", "Closed"].map(s => (
+                                                            <DropdownMenuItem key={s} onClick={(e) => { e.stopPropagation(); updateStatus(f, s); }}>
+                                                                {s}
+                                                            </DropdownMenuItem>
+                                                        ))}
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                                <p className="text-xs text-muted-foreground font-mono">
+                                                    {f["template-id"]}
+                                                </p>
                                             </div>
-                                        </div>
-
-                                        <div className="bg-muted/30 p-2 rounded-md border border-border/50 flex items-center gap-2">
-                                            <ExternalLink className="h-3 w-3 shrink-0 text-blue-400" />
-                                            <a
-                                                href={f["matched-at"] || f.host}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="text-xs font-mono text-blue-400 hover:underline truncate"
-                                                onClick={e => e.stopPropagation()}
-                                            >
-                                                {f["matched-at"] || f.host}
-                                            </a>
                                         </div>
                                     </div>
 
-                                    <div className="flex md:flex-col items-center md:items-end gap-2 text-xs text-muted-foreground">
-                                        <span className="whitespace-nowrap" title={new Date(f.timestamp).toLocaleString()}>
-                                            {new Date(f.timestamp).toLocaleDateString()}
-                                        </span>
-
-                                        <div className="flex items-center gap-1">
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-7 w-7 hover:bg-background hover:text-foreground"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    navigator.clipboard.writeText(f["matched-at"] || f.host || "");
-                                                    toast.success("Copied to clipboard");
-                                                }}
-                                                title="Copy URL"
-                                            >
-                                                <Copy className="h-3.5 w-3.5" />
-                                            </Button>
-
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-7 w-7 hover:bg-emerald-500/10 hover:text-emerald-500"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    rescan(f);
-                                                }}
-                                                title="Rescan"
-                                            >
-                                                <RefreshCw className="h-3.5 w-3.5" />
-                                            </Button>
-
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-7 w-7 hover:bg-red-500/10 hover:text-red-500"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    deleteFinding(f);
-                                                }}
-                                                title="Delete"
-                                            >
-                                                <Trash2 className="h-3.5 w-3.5" />
-                                            </Button>
-                                        </div>
+                                    <div className="bg-muted/30 p-2 rounded-md border border-border/50 flex items-center gap-2">
+                                        <ExternalLink className="h-3 w-3 shrink-0 text-blue-400" />
+                                        <a
+                                            href={f["matched-at"] || f.host}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-xs font-mono text-blue-400 hover:underline truncate"
+                                            onClick={e => e.stopPropagation()}
+                                        >
+                                            {f["matched-at"] || f.host}
+                                        </a>
                                     </div>
                                 </div>
                             </CardContent>
+
+                            <CardFooter className="p-3 pt-3 border-t bg-muted/5 flex justify-between items-center">
+                                <div className="flex items-center gap-1.5">
+                                    <span className="text-xs text-muted-foreground/70">Detected:</span>
+                                    <span className="text-xs text-muted-foreground font-medium" title={new Date(f.timestamp).toLocaleString()}>
+                                        {new Date(f.timestamp).toLocaleDateString()}
+                                    </span>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-8 gap-1.5 hover:bg-background"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            navigator.clipboard.writeText(f["matched-at"] || f.host || "");
+                                            toast.success("Copied to clipboard");
+                                        }}
+                                    >
+                                        <Copy className="h-3.5 w-3.5" />
+                                        <span className="text-xs">Copy</span>
+                                    </Button>
+
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-8 gap-1.5 hover:bg-emerald-500/10 hover:text-emerald-500 hover:border-emerald-500/50"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            rescan(f);
+                                        }}
+                                    >
+                                        <RefreshCw className="h-3.5 w-3.5" />
+                                        <span className="text-xs">Rescan</span>
+                                    </Button>
+
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-8 gap-1.5 hover:bg-red-500/10 hover:text-red-500 hover:border-red-500/50"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setFindingToDelete(f);
+                                        }}
+                                    >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                        <span className="text-xs">Delete</span>
+                                    </Button>
+                                </div>
+                            </CardFooter>
                         </Card>
                     ))}
                 </div>
@@ -689,7 +704,7 @@ export function FindingsTable() {
                                 <Button
                                     variant="destructive"
                                     size="sm"
-                                    onClick={() => selectedFinding && deleteFinding(selectedFinding)}
+                                    onClick={() => selectedFinding && setFindingToDelete(selectedFinding)}
                                     className="bg-red-500/10 text-red-500 hover:bg-red-500/20 border-red-500/20"
                                 >
                                     <Trash2 className="w-4 h-4 mr-2" />
@@ -724,6 +739,26 @@ export function FindingsTable() {
                     </Tabs>
                 </DialogContent>
             </Dialog>
+
+            <AlertDialog open={!!findingToDelete} onOpenChange={(open) => !open && setFindingToDelete(null)}>
+                <AlertDialogContent className="bg-card border-border">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="text-foreground">Delete Finding</AlertDialogTitle>
+                        <AlertDialogDescription className="text-muted-foreground">
+                            Are you sure you want to delete this finding? This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel className="bg-background hover:bg-muted">Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={deleteFinding}
+                            className="bg-red-500 hover:bg-red-600 text-white"
+                        >
+                            Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

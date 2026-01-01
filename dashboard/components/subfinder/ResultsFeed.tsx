@@ -24,6 +24,16 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Target {
     id: number;
@@ -51,6 +61,7 @@ export function ResultsFeed({ initialTarget, onScanTarget }: { initialTarget?: s
     const [loading, setLoading] = useState(false);
     const [search, setSearch] = useState("");
     const [filterStatus, setFilterStatus] = useState<string[]>([]); // Empty = All
+    const [targetToDelete, setTargetToDelete] = useState<Target | null>(null);
 
     // Fetch Targets (Inventory)
     const fetchTargets = async () => {
@@ -366,13 +377,7 @@ export function ResultsFeed({ initialTarget, onScanTarget }: { initialTarget?: s
                                         className="h-6 w-6 p-0 mt-2 text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            if (confirm("Delete this target and all its subdomain history?")) {
-                                                const deleteTarget = async () => {
-                                                    await fetch(`/api/subfinder/inventory?targetId=${target.id}`, { method: 'DELETE' });
-                                                    fetchTargets();
-                                                };
-                                                deleteTarget();
-                                            }
+                                            setTargetToDelete(target);
                                         }}
                                     >
                                         <Trash2 className="h-3 w-3" />
@@ -389,6 +394,33 @@ export function ResultsFeed({ initialTarget, onScanTarget }: { initialTarget?: s
                     </div>
                 )}
             </div>
+
+            <AlertDialog open={!!targetToDelete} onOpenChange={(open) => !open && setTargetToDelete(null)}>
+                <AlertDialogContent className="bg-card border-border">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="text-foreground">Delete Target</AlertDialogTitle>
+                        <AlertDialogDescription className="text-muted-foreground">
+                            Are you sure you want to delete <span className="font-mono text-emerald-400">{targetToDelete?.target}</span> and all its subdomain history? This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel className="bg-background hover:bg-muted">Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={async () => {
+                                if (targetToDelete) {
+                                    await fetch(`/api/subfinder/inventory?targetId=${targetToDelete.id}`, { method: 'DELETE' });
+                                    toast.success("Target deleted successfully");
+                                    fetchTargets();
+                                    setTargetToDelete(null);
+                                }
+                            }}
+                            className="bg-red-500 hover:bg-red-600 text-white"
+                        >
+                            Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

@@ -12,6 +12,16 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SubdomainTable } from "@/components/subfinder/SubdomainTable";
 import { ResultsFeed } from "@/components/subfinder/ResultsFeed";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // We need to define or import SubfinderScan type
 interface SubfinderScan {
@@ -38,6 +48,7 @@ export function SubfinderPanel({ onScanTarget }: SubfinderPanelProps) {
     const [selectedScanId, setSelectedScanId] = useState<string | null>(null);
     const [customArgs, setCustomArgs] = useState("");
     const [showAdvanced, setShowAdvanced] = useState(false);
+    const [scanToDelete, setScanToDelete] = useState<string | null>(null);
 
     // Poll history to show status updates
     const fetchHistory = async () => {
@@ -114,19 +125,18 @@ export function SubfinderPanel({ onScanTarget }: SubfinderPanelProps) {
         }
     };
 
-    const handleDeleteScan = async (e: React.MouseEvent, scanId: string) => {
-        e.stopPropagation();
-        if (!confirm("Are you sure you want to delete this scan and all its results?")) return;
+    const handleDeleteScan = async () => {
+        if (!scanToDelete) return;
 
         try {
-            const res = await fetch(`/api/subfinder?id=${scanId}`, {
+            const res = await fetch(`/api/subfinder?id=${scanToDelete}`, {
                 method: "DELETE"
             });
 
             if (res.ok) {
                 toast.success("Scan deleted");
                 // Clear selection if deleted
-                if (selectedScanId === scanId) {
+                if (selectedScanId === scanToDelete) {
                     setSelectedScanId(null);
                     setActiveTab("scanner");
                 }
@@ -136,6 +146,8 @@ export function SubfinderPanel({ onScanTarget }: SubfinderPanelProps) {
             }
         } catch (error) {
             toast.error("Something went wrong");
+        } finally {
+            setScanToDelete(null);
         }
     };
 
@@ -344,7 +356,7 @@ export function SubfinderPanel({ onScanTarget }: SubfinderPanelProps) {
                                                         {scan.status !== 'running' && (
                                                             <div
                                                                 role="button"
-                                                                onClick={(e) => handleDeleteScan(e, scan.id)}
+                                                                onClick={(e) => { e.stopPropagation(); setScanToDelete(scan.id); }}
                                                                 className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md hover:bg-red-500/20 hover:text-red-500 text-muted-foreground transition-all"
                                                                 title="Delete Scan"
                                                             >
@@ -467,7 +479,7 @@ export function SubfinderPanel({ onScanTarget }: SubfinderPanelProps) {
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
-                                                        onClick={(e) => handleDeleteScan(e, scan.id)}
+                                                        onClick={(e) => { e.stopPropagation(); setScanToDelete(scan.id); }}
                                                         className="text-muted-foreground hover:text-red-500"
                                                     >
                                                         <Trash2 className="h-4 w-4" />
@@ -511,6 +523,26 @@ export function SubfinderPanel({ onScanTarget }: SubfinderPanelProps) {
                     />
                 </TabsContent>
             </Tabs>
+
+            <AlertDialog open={!!scanToDelete} onOpenChange={(open) => !open && setScanToDelete(null)}>
+                <AlertDialogContent className="bg-card border-border">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="text-foreground">Delete Scan</AlertDialogTitle>
+                        <AlertDialogDescription className="text-muted-foreground">
+                            Are you sure you want to delete this scan and all its results? This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel className="bg-background hover:bg-muted">Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleDeleteScan}
+                            className="bg-red-500 hover:bg-red-600 text-white"
+                        >
+                            Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

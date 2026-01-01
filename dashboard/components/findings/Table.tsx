@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Download, RefreshCw, Filter, Trash2, Sparkles } from "lucide-react";
+import { Download, RefreshCw, Filter, Trash2, Copy, ExternalLink, Zap } from "lucide-react";
 import { toast } from "sonner";
 import {
     DropdownMenu,
@@ -17,7 +16,8 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 interface Finding {
     "template-id": string;
@@ -28,12 +28,12 @@ interface Finding {
         description?: string;
         tags?: string[];
     };
-    "matched-at": string; // url
+    "matched-at": string;
     timestamp: string;
     host?: string;
-    _sourceFile?: string; // For deletion
-    _status?: string; // Status from database
-    _dbId?: number; // Database ID
+    _sourceFile?: string;
+    _status?: string;
+    _dbId?: number;
     request?: string;
     response?: string;
 }
@@ -70,7 +70,6 @@ const HostFilter = ({ hosts, selectedHosts, onToggle, onClear }: HostFilterProps
                         className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-slate-500"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        // Prevent dropdown from closing when clicking input
                         onClick={(e) => e.stopPropagation()}
                     />
                 </div>
@@ -133,15 +132,23 @@ export function FindingsTable() {
         }
     };
 
+    const getSeverityBorder = (severity: string) => {
+        switch (severity.toLowerCase()) {
+            case "critical": return "border-red-500/50 shadow-red-500/5";
+            case "high": return "border-orange-500/50 shadow-orange-500/5";
+            case "medium": return "border-yellow-500/50 shadow-yellow-500/5";
+            case "low": return "border-blue-500/50 shadow-blue-500/5";
+            default: return "border-zinc-500/50";
+        }
+    };
+
     const exportData = async () => {
         setLoading(true);
         try {
-            // Dynamically import exceljs to avoid server-side issues
             const ExcelJS = (await import('exceljs')).default;
             const workbook = new ExcelJS.Workbook();
             const worksheet = workbook.addWorksheet('Findings');
 
-            // Define columns
             worksheet.columns = [
                 { header: 'ID', key: 'id', width: 25 },
                 { header: 'Name', key: 'name', width: 40 },
@@ -151,17 +158,15 @@ export function FindingsTable() {
                 { header: 'Status', key: 'status', width: 20 }
             ];
 
-            // Define colors (ARGB format)
             const severityColors: Record<string, string> = {
-                critical: 'FFFFCCCC', // Light Red
-                high: 'FFFFE5CC',     // Light Orange
-                medium: 'FFFFFFCC',   // Light Yellow
-                low: 'FFE5F2FF',      // Light Blue
-                info: 'FFFFFFFF',     // White
-                unknown: 'FFF2F2F2'   // Light Gray
+                critical: 'FFFFCCCC',
+                high: 'FFFFE5CC',
+                medium: 'FFFFFFCC',
+                low: 'FFE5F2FF',
+                info: 'FFFFFFFF',
+                unknown: 'FFF2F2F2'
             };
 
-            // Add rows and style them
             filteredFindings.forEach(f => {
                 const sev = f.info.severity.toLowerCase();
                 const color = severityColors[sev] || severityColors.unknown;
@@ -175,7 +180,6 @@ export function FindingsTable() {
                     status: f._status || "New"
                 });
 
-                // Apply fill to each cell in the row
                 row.eachCell((cell) => {
                     cell.fill = {
                         type: 'pattern',
@@ -191,7 +195,6 @@ export function FindingsTable() {
                 });
             });
 
-            // Style header row
             worksheet.getRow(1).eachCell((cell) => {
                 cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
                 cell.fill = {
@@ -201,7 +204,6 @@ export function FindingsTable() {
                 };
             });
 
-            // Generate buffer
             const buffer = await workbook.xlsx.writeBuffer();
             const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
             const url = window.URL.createObjectURL(blob);
@@ -244,7 +246,7 @@ export function FindingsTable() {
                         duration: 5000,
                     });
                 }
-                fetchFindings(); // Refresh the list
+                fetchFindings();
             } else {
                 toast.error("Rescan Failed", {
                     description: result.message,
@@ -270,7 +272,7 @@ export function FindingsTable() {
                     id: (f as any)._dbId || (f as any).id
                 }),
             });
-            fetchFindings(); // Refresh list
+            fetchFindings();
         } catch (e) {
             alert("Failed to delete finding");
             console.error(e);
@@ -289,7 +291,7 @@ export function FindingsTable() {
             });
 
             if (response.ok) {
-                fetchFindings(); // Refresh list
+                fetchFindings();
             } else {
                 alert("Failed to update status");
             }
@@ -310,10 +312,8 @@ export function FindingsTable() {
         }
     };
 
-    // Get unique hosts
     const uniqueHosts = Array.from(new Set(findings.map(f => f.host || f["matched-at"] || "Unknown").filter(Boolean))).sort();
 
-    // Toggle severity filter
     const toggleSeverityFilter = (severity: string) => {
         setSeverityFilters(prev =>
             prev.includes(severity)
@@ -322,7 +322,6 @@ export function FindingsTable() {
         );
     };
 
-    // Toggle status filter
     const toggleStatusFilter = (status: string) => {
         setStatusFilters(prev =>
             prev.includes(status)
@@ -331,7 +330,6 @@ export function FindingsTable() {
         );
     };
 
-    // Toggle host filter
     const toggleHostFilter = (host: string) => {
         setHostFilters(prev =>
             prev.includes(host)
@@ -340,7 +338,6 @@ export function FindingsTable() {
         );
     };
 
-    // Filter findings by severity, status, and host
     const filteredFindings = findings.filter(f => {
         const matchesSeverity = severityFilters.length === 0 || severityFilters.includes(f.info.severity.toLowerCase());
         const matchesStatus = statusFilters.length === 0 || statusFilters.includes(f._status || "New");
@@ -348,52 +345,6 @@ export function FindingsTable() {
         const matchesHost = hostFilters.length === 0 || hostFilters.includes(host);
         return matchesSeverity && matchesStatus && matchesHost;
     });
-
-    const [summary, setSummary] = useState<string | null>(null);
-    const [summaryLoading, setSummaryLoading] = useState(false);
-    const [aiEnabled, setAiEnabled] = useState(true);
-
-    useEffect(() => {
-        const stored = localStorage.getItem("nuclei_settings");
-        if (stored) {
-            try {
-                const parsed = JSON.parse(stored);
-                if (parsed.aiSummary !== undefined) {
-                    setAiEnabled(parsed.aiSummary);
-                }
-            } catch (e) {
-                console.error("Failed to parse settings", e);
-            }
-        }
-    }, [findings]); // Re-check when findings change (implied refresh usually) or just once on mount/interaction if we had a global event. For now, simple check.
-
-    const summarizeFindings = async () => {
-        if (filteredFindings.length === 0) {
-            alert("No findings to summarize.");
-            return;
-        }
-
-        setSummaryLoading(true);
-        try {
-            const res = await fetch("/api/summarize", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ findings: filteredFindings })
-            });
-            const data = await res.json();
-
-            if (data.success) {
-                setSummary(data.summary);
-            } else {
-                alert("Summary failed: " + data.message);
-            }
-        } catch (e) {
-            console.error(e);
-            alert("Failed to generate summary.");
-        } finally {
-            setSummaryLoading(false);
-        }
-    };
 
     const exportToPDF = async () => {
         setLoading(true);
@@ -403,7 +354,6 @@ export function FindingsTable() {
 
             const doc = new jsPDF();
 
-            // Add title
             doc.setFontSize(16);
             doc.text("Nuclei Findings Report", 14, 15);
             doc.setFontSize(10);
@@ -429,20 +379,20 @@ export function FindingsTable() {
                 body: tableRows,
                 startY: 30,
                 styles: { fontSize: 8 },
-                headStyles: { fillColor: [22, 163, 74] }, // Emerald-600
+                headStyles: { fillColor: [22, 163, 74] },
                 didParseCell: (data) => {
                     if (data.section === 'body' && data.column.index === 2) {
                         const severity = data.cell.raw?.toString().toLowerCase();
                         if (severity === 'critical') {
-                            data.cell.styles.textColor = [220, 38, 38]; // Red
+                            data.cell.styles.textColor = [220, 38, 38];
                             data.cell.styles.fontStyle = 'bold';
                         } else if (severity === 'high') {
-                            data.cell.styles.textColor = [234, 88, 12]; // Orange
+                            data.cell.styles.textColor = [234, 88, 12];
                             data.cell.styles.fontStyle = 'bold';
                         } else if (severity === 'medium') {
-                            data.cell.styles.textColor = [234, 179, 8]; // Yellow
+                            data.cell.styles.textColor = [234, 179, 8];
                         } else if (severity === 'low') {
-                            data.cell.styles.textColor = [37, 99, 235]; // Blue
+                            data.cell.styles.textColor = [37, 99, 235];
                         }
                     }
                 }
@@ -458,23 +408,16 @@ export function FindingsTable() {
     };
 
     return (
-        <div className="space-y-4 bg-card p-4 rounded-xl border border-border shadow-sm">
-            <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-foreground">Vulnerability Feed</h3>
-                <div className="flex gap-2">
-                    {aiEnabled && (
-                        <Button
-                            variant="default"
-                            size="sm"
-                            onClick={summarizeFindings}
-                            disabled={summaryLoading}
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-500/50"
-                        >
-                            <Sparkles className={`mr-2 h-4 w-4 ${summaryLoading ? 'animate-spin' : ''}`} />
-                            {summaryLoading ? "Thinking..." : "Summarize"}
-                        </Button>
-                    )}
-                    {/* Severity Filter */}
+        <div className="space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 rounded-xl border border-border shadow-sm">
+                <div>
+                    <h3 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
+                        <Zap className="h-5 w-5 text-amber-500" /> Vulnerability Feed
+                    </h3>
+                    <p className="text-sm text-muted-foreground">Real-time security alerts from Nuclei engine.</p>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="outline" size="sm">
@@ -503,7 +446,6 @@ export function FindingsTable() {
                         </DropdownMenuContent>
                     </DropdownMenu>
 
-                    {/* Status Filter */}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="outline" size="sm">
@@ -532,7 +474,6 @@ export function FindingsTable() {
                         </DropdownMenuContent>
                     </DropdownMenu>
 
-                    {/* Host Filter */}
                     <HostFilter
                         hosts={uniqueHosts}
                         selectedHosts={hostFilters}
@@ -540,20 +481,142 @@ export function FindingsTable() {
                         onClear={() => setHostFilters([])}
                     />
 
+                    <div className="h-6 w-px bg-border mx-1" />
+
                     <Button variant="outline" size="sm" onClick={fetchFindings} disabled={loading}>
                         <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                     </Button>
 
-                    <Button variant="outline" size="sm" onClick={exportToPDF} title="Export current view to PDF">
+                    <Button variant="outline" size="sm" onClick={exportToPDF} title="Export PDF">
                         <Download className="mr-2 h-4 w-4" /> PDF
                     </Button>
 
-                    <Button variant="outline" size="sm" onClick={exportData} title="Export current view to Excel">
+                    <Button variant="outline" size="sm" onClick={exportData} title="Export XLS">
                         <Download className="mr-2 h-4 w-4" /> XLS
                     </Button>
                 </div>
             </div>
 
+            {filteredFindings.length === 0 ? (
+                <div className="h-64 flex flex-col items-center justify-center border border-dashed rounded-xl bg-card/50 text-muted-foreground">
+                    <Zap className="h-10 w-10 opacity-20 mb-3" />
+                    <p className="text-lg font-medium">{loading ? "Loading results..." : "No findings found"}</p>
+                    <p className="text-xs">Adjust filters or run a new scan</p>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 gap-3">
+                    {filteredFindings.map((f, i) => (
+                        <Card
+                            key={i}
+                            onClick={() => setSelectedFinding(f)}
+                            className={cn(
+                                "cursor-pointer transition-all duration-200 hover:scale-[1.005] hover:bg-muted/10 group",
+                                "border shadow-sm",
+                                getSeverityBorder(f.info.severity)
+                            )}
+                        >
+                            <CardContent className="p-4">
+                                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                                    <div className="flex-1 min-w-0 space-y-2">
+                                        <div className="flex items-start gap-3">
+                                            <div className="flex-1 min-w-0">
+                                                <h4 className="text-base font-bold leading-tight group-hover:text-primary transition-colors mb-1.5">
+                                                    {f.info.name}
+                                                </h4>
+                                                <div className="flex flex-wrap gap-2 items-center">
+                                                    <Badge variant="outline" className={`${getSeverityColor(f.info.severity)} text-[10px] px-1.5 h-5 uppercase tracking-wider font-bold`}>
+                                                        {f.info.severity}
+                                                    </Badge>
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                                            <Badge className={cn("cursor-pointer hover:opacity-80 text-[10px] px-2 h-5 uppercase", getStatusColor(f._status))}>
+                                                                {f._status || "New"}
+                                                            </Badge>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="start" className="bg-black/90 border-white/10 text-zinc-300">
+                                                            <DropdownMenuLabel>Change Status</DropdownMenuLabel>
+                                                            <DropdownMenuSeparator className="bg-white/10" />
+                                                            {["New", "Confirmed", "False Positive", "Fixed", "Closed"].map(s => (
+                                                                <DropdownMenuItem key={s} onClick={(e) => { e.stopPropagation(); updateStatus(f, s); }}>
+                                                                    {s}
+                                                                </DropdownMenuItem>
+                                                            ))}
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                    <p className="text-xs text-muted-foreground font-mono">
+                                                        {f["template-id"]}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-muted/30 p-2 rounded-md border border-border/50 flex items-center gap-2">
+                                            <ExternalLink className="h-3 w-3 shrink-0 text-blue-400" />
+                                            <a
+                                                href={f["matched-at"] || f.host}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-xs font-mono text-blue-400 hover:underline truncate"
+                                                onClick={e => e.stopPropagation()}
+                                            >
+                                                {f["matched-at"] || f.host}
+                                            </a>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex md:flex-col items-center md:items-end gap-2 text-xs text-muted-foreground">
+                                        <span className="whitespace-nowrap" title={new Date(f.timestamp).toLocaleString()}>
+                                            {new Date(f.timestamp).toLocaleDateString()}
+                                        </span>
+
+                                        <div className="flex items-center gap-1">
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-7 w-7 hover:bg-background hover:text-foreground"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    navigator.clipboard.writeText(f["matched-at"] || f.host || "");
+                                                    toast.success("Copied to clipboard");
+                                                }}
+                                                title="Copy URL"
+                                            >
+                                                <Copy className="h-3.5 w-3.5" />
+                                            </Button>
+
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-7 w-7 hover:bg-emerald-500/10 hover:text-emerald-500"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    rescan(f);
+                                                }}
+                                                title="Rescan"
+                                            >
+                                                <RefreshCw className="h-3.5 w-3.5" />
+                                            </Button>
+
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-7 w-7 hover:bg-red-500/10 hover:text-red-500"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    deleteFinding(f);
+                                                }}
+                                                title="Delete"
+                                            >
+                                                <Trash2 className="h-3.5 w-3.5" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ))}
+                </div>
+            )}
 
             <Dialog open={!!selectedFinding} onOpenChange={(open) => !open && setSelectedFinding(null)}>
                 <DialogContent className="max-w-3xl bg-card border-border text-foreground max-h-[90vh] overflow-y-auto">
@@ -661,102 +724,6 @@ export function FindingsTable() {
                     </Tabs>
                 </DialogContent>
             </Dialog>
-
-            <Dialog open={!!summary} onOpenChange={(open) => !open && setSummary(null)}>
-                <DialogContent className="max-w-2xl bg-card border-border text-foreground max-h-[80vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2 text-indigo-400">
-                            <Sparkles className="w-5 h-5" />
-                            AI Security Summary
-                        </DialogTitle>
-                    </DialogHeader>
-                    <div className="mt-4 prose prose-invert prose-sm max-w-none">
-                        {/* Simple markdown rendering */}
-                        {summary?.split('\n').map((line, i) => (
-                            <p key={i} className={line.startsWith('#') ? "font-bold text-lg mt-4 mb-2 text-black" : "mb-2 text-zinc-900 font-medium"}>
-                                {line.replace(/^#+\s/, '').replace(/\*\*/g, '')}
-                            </p>
-                        ))}
-                    </div>
-                </DialogContent>
-            </Dialog>
-
-            <div className="rounded-md border border-white/10 overflow-hidden">
-                <Table>
-                    <TableHeader className="bg-white/5">
-                        <TableRow className="hover:bg-transparent border-white/10">
-                            <TableHead className="text-black font-bold">Severity</TableHead>
-                            <TableHead className="text-black font-bold">Status</TableHead>
-                            <TableHead className="text-black font-bold">Vulnerability</TableHead>
-                            <TableHead className="text-black font-bold">Host</TableHead>
-                            <TableHead className="text-black font-bold">Template ID</TableHead>
-                            <TableHead className="text-black font-bold">Action</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {filteredFindings.length === 0 ? (
-                            <TableRow>
-                                <TableCell colSpan={6} className="text-center h-24 text-zinc-500">
-                                    {loading ? "Loading..." : severityFilters.length > 0 ? `No findings matching selected severities.` : "No findings found yet."}
-                                </TableCell>
-                            </TableRow>
-                        ) : (
-                            filteredFindings.map((f, i) => (
-                                <TableRow key={i} className="border-white/10 hover:bg-white/5 group cursor-pointer" onClick={() => setSelectedFinding(f)}>
-                                    <TableCell>
-                                        <Badge variant="outline" className={`${getSeverityColor(f.info.severity)} uppercase text-[10px] tracking-wider`}>
-                                            {f.info.severity}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell onClick={(e) => e.stopPropagation()}>
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Badge className={`${getStatusColor(f._status)} border cursor-pointer hover:opacity-80 uppercase text-[10px] tracking-wider`}>
-                                                    {f._status || "New"}
-                                                </Badge>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="start" className="bg-black/90 border-white/10 text-zinc-300">
-                                                <DropdownMenuLabel>Change Status</DropdownMenuLabel>
-                                                <DropdownMenuSeparator className="bg-white/10" />
-                                                <DropdownMenuItem onClick={() => updateStatus(f, "New")}>
-                                                    New
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => updateStatus(f, "Confirmed")}>
-                                                    Confirmed
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => updateStatus(f, "False Positive")}>
-                                                    False Positive
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => updateStatus(f, "Fixed")}>
-                                                    Fixed
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => updateStatus(f, "Closed")}>
-                                                    Closed
-                                                </DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    </TableCell>
-                                    <TableCell className="font-bold text-black group-hover:text-emerald-700 transition-colors">
-                                        {f.info.name}
-                                    </TableCell>
-                                    <TableCell className="text-black font-mono text-xs">{f["matched-at"] || f.host}</TableCell>
-                                    <TableCell className="text-zinc-900 font-mono text-xs">{f["template-id"]}</TableCell>
-                                    <TableCell>
-                                        <div className="flex gap-2">
-                                            <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); rescan(f); }} className="text-emerald-400 hover:text-emerald-300">
-                                                Rescan
-                                            </Button>
-                                            <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); deleteFinding(f); }} className="text-red-400 hover:text-red-300">
-                                                <Trash2 className="w-4 h-4" />
-                                            </Button>
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            ))
-                        )}
-                    </TableBody>
-                </Table>
-            </div>
         </div>
     );
 }

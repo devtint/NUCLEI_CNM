@@ -14,7 +14,6 @@ const DEFAULTS = {
     rateLimit: 150,
     concurrency: 25,
     bulkSize: 25,
-    aiSummary: true,
 };
 
 export function ScannerConfig() {
@@ -167,27 +166,7 @@ export function ScannerConfig() {
                             />
                         </div>
 
-                        <div className="h-px bg-border" />
 
-                        {/* AI Summary */}
-                        <div className="space-y-4">
-                            <div className="flex justify-between items-center">
-                                <div className="space-y-1">
-                                    <Label className="text-base text-foreground">AI Summarization</Label>
-                                    <p className="text-xs text-muted-foreground">Enable Gemini-powered findings summary button.</p>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                    <Button
-                                        variant={config.aiSummary ? "default" : "outline"}
-                                        size="sm"
-                                        onClick={() => handleChange("aiSummary", !config.aiSummary)}
-                                        className={config.aiSummary ? "bg-indigo-600 hover:bg-indigo-700" : ""}
-                                    >
-                                        {config.aiSummary ? "Enabled" : "Disabled"}
-                                    </Button>
-                                </div>
-                            </div>
-                        </div>
 
                     </CardContent>
                 </Card>

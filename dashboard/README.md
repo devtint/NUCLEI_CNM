@@ -66,6 +66,18 @@ The primary interface for Asset Probing.
     *   `useEffect` ordering fixed for safe conditional rendering.
     *   `AlertDialog` integration for destructive actions.
 
+### `findings/Table.tsx`
+Modern card-based Vulnerability Feed (refactored from table layout).
+*   **UI Design**:
+    *   **Card Grid**: Responsive single-column layout with severity-coded borders (red/orange/yellow/blue).
+    *   **Inline Actions**: Copy URL, Rescan, and Delete buttons directly on each card.
+    *   **Status Management**: Click-to-edit status badges with dropdown menu.
+*   **Features**:
+    *   Multi-filter support (Severity, Status, Host) with checkbox dropdowns.
+    *   Export to PDF and Excel with color-coded severity.
+    *   Detail dialog with tabbed views (Overview, Request, Response, Raw JSON).
+*   **Performance**: No AI dependencies, fully client-side rendering.
+
 ### `ui/alert-dialog.tsx`
 *   New primitive based on Radix UI.
 *   Used for "Delete Single Scan" and "Delete All History" warnings.

@@ -33,12 +33,12 @@ Turn ephemeral CLI output into a permanent, intelligent asset inventory.
 ## 🌟 Key Capabilities
 
 ### 1. Smart Vulnerability Management
+*   **Modern Card Interface**: Rich, visual card-based feed with severity-coded borders and inline actions (Copy, Rescan, Delete).
 *   **Deduplication**: Intelligent hashing ensures you never see the same duplicate finding twice (even if protocols differ: `http` vs `https`).
 *   **Lifecycle Tracking**:
     *   **🆕 NEW**: Fresh findings from recent scans.
     *   **✅ FIXED**: Issues that were present but vanished in the latest scan.
     *   **⚠️ REGRESSION**: Issues that were fixed but have returned.
-*   **AI Triage**: Built-in Google Gemini integration for instant impact analysis and remediation advice.
 
 ### 2. Live Asset Probing (HTTPX)
 *   **Visual Recon**: Full-screen drill-down with captured screenshots of every live target.

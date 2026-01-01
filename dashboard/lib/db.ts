@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import crypto from 'crypto';
+import { normalizeUrl } from './utils';
 
 // Database file location
 const DB_PATH = path.join(process.cwd(), 'nuclei.db');
@@ -135,7 +136,60 @@ function initializeSchema() {
         CREATE INDEX IF NOT EXISTS idx_subfinder_results_scan_id ON subfinder_results(scan_id);
         CREATE UNIQUE INDEX IF NOT EXISTS idx_subfinder_results_scan_subdomain ON subfinder_results(scan_id, subdomain);
         CREATE INDEX IF NOT EXISTS idx_subfinder_scans_start_time ON subfinder_scans(start_time DESC);
+
+        -- HTTPX Tables
+        CREATE TABLE IF NOT EXISTS httpx_scans (
+            id TEXT PRIMARY KEY,
+            target TEXT NOT NULL,
+            start_time INTEGER NOT NULL,
+            end_time INTEGER,
+            status TEXT NOT NULL,
+            count INTEGER DEFAULT 0,
+            created_at INTEGER DEFAULT (strftime('%s', 'now'))
+        )
     `);
+
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS httpx_results (
+            id TEXT PRIMARY KEY,
+            scan_id TEXT NOT NULL,
+            url TEXT NOT NULL,
+            host TEXT NOT NULL,
+            port INTEGER,
+            scheme TEXT,
+            title TEXT,
+            status_code INTEGER,
+            subdomain TEXT,
+            technologies TEXT,
+            web_server TEXT,
+            content_type TEXT,
+            content_length INTEGER,
+            response_time TEXT,
+            ip TEXT,
+            cname TEXT,
+            cdn_name TEXT,
+            timestamp INTEGER,
+            is_new BOOLEAN DEFAULT 0,
+            change_status TEXT DEFAULT 'new',
+            screenshot_path TEXT,
+            FOREIGN KEY(scan_id) REFERENCES httpx_scans(id) ON DELETE CASCADE
+        )
+    `);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_httpx_results_scan_id ON httpx_results(scan_id);`);
+
+    // Migrations for HTTPX
+    try {
+        db.exec("ALTER TABLE httpx_scans ADD COLUMN pid INTEGER");
+    } catch (e: any) { if (!e.message.includes("duplicate column")) { } }
+    try {
+        db.exec("ALTER TABLE httpx_scans ADD COLUMN log_path TEXT");
+    } catch (e: any) { if (!e.message.includes("duplicate column")) { } }
+    try {
+        db.prepare("ALTER TABLE httpx_results ADD COLUMN change_status TEXT DEFAULT 'new'").run();
+    } catch (e) { /* ignore */ }
+    try {
+        db.prepare("ALTER TABLE httpx_results ADD COLUMN screenshot_path TEXT").run();
+    } catch (e) { /* ignore */ }
 }
 
 
@@ -214,6 +268,21 @@ export function deleteScan(id: string) {
     stmt.run(id);
 }
 
+// function deleteHttpxScan is already defined above
+
+export function clearHttpxResults() {
+    const db = getDatabase();
+    // Delete all results and scans
+    try {
+        db.exec("DELETE FROM httpx_results");
+        db.exec("DELETE FROM httpx_scans");
+        // Also clean up screenshots? For now let's just clear DB.
+    } catch (e) {
+        console.error("Failed to clear httpx data", e);
+        throw e;
+    }
+}
+
 // Finding operations
 export interface FindingRecord {
     id?: number;
@@ -244,7 +313,9 @@ export function generateFindingHash(
     // Use empty string if values are undefined to ensure consistent hashing
     // Include name AND matcher_name to differentiate findings from same template with different matchers
     // Example: http-missing-security-headers with different missing headers (x-frame-options, csp, etc.)
-    const data = `${templateId || ''}|${host || ''}|${matchedAt || ''}|${name || ''}|${matcherName || ''}`;
+    // URL Normalization (P1): Strip protocol/slash to prevent duplicates on scheme change
+    const normalizedUrl = normalizeUrl(matchedAt);
+    const data = `${templateId || ''}|${host || ''}|${normalizedUrl}|${name || ''}|${matcherName || ''}`;
     return crypto.createHash('sha256').update(data).digest('hex');
 }
 
@@ -566,3 +637,202 @@ export function deleteSubfinderScan(id: string) {
     }
 }
 // End of DB helpers
+
+// HTTPX Operations
+export interface HttpxScanRecord {
+    id: string;
+    target: string;
+    start_time: number;
+    end_time?: number;
+    status: 'running' | 'completed' | 'failed' | 'stopped';
+    count: number;
+    pid?: number;
+    log_path?: string;
+}
+
+export interface HttpxResultRecord {
+    id: string; // url as id or random? Let's use random or hash.
+    scan_id: string;
+    url: string;
+    host: string;
+    port?: number;
+    scheme: string;
+    title?: string;
+    status_code?: number;
+    subdomain?: string;
+    technologies?: string[]; // Stored as JSON string in DB
+    web_server?: string;
+    content_type?: string;
+    content_length?: number;
+    response_time?: string;
+    ip?: string;
+    cname?: string[]; // Stored as JSON or comma string? Httpx returns array.
+    cdn_name?: string;
+    timestamp?: string;
+}
+
+export function insertHttpxScan(scan: HttpxScanRecord) {
+    const db = getDatabase();
+    const stmt = db.prepare(`
+        INSERT INTO httpx_scans (id, target, start_time, status, count, pid, log_path)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+    stmt.run(scan.id, scan.target, scan.start_time, scan.status, scan.count, scan.pid, scan.log_path);
+}
+
+export function updateHttpxScan(id: string, updates: Partial<HttpxScanRecord>) {
+    const db = getDatabase();
+    const fields: string[] = [];
+    const values: any[] = [];
+
+    if (updates.status !== undefined) {
+        fields.push('status = ?');
+        values.push(updates.status);
+    }
+    if (updates.end_time !== undefined) {
+        fields.push('end_time = ?');
+        values.push(updates.end_time);
+    }
+    if (updates.count !== undefined) {
+        fields.push('count = ?');
+        values.push(updates.count);
+    }
+    if (updates.pid !== undefined) {
+        fields.push('pid = ?');
+        values.push(updates.pid);
+    }
+    if (updates.log_path !== undefined) {
+        fields.push('log_path = ?');
+        values.push(updates.log_path);
+    }
+
+    if (fields.length === 0) return;
+
+    values.push(id);
+    const stmt = db.prepare(`UPDATE httpx_scans SET ${fields.join(', ')} WHERE id = ?`);
+    stmt.run(...values);
+}
+
+export function getHttpxScans(): HttpxScanRecord[] {
+    const db = getDatabase();
+    const stmt = db.prepare('SELECT * FROM httpx_scans ORDER BY start_time DESC');
+    return stmt.all() as HttpxScanRecord[];
+}
+
+export function saveHttpxResults(scanId: string, results: any[]) {
+    const db = getDatabase();
+
+    // Prepare statement to find previous result for comparison
+    const findPrev = db.prepare('SELECT status_code, title FROM httpx_results WHERE url = ? ORDER BY timestamp DESC LIMIT 1');
+
+    const insert = db.prepare(`
+        INSERT INTO httpx_results (
+            id, scan_id, url, host, port, scheme, title, status_code,
+            subdomain, technologies, web_server, content_type,
+            content_length, response_time, ip, cname, cdn_name, 
+            timestamp, change_status, screenshot_path
+        ) VALUES (
+            ?, ?, ?, ?, ?, ?, ?, ?,
+            ?, ?, ?, ?,
+            ?, ?, ?, ?, ?, ?, ?, ?
+        )
+    `);
+
+    const transaction = db.transaction((items: any[]) => {
+        for (const item of items) {
+            const id = crypto.randomUUID();
+            const technologies = item.tech ? JSON.stringify(item.tech) : null;
+            const cnames = item.cname ? JSON.stringify(item.cname) : null;
+            const now = Date.now();
+
+            // Determine Changes
+            let status = 'new';
+            const prev = findPrev.get(item.url) as any;
+
+            if (prev) {
+                const prevCode = prev.status_code;
+                const currCode = item.status_code;
+                const prevTitle = prev.title || '';
+                const currTitle = item.title || '';
+
+                if (prevCode !== currCode || prevTitle !== currTitle) {
+                    status = 'changed';
+                } else {
+                    status = 'old';
+                }
+            }
+
+            insert.run(
+                id, scanId, item.url, item.host, item.port, item.scheme, item.title, item.status_code,
+                item.input, technologies, item.webserver, item.content_type,
+                item.content_length, item.response_time || item.time || "0ms", item.host_ip || (Array.isArray(item.a) ? item.a[0] : item.a) || item.ip, cnames, item.cdn_name,
+                now, status, item.screenshot_path
+            );
+        }
+    });
+
+    try {
+        transaction(results);
+    } catch (e) { console.error("Failed to insert results", e); }
+}
+
+export function getHttpxResults(scanId?: string) {
+    const db = getDatabase();
+    if (!scanId) {
+        // Global View: Deduplicate by URL in JS to handle legacy NULL timestamps safely
+        const all = db.prepare('SELECT * FROM httpx_results ORDER BY COALESCE(timestamp, 0) DESC').all() as any[];
+        const seen = new Set<string>();
+        const unique = [];
+        for (const item of all) {
+            if (!seen.has(item.url)) {
+                seen.add(item.url);
+                unique.push(item);
+            }
+        }
+        return unique;
+    }
+    return db.prepare('SELECT * FROM httpx_results WHERE scan_id = ?').all(scanId);
+}
+
+export function deleteHttpxScan(id: string) {
+    const db = getDatabase();
+    db.transaction(() => {
+        db.prepare("DELETE FROM httpx_results WHERE scan_id = ?").run(id);
+        db.prepare("DELETE FROM httpx_scans WHERE id = ?").run(id);
+    })();
+}
+
+export function getHttpxDomainSummary() {
+    const results = getHttpxResults() as any[]; // Get all fresh results
+    const groups: Record<string, number> = {};
+
+    for (const r of results) {
+        try {
+            const hostname = new URL(r.url).hostname;
+            const parts = hostname.split('.');
+            let domain = hostname;
+
+            // Simple logic: if > 2 parts, check for ccTLDs like .ac.th, .co.uk
+            if (parts.length > 2) {
+                const last = parts[parts.length - 1];
+                const secondLast = parts[parts.length - 2];
+                // Common 2-letter 2nd level domains
+                if (['ac', 'co', 'go', 'or', 'in', 'com', 'org', 'net', 'edu', 'gov'].includes(secondLast) && last.length === 2) {
+                    domain = parts.slice(-3).join('.');
+                } else {
+                    domain = parts.slice(-2).join('.');
+                }
+            }
+
+            groups[domain] = (groups[domain] || 0) + 1;
+        } catch (e) {
+            // fallback
+            groups["IP/Other"] = (groups["IP/Other"] || 0) + 1;
+        }
+    }
+
+    return Object.entries(groups)
+        .map(([domain, count]) => ({ domain, count }))
+        .sort((a, b) => b.count - a.count);
+}
+

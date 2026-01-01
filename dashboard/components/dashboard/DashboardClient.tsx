@@ -11,6 +11,7 @@ import { ScanHistory } from "@/components/scan/History";
 import { Settings } from "@/components/settings/Settings";
 import { TemplateList } from "@/components/templates/List";
 import { SubfinderPanel } from "@/components/subfinder/SubfinderPanel";
+import { HttpxPanel } from "@/components/httpx/HttpxPanel";
 import { SystemStatus } from "@/components/dashboard/SystemStatus";
 
 export function DashboardClient({ initialStats }: { initialStats: any }) {
@@ -123,6 +124,12 @@ export function DashboardClient({ initialStats }: { initialStats: any }) {
 
                     {activeView === "subfinder" && (
                         <SubfinderPanel onScanTarget={startMainScan} />
+                    )}
+
+                    {activeView === "httpx" && (
+                        <div className="animate-in fade-in duration-500">
+                            <HttpxPanel />
+                        </div>
                     )}
 
                     {activeView === "settings" && (

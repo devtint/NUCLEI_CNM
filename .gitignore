@@ -1,18 +1,18 @@
 # Dependencies
 node_modules/
-/.pnp
+.pnp
 .pnp.js
 
 # Testing
-/coverage
+coverage/
 
 # Next.js
-/.next/
-/out/
+.next/
+out/
 
 # Production
-/build
-/dist
+build/
+dist/
 
 # Misc
 .DS_Store
@@ -22,13 +22,11 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 
 # Local env files
 .env
 .env*.local
-.env.development.local
-.env.test.local
-.env.production.local
 
 # Vercel
 .vercel
@@ -48,27 +46,30 @@ next-env.d.ts
 Thumbs.db
 .DS_Store
 
-# Scan Results (Generated at Runtime)
+# Scan Results & Artifacts (Critical for production)
+# We ignore these to prevent committing sensitive scan data
 dashboard/scans/*.json
 dashboard/scans/*.log
+dashboard/scans/logs/*
+!dashboard/scans/logs/.gitkeep
+dashboard/scans/uploads/*
+!dashboard/scans/uploads/.gitkeep
+dashboard/public/screenshots/*
+!dashboard/public/screenshots/.gitkeep
 
-# Privacy - Exclude saved documentation pages
-Refrencce and Usage And Guide/*.mhtml
-
-# Temporary files
-*.tmp
-*.temp
-tags_output.txt
-tags_list.txt
-
-# Database
+# Database (SQLite)
 *.db
 *.db-shm
 *.db-wal
+dashboard/*.db
+dashboard/*.db-shm
+dashboard/*.db-wal
 
-# User-specific Nuclei paths (will vary per machine)
-# Note: The application dynamically resolves these at runtime
-# C:\Users\<username>\AppData\Roaming\nuclei
-# C:\Users\<username>\AppData\Local\nuclei
-# C:\Users\<username>\.pdcp
-# C:\Users\<username>\nuclei-custom-templates
+# Logs
+logs/
+*.log
+npm-debug.log
+
+# Temp
+*.tmp
+*.temp

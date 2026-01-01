@@ -5,7 +5,15 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Search, ChevronRight, Globe, Calendar, ArrowLeft, RefreshCw, LayoutList, Trash2, Copy, Crosshair, Target } from "lucide-react";
+import { Search, ChevronRight, Globe, Calendar, ArrowLeft, RefreshCw, LayoutList, Trash2, Copy, Crosshair, Target, Activity } from "lucide-react";
+import {
+    DropdownMenu,
+    DropdownMenuCheckboxItem,
+    DropdownMenuContent,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -42,6 +50,7 @@ export function ResultsFeed({ initialTarget, onScanTarget }: { initialTarget?: s
     const [subdomains, setSubdomains] = useState<Subdomain[]>([]);
     const [loading, setLoading] = useState(false);
     const [search, setSearch] = useState("");
+    const [filterStatus, setFilterStatus] = useState<string[]>([]); // Empty = All
 
     // Fetch Targets (Inventory)
     const fetchTargets = async () => {
@@ -146,9 +155,84 @@ export function ResultsFeed({ initialTarget, onScanTarget }: { initialTarget?: s
                             Last Scanned: {formatDate(selectedTarget.last_scan_date)} • Total: {subdomains.length}
                         </p>
                     </div>
-                    <Button variant="outline" size="sm" onClick={() => fetchSubdomains(selectedTarget)}>
-                        <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
-                    </Button>
+                    <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => fetchSubdomains(selectedTarget)}>
+                            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
+                        </Button>
+                        <Button
+                            variant="default"
+                            size="sm"
+                            className="bg-emerald-600 hover:bg-emerald-700"
+                            onClick={() => {
+                                const activeSubs = subdomains
+                                    .filter(s => {
+                                        if (filterStatus.length > 0 && s.status && !filterStatus.includes(s.status)) return false;
+                                        return s.subdomain.includes(search);
+                                    })
+                                    .map(s => s.subdomain);
+
+                                if (activeSubs.length === 0) {
+                                    toast.error("No subdomains to copy");
+                                    return;
+                                }
+                                navigator.clipboard.writeText(activeSubs.join("\n"));
+                                toast.success(`Copied ${activeSubs.length} subdomains to clipboard`);
+                            }}
+                        >
+                            <Copy className="mr-2 h-4 w-4" /> Copy Subdomains
+                        </Button>
+
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-2 mb-4">
+                    <div className="relative flex-1 max-w-sm">
+                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Search subdomains..."
+                            className="pl-8"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                        />
+                    </div>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" className="w-[140px] justify-between border-dashed">
+                                Status {filterStatus.length > 0 ? `(${filterStatus.length})` : ""}
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-[150px]">
+                            <DropdownMenuLabel>Filter Status</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            {['new', 'active', 'inactive'].map((status) => (
+                                <DropdownMenuCheckboxItem
+                                    key={status}
+                                    checked={filterStatus.includes(status)}
+                                    onCheckedChange={(checked) => {
+                                        if (checked) setFilterStatus([...filterStatus, status]);
+                                        else setFilterStatus(filterStatus.filter(s => s !== status));
+                                    }}
+                                    onSelect={(e) => e.preventDefault()}
+                                    className="capitalize"
+                                >
+                                    {status}
+                                </DropdownMenuCheckboxItem>
+                            ))}
+                            {filterStatus.length > 0 && (
+                                <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuCheckboxItem
+                                        checked={false}
+                                        onCheckedChange={() => setFilterStatus([])}
+                                        onSelect={(e) => e.preventDefault()}
+                                        className="justify-center text-center text-xs font-medium"
+                                    >
+                                        Clear Filter
+                                    </DropdownMenuCheckboxItem>
+                                </>
+                            )}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
 
                 <div className="rounded-md border border-white/10 overflow-hidden bg-card">
@@ -170,52 +254,60 @@ export function ResultsFeed({ initialTarget, onScanTarget }: { initialTarget?: s
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                subdomains.map((sub) => (
-                                    <TableRow key={sub.id} className="border-white/10 hover:bg-white/5">
-                                        <TableCell>
-                                            <StatusBadge status={sub.status || 'inactive'} />
-                                        </TableCell>
-                                        <TableCell className="font-mono text-sm">{sub.subdomain}</TableCell>
-                                        <TableCell className="text-right text-xs text-muted-foreground font-mono">
-                                            {formatDate(sub.first_seen)}
-                                        </TableCell>
-                                        <TableCell className="text-right text-xs text-muted-foreground font-mono">
-                                            {formatDate(sub.last_seen)}
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <div className="flex justify-end gap-1">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-6 w-6"
-                                                    onClick={() => {
-                                                        navigator.clipboard.writeText(sub.subdomain);
-                                                        toast.success("Subdomain copied");
-                                                    }}
-                                                    title="Copy Subdomain"
-                                                >
-                                                    <Copy className="h-3 w-3" />
-                                                </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-6 w-6"
-                                                    onClick={() => {
-                                                        if (onScanTarget) {
-                                                            onScanTarget(sub.subdomain);
-                                                        } else {
+                                subdomains
+                                    .filter(s => {
+                                        if (filterStatus.length > 0 && s.status && !filterStatus.includes(s.status)) return false;
+                                        // Support comma separated search
+                                        const terms = search.split(',').map(t => t.trim()).filter(t => t);
+                                        if (terms.length === 0) return true;
+                                        return terms.some(term => s.subdomain.toLowerCase().includes(term.toLowerCase()));
+                                    })
+                                    .map((sub) => (
+                                        <TableRow key={sub.id} className="border-white/10 hover:bg-white/5">
+                                            <TableCell>
+                                                <StatusBadge status={sub.status || 'inactive'} />
+                                            </TableCell>
+                                            <TableCell className="font-mono text-sm">{sub.subdomain}</TableCell>
+                                            <TableCell className="text-right text-xs text-muted-foreground font-mono">
+                                                {formatDate(sub.first_seen)}
+                                            </TableCell>
+                                            <TableCell className="text-right text-xs text-muted-foreground font-mono">
+                                                {formatDate(sub.last_seen)}
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <div className="flex justify-end gap-1">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-6 w-6"
+                                                        onClick={() => {
                                                             navigator.clipboard.writeText(sub.subdomain);
-                                                            toast.info("Copied for scanning (Scanner not linked)");
-                                                        }
-                                                    }}
-                                                    title="Start Nuclei Scan"
-                                                >
-                                                    <Target className="h-3 w-3" />
-                                                </Button>
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ))
+                                                            toast.success("Subdomain copied");
+                                                        }}
+                                                        title="Copy Subdomain"
+                                                    >
+                                                        <Copy className="h-3 w-3" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-6 w-6"
+                                                        onClick={() => {
+                                                            if (onScanTarget) {
+                                                                onScanTarget(sub.subdomain);
+                                                            } else {
+                                                                navigator.clipboard.writeText(sub.subdomain);
+                                                                toast.info("Copied for scanning (Scanner not linked)");
+                                                            }
+                                                        }}
+                                                        title="Start Nuclei Scan"
+                                                    >
+                                                        <Target className="h-3 w-3" />
+                                                    </Button>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
                             )}
                         </TableBody>
                     </Table>

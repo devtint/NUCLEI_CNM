@@ -73,3 +73,7 @@ npm-debug.log
 # Temp
 *.tmp
 *.temp
+
+# System Logs
+access_logs.json
+*.log*

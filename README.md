@@ -4,6 +4,7 @@
 ### The Self-Hosted Vulnerability Operations Platform
 
 [![License](https://img.shields.io/badge/license-MIT-emerald.svg?style=for-the-badge)](LICENSE)
+[![Docker Hub](https://img.shields.io/badge/Docker_Hub-mrtintnaingwin/nuclei--command--center-2496ED?style=for-the-badge&logo=docker)](https://hub.docker.com/r/mrtintnaingwin/nuclei-command-center)
 [![Stack](https://img.shields.io/badge/Stack-Next.js_15_&_React_19-black?style=for-the-badge)](https://nextjs.org/)
 [![Security](https://img.shields.io/badge/Security-Hardened-blue?style=for-the-badge)](#-security-features)
 
@@ -77,77 +78,126 @@ This dashboard is designed to be exposed to the internet safely.
 
 ## 🚀 Installation
 
-### Prerequisites
+### 🐳 Docker Deployment (Recommended)
+
+**Pre-built image available!** No Node.js or Go installation required.
+
+#### Option A: Pull from Docker Hub (30 seconds)
+```bash
+# Pull the image
+docker pull mrtintnaingwin/nuclei-command-center:latest
+
+# Run with persistent storage
+docker run -d \
+  --name nuclei-command-center \
+  -p 3000:3000 \
+  -v nuclei-data:/app/data \
+  -v nuclei-config:/root/.config/nuclei \
+  -e AUTH_SECRET=$(openssl rand -base64 32) \
+  -e ADMIN_PASSWORD_HASH="your_bcrypt_hash_here" \
+  mrtintnaingwin/nuclei-command-center:latest
+
+# Access at https://localhost:3000
+```
+
+#### Option B: Docker Compose (from source)
+```bash
+# Switch to docker branch for full Docker setup
+git clone -b docker https://github.com/devtint/NUCLEI_CNM.git
+cd NUCLEI_CNM/dashboard
+docker-compose up -d
+```
+
+**What's Included in Docker:**
+✅ Nuclei v3, Subfinder v2, HTTPX (latest)  
+✅ Persistent database (survives restarts)  
+✅ SSL/HTTPS certificates  
+✅ Volume-mounted scan results  
+✅ Alpine Linux (2.74GB image)
+
+📦 **Docker Branch:** [github.com/devtint/NUCLEI_CNM/tree/docker](https://github.com/devtint/NUCLEI_CNM/tree/docker)
+
+---
+
+### 💻 Manual Installation
+
+For development or customization without Docker.
+
+#### Prerequisites
 *   **Node.js** v20+
 *   **Go** 1.21+ (for scanners)
 *   **OpenSSL** (for secret generation)
 
-### 1. Install Scanners
-Ensure `nuclei`, `subfinder`, and `httpx` are installed and in your global `$PATH`.
+#### 1. Install Scanners
 ```bash
 go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
 go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
 go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest
 ```
 
-### 2. Clone & Setup
+#### 2. Clone & Setup
 ```bash
 git clone https://github.com/devtint/NUCLEI_CNM.git
 cd NUCLEI_CNM/dashboard
-
-# Install Dependencies (Compiles SQLite bindings)
 npm install
 ```
 
-### 3. Configure Security
-Create your local environment file and secure your admin credentials.
-
+#### 3. Configure Security
 ```bash
 cp .env.example .env.local
 
-# 1. Generate Auth Secret
+# Generate Auth Secret
 openssl rand -base64 32
-# -> Paste result into .env.local as AUTH_SECRET
+# -> Paste into .env.local as AUTH_SECRET
 
-# 2. Hash your Admin Password
-node scripts/hash-password.js mySuperSecretPassword
-# -> Paste extracted Hash into .env.local as ADMIN_PASSWORD_HASH
+# Hash Admin Password
+node scripts/hash-password.js YOUR_PASSWORD
+# -> Paste into .env.local as ADMIN_PASSWORD_HASH
 ```
 
-### 4. Run Development Server
+#### 4. Run Development
 ```bash
 npm run dev
-# Dashboard available at http://localhost:3000
+# Dashboard at http://localhost:3000
 ```
 
-### 5. Production Deployment (PM2)
-For 24/7 background running on a server:
-
+#### 5. Production (PM2)
 ```bash
 npm run build
 npm install -g pm2
 pm2 start npm --name "nuclei-dashboard" -- start
-pm2 save
-pm2 startup
+pm2 save && pm2 startup
 ```
 
 ---
 
 ## 🔧 Troubleshooting
 
-### "Invalid Credentials" Loop
-If you cannot log in despite setting the hash correctness:
-1.  Ensure you have **restarted the server** after changing `.env.local`.
-2.  The application uses a robust fallback loader. Check the server console logs on startup for `ℹ️ Manually loaded .env.local keys`.
-3.  Verify the hash matches using our test script:
-    ```bash
-    # Edit the script to use your password if needed
-    node scripts/verify-env.js
-    ```
+### Docker Issues
+**"Invalid Credentials"**
+```bash
+docker logs nuclei-command-center | grep AUTH
+docker exec nuclei-command-center node -e "console.log(require('bcryptjs').hashSync('YOUR_PASSWORD', 10))"
+```
 
-### Scans Failing
-*   **Permissions**: Ensure the process has write access to `dashboard/scans` and `dashboard/nuclei.db`.
-*   **Path**: Use `which nuclei` to verify the binary path and update `lib/nuclei/config.ts` if your path is non-standard.
+**Database not persisting**
+```bash
+docker volume inspect nuclei-data
+docker exec nuclei-command-center ls -lh /app/data/
+```
+
+---
+
+### Manual Installation Issues
+
+**"Invalid Credentials" Loop**
+1.  Restart server after changing `.env.local`
+2.  Check console for `ℹ️ Manually loaded .env.local keys`
+3.  Verify: `node scripts/verify-env.js`
+
+**Scans Failing**
+*   Ensure write access to `dashboard/scans` and `dashboard/nuclei.db`
+*   Verify scanner path: `which nuclei`
 
 ---
 

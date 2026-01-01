@@ -35,6 +35,11 @@ next-env.d.ts
 *.db-wal
 nuclei.db
 
+# Backup Files (Sensitive Data)
+nuclei-cc-backup*.json
+*-backup*.json
+*.backup.json
+
 # Scan Artifacts (Runtime Generated)
 # Logs, JSON results, and uploaded target lists
 scans/*.json

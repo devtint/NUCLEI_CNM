@@ -9,8 +9,9 @@ Complete documentation of all API endpoints in the Nuclei Dashboard with databas
 2. [Findings API](#findings-api)
 3. [History API](#history-api)
 4. [Templates API](#templates-api)
-5. [Caching](#caching)
-6. [Error Handling](#error-handling)
+5. [Backup & Restore API](#backup--restore-api)
+6. [Caching](#caching)
+7. [Error Handling](#error-handling)
 
 ---
 
@@ -383,6 +384,143 @@ Read template content.
 ```json
 {
   "content": "id: my-template\ninfo:\n  name: My Template\n..."
+}
+```
+
+---
+
+## Backup & Restore API
+
+### GET `/api/backup/export`
+Export complete database backup.
+
+**Authentication:** Required
+
+**Response:**
+- **Content-Type**: `application/json`
+- **Content-Disposition**: `attachment; filename="nuclei-cc-backup_{timestamp}.json"`
+- **Body**: Complete backup JSON
+
+**Backup Format:**
+```json
+{
+  "metadata": {
+    "version": "1.0.0",
+    "exportedAt": "2026-01-01T10:00:00.000Z",
+    "exportedBy": "Nuclei CC Backup System",
+    "format": "nuclei-cc-backup"
+  },
+  "nuclei": {
+    "scans": [...],
+    "findings": [...]
+  },
+  "subfinder": {
+    "scans": [...],
+    "results": [...],
+    "monitored_targets": [...],
+    "monitored_subdomains": [...]
+  },
+  "httpx": {
+    "scans": [...],
+    "results": [...]
+  }
+}
+```
+
+**Process:**
+1. Queries all tables from database
+2. Adds metadata with version and timestamp
+3. Returns as downloadable JSON file
+
+---
+
+### POST `/api/backup/restore`
+Restore from Nuclei CC backup file.
+
+**Authentication:** Required
+
+**Request:**
+- **Content-Type**: `multipart/form-data`
+- **Body**: File upload (JSON)
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Backup restored successfully",
+  "stats": {
+    "nuclei": { "scans": 10, "findings": 150 },
+    "subfinder": { "scans": 5, "results": 200, "monitored_targets": 3, "monitored_subdomains": 50 },
+    "httpx": { "scans": 8, "results": 120 }
+  },
+  "backupInfo": {
+    "version": "1.0.0",
+    "exportedAt": "2026-01-01T10:00:00.000Z"
+  }
+}
+```
+
+**Validation:**
+1. Checks file is JSON
+2. Validates `metadata.format === "nuclei-cc-backup"`
+3. Checks version compatibility
+
+**Process:**
+1. Begins SQLite transaction
+2. Restores data in order (parent tables first)
+3. Uses `INSERT OR IGNORE` for duplicate prevention
+4. Skips records with invalid foreign keys
+5. Commits transaction (or rolls back on error)
+6. Returns detailed statistics
+
+**Error Response:**
+```json
+{
+  "error": "Invalid backup format. Only files created by Nuclei CC Backup System are supported."
+}
+```
+
+---
+
+### POST `/api/findings/import`
+Import external Nuclei JSON scan results.
+
+**Authentication:** Required
+
+**Request:**
+- **Content-Type**: `multipart/form-data`
+- **Body**: Nuclei JSON file upload
+
+**Response:**
+```json
+{
+  "success": true,
+  "scanId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "imported": 45,
+  "message": "Successfully imported 45 findings from scan.json"
+}
+```
+
+**Validation:**
+1. Checks file is JSON
+2. Validates array format
+3. Checks first finding has required fields:
+   - `info` object
+   - `template-id`
+   - `matched-at` or `host`
+
+**Process:**
+1. Generates scan ID
+2. Creates scan record (status: 'completed', source: 'json_import')
+3. Parses findings array
+4. Uses existing `generateFindingHash()` for deduplication
+5. Inserts findings into database
+6. Returns scan ID and count
+
+**Error Response:**
+```json
+{
+  "error": "Invalid Nuclei format. Required fields: 'info', 'template-id'"
 }
 ```
 

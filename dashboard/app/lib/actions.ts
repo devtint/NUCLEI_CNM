@@ -25,10 +25,5 @@ export async function authenticate(
 import { signOut } from '@/auth';
 
 export async function handleSignOut() {
-    try {
-        await signOut({ redirectTo: '/login' });
-    } catch (error) {
-        console.error("Sign out error:", error);
-        throw error;
-    }
+    await signOut({ redirect: false });
 }

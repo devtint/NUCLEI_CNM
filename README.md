@@ -33,12 +33,12 @@ Turn ephemeral CLI output into a permanent, intelligent asset inventory.
 ## 🌟 Key Capabilities
 
 ### 1. Smart Vulnerability Management
+*   **Modern Card Interface**: Rich, visual card-based feed with severity-coded borders and inline actions (Copy, Rescan, Delete).
 *   **Deduplication**: Intelligent hashing ensures you never see the same duplicate finding twice (even if protocols differ: `http` vs `https`).
 *   **Lifecycle Tracking**:
     *   **🆕 NEW**: Fresh findings from recent scans.
     *   **✅ FIXED**: Issues that were present but vanished in the latest scan.
     *   **⚠️ REGRESSION**: Issues that were fixed but have returned.
-*   **AI Triage**: Built-in Google Gemini integration for instant impact analysis and remediation advice.
 
 ### 2. Live Asset Probing (HTTPX)
 *   **Visual Recon**: Full-screen drill-down with captured screenshots of every live target.
@@ -49,6 +49,18 @@ Turn ephemeral CLI output into a permanent, intelligent asset inventory.
 *   **Continuous Inventory**: Keep a database of every subdomain ever found.
 *   **"New Discoveries"**: Automatically diffs daily scans to highlight *only* fresh targets.
 *   **Global Search**: Instantly search across thousands of assets by IP, Title, Technology, or Subdomain.
+
+### 4. Scanner Management (System)
+*   **Centralized Control**: Manage Nuclei, Subfinder, and HTTPX versions from a single interface.
+*   **One-Click Updates**: Keep your engines and templates fresh with instant update actions.
+*   **Smart Detection**: Automatically finds installed versions and template snapshots, with cross-platform support for Windows/Linux paths (e.g., `~/.local`).
+
+### 5. Backup & Restore
+*   **Complete Data Export**: Create full backups of all Nuclei findings, Subfinder discoveries, and HTTPX results in a single JSON file.
+*   **Secure Format**: Proprietary backup format with version metadata prevents accidental imports of incompatible data.
+*   **Transaction-Safe Restore**: All-or-nothing restore with automatic rollback on errors ensures database integrity.
+*   **Import External Scans**: Upload Nuclei JSON output from CI/CD pipelines or remote scans for centralized management.
+*   **Duplicate Prevention**: Automatic deduplication during restore prevents data conflicts.
 
 ---
 

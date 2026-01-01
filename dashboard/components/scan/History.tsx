@@ -4,6 +4,17 @@ import { useEffect, useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Download, FileText, FileJson, Clock, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface ScanRecord {
     id: string;
@@ -22,6 +33,7 @@ interface ScanRecord {
 export function ScanHistory() {
     const [history, setHistory] = useState<ScanRecord[]>([]);
     const [loading, setLoading] = useState(true);
+    const [scanToDelete, setScanToDelete] = useState<{ id: string, filename: string } | null>(null);
 
     const fetchHistory = async () => {
         setLoading(true);
@@ -42,26 +54,26 @@ export function ScanHistory() {
         window.open(`/api/history/download?file=${filename}`, "_blank");
     };
 
-    const deleteScan = async (id: string, filename: string) => {
-        if (!confirm(`Are you sure you want to delete scan "${filename}"? This will delete all associated findings and cannot be undone.`)) {
-            return;
-        }
+    const deleteScan = async () => {
+        if (!scanToDelete) return;
 
         try {
-            const res = await fetch(`/api/history?id=${id}`, {
+            const res = await fetch(`/api/history?id=${scanToDelete.id}`, {
                 method: "DELETE"
             });
 
             if (res.ok) {
-                alert("Scan deleted successfully");
+                toast.success("Scan deleted successfully");
                 fetchHistory(); // Refresh list
             } else {
                 const error = await res.json();
-                alert(`Failed to delete scan: ${error.error || "Unknown error"}`);
+                toast.error(`Failed to delete scan: ${error.error || "Unknown error"}`);
             }
         } catch (e) {
             console.error(e);
-            alert("Failed to delete scan");
+            toast.error("Failed to delete scan");
+        } finally {
+            setScanToDelete(null);
         }
     };
 
@@ -136,7 +148,7 @@ export function ScanHistory() {
                                                 variant="outline"
                                                 size="sm"
                                                 className="h-8 border-red-900/50 text-red-500 hover:bg-red-900/20"
-                                                onClick={() => deleteScan(record.id, record.filename)}
+                                                onClick={() => setScanToDelete({ id: record.id, filename: record.filename })}
                                             >
                                                 <Trash2 className="mr-2 h-3 w-3" /> Delete
                                             </Button>
@@ -148,6 +160,26 @@ export function ScanHistory() {
                     </TableBody>
                 </Table>
             </div>
+
+            <AlertDialog open={!!scanToDelete} onOpenChange={(open) => !open && setScanToDelete(null)}>
+                <AlertDialogContent className="bg-card border-border">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="text-foreground">Delete Scan</AlertDialogTitle>
+                        <AlertDialogDescription className="text-muted-foreground">
+                            Are you sure you want to delete scan <span className="font-mono text-emerald-400">"{scanToDelete?.filename}"</span>? This will delete all associated findings and cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel className="bg-background hover:bg-muted">Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={deleteScan}
+                            className="bg-red-500 hover:bg-red-600 text-white"
+                        >
+                            Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

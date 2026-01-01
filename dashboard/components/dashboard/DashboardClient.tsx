@@ -8,11 +8,12 @@ import { FindingsTable } from "@/components/findings/Table";
 import { TemplateManager } from "@/components/templates/Manager";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { ScanHistory } from "@/components/scan/History";
-import { Settings } from "@/components/settings/Settings";
 import { TemplateList } from "@/components/templates/List";
 import { SubfinderPanel } from "@/components/subfinder/SubfinderPanel";
 import { HttpxPanel } from "@/components/httpx/HttpxPanel";
 import { SystemStatus } from "@/components/dashboard/SystemStatus";
+import { SystemPanel } from "@/components/system/SystemPanel";
+import { BackupRestorePanel } from "@/components/import/ImportPanel";
 
 export function DashboardClient({ initialStats }: { initialStats: any }) {
     const [activeScanId, setActiveScanId] = useState<string | null>(null);
@@ -132,10 +133,16 @@ export function DashboardClient({ initialStats }: { initialStats: any }) {
                         </div>
                     )}
 
-                    {activeView === "settings" && (
+                    {activeView === "system" && (
                         <div className="animate-in fade-in duration-500">
-                            <Settings />
+                            <SystemPanel />
                         </div>
+                    )}
+
+                    {activeView === "backup" && (
+                        <BackupRestorePanel onRestoreComplete={() => {
+                            setStatsRefresh(prev => prev + 1);
+                        }} />
                     )}
                 </div>
             </div>

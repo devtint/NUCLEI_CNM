@@ -5,6 +5,9 @@ import { z } from 'zod';
 import { env } from './lib/env';
 import bcrypt from 'bcrypt';
 
+import { logAccess } from './lib/db';
+import { headers } from 'next/headers';
+
 export const { auth, signIn, signOut } = NextAuth({
     ...authConfig,
     providers: [
@@ -18,14 +21,19 @@ export const { auth, signIn, signOut } = NextAuth({
                     const { password } = parsedCredentials.data;
                     const hash = env.ADMIN_PASSWORD_HASH;
 
-                    // console.log("🔐 [Auth] Hash loaded:", hash); // Be careful logging actual hash
-
                     try {
-                        // Secure Check: Compare against HASHED password in env
-                        // We use env.ADMIN_PASSWORD_HASH which guarantees existence
                         const match = await bcrypt.compare(password, hash);
-
                         if (match) {
+                            // Phase 7: Log successful login
+                            try {
+                                const headersList = await headers();
+                                const ip = headersList.get('x-forwarded-for') || '127.0.0.1';
+                                const userAgent = headersList.get('user-agent') || 'Unknown';
+                                logAccess(ip, userAgent, 'LOGIN');
+                            } catch (logErr) {
+                                console.error("Failed to log access:", logErr);
+                            }
+
                             return { id: '1', name: 'Admin', email: 'admin@local' };
                         }
                     } catch (e) {

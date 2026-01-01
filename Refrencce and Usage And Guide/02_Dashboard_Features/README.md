@@ -56,3 +56,12 @@ This document outlines the functional requirements, core features, and architect
 1. **Analysing Official Cmds**: Deep analysis of `nuclei -u` usage.
 2. **Local Integration**: Using the paths defined in `01_System_Configuration`.
 3. **Cloud Usage**: Utilizing PDCP login for learning/template fetching only.
+
+#### E. Backup & Restore
+- **Purpose**: Data management and portability.
+- **Capabilities**:
+  - Export complete database backup (all scanners).
+  - Restore from Nuclei CC backup files.
+  - Import external Nuclei JSON scans.
+- **Security**: Format validation, transaction safety, duplicate prevention.
+

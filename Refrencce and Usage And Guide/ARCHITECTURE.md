@@ -77,6 +77,9 @@ d:\NCNC\
 │   │   │   │   └── download/       # File downloads
 │   │   │   ├── scan/               # Scan execution API
 │   │   │   │   └── route.ts        # POST, GET, DELETE
+│   │   │   ├── backup/             # Backup & Restore API
+│   │   │   │   ├── export/         # Export complete backup
+│   │   │   │   └── restore/        # Restore from backup
 │   │   │   ├── settings/           # Settings API
 │   │   │   ├── stream/             # Real-time log streaming
 │   │   │   └── templates/          # Custom template management
@@ -95,6 +98,8 @@ d:\NCNC\
 │   │   │   ├── Wizard.tsx          # Scan configuration
 │   │   │   ├── LiveConsole.tsx     # Activity monitor
 │   │   │   └── History.tsx         # Scan history
+│   │   ├── import/                 # Backup & Restore
+│   │   │   └── ImportPanel.tsx     # Backup/Restore/Import UI
 │   │   ├── settings/               # Settings UI
 │   │   ├── templates/              # Template management
 │   │   └── ui/                     # shadcn/ui components
@@ -310,6 +315,26 @@ Scan history with:
 - Saves to `~/nuclei-custom-templates/`
 - Returns: `{ success: true }`
 
+### `/api/backup/export`
+**GET** - Export complete database backup
+- Returns: Downloadable JSON file with all data
+- Format: `nuclei-cc-backup` with version metadata
+- Includes: Nuclei, Subfinder, HTTPX data
+
+### `/api/backup/restore`
+**POST** - Restore from Nuclei CC backup
+- Body: FormData with backup file
+- Validates backup format
+- Uses SQLite transactions
+- Returns: Restore statistics
+
+### `/api/findings/import`
+**POST** - Import external Nuclei JSON
+- Body: FormData with Nuclei JSON file
+- Validates Nuclei format
+- Creates scan record
+- Returns: Import statistics
+
 ---
 
 ## Database Schema
@@ -503,6 +528,8 @@ Dynamically resolved using `os.homedir()`
 ✅ Severity breakdown dashboard  
 ✅ File metadata storage  
 ✅ Error handling improvements  
+✅ Backup & Restore system  
+✅ Import external Nuclei scans  
 
 ## Future Enhancements
 

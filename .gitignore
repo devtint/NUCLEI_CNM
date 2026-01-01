@@ -65,6 +65,11 @@ dashboard/*.db
 dashboard/*.db-shm
 dashboard/*.db-wal
 
+# Backup Files (Sensitive Data)
+nuclei-cc-backup*.json
+*-backup*.json
+*.backup.json
+
 # Logs
 logs/
 *.log
@@ -73,3 +78,7 @@ npm-debug.log
 # Temp
 *.tmp
 *.temp
+
+# System Logs
+access_logs.json
+*.log*

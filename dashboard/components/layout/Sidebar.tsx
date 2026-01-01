@@ -11,7 +11,8 @@ import {
     Settings,
     History,
     Star,
-    Network
+    Network,
+    Database
 } from "lucide-react";
 
 import { handleSignOut } from "@/app/lib/actions";
@@ -32,7 +33,8 @@ export function Sidebar({ className, activeView, onChangeView }: SidebarProps) {
         { id: "templates", label: "Templates", icon: FileCode },
         { id: "subfinder", label: "Subfinder", icon: Network },
         { id: "httpx", label: "Live Assets", icon: Activity },
-        { id: "settings", label: "Settings", icon: Settings },
+        { id: "backup", label: "Backup & Restore", icon: Database },
+        { id: "system", label: "System", icon: ShieldAlert },
     ];
 
     return (
@@ -62,15 +64,17 @@ export function Sidebar({ className, activeView, onChangeView }: SidebarProps) {
 
                 {/* Bottom Actions Container */}
                 <div className="absolute bottom-4 left-4 right-4 space-y-2">
-                    <form action={handleSignOut}>
-                        <Button
-                            variant="ghost"
-                            className="w-full justify-start text-red-400 hover:text-red-300 hover:bg-red-900/10 group"
-                        >
-                            <LogOut className="mr-2 h-4 w-4 group-hover:scale-110 transition-transform" />
-                            Log Out
-                        </Button>
-                    </form>
+                    <Button
+                        variant="ghost"
+                        className="w-full justify-start text-red-400 hover:text-red-300 hover:bg-red-900/10 group"
+                        onClick={async () => {
+                            await handleSignOut();
+                            window.location.href = "/login";
+                        }}
+                    >
+                        <LogOut className="mr-2 h-4 w-4 group-hover:scale-110 transition-transform" />
+                        Log Out
+                    </Button>
 
                     <a
                         href="https://github.com/devtint/NUCLEI_CNM"

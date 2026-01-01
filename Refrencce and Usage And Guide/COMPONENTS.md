@@ -870,3 +870,83 @@ Scan starts
 For API details, see [API_REFERENCE.md](./API_REFERENCE.md)  
 For architecture overview, see [ARCHITECTURE.md](./ARCHITECTURE.md)  
 For features documentation, see [FEATURES.md](./FEATURES.md)
+
+## Backup & Restore Components
+
+### BackupRestorePanel.tsx
+**Location:** `dashboard/components/import/ImportPanel.tsx`
+
+**Purpose:** Complete data management system for backing up and restoring all scan data.
+
+**State:**
+```typescript
+const [restoring, setRestoring] = useState(false);
+const [backing, setBacking] = useState(false);
+const [importing, setImporting] = useState(false);
+const [lastRestore, setLastRestore] = useState<{ filename: string; stats: any } | null>(null);
+const [lastImport, setLastImport] = useState<{ filename: string; count: number; scanId: string } | null>(null);
+```
+
+**Props:**
+```typescript
+interface BackupRestorePanelProps {
+    onRestoreComplete?: () => void;
+}
+```
+
+**Functions:**
+- `handleBackup()`: GET `/api/backup/export`
+  - Downloads complete database backup
+  - Includes all Nuclei, Subfinder, and HTTPX data
+  - Returns timestamped JSON file
+- `handleRestore(event)`: POST `/api/backup/restore`
+  - Validates backup file format
+  - Restores data with transaction safety
+  - Shows detailed statistics
+- `handleImport(event)`: POST `/api/findings/import`
+  - Imports external Nuclei JSON scans
+  - Validates Nuclei format
+  - Automatic deduplication
+
+**Features:**
+
+#### 1. Backup Tab
+- One-click database export
+- Downloads all data in proprietary format
+- Includes metadata (version, timestamp)
+- Timestamped filename
+
+#### 2. Restore Tab
+- Upload Nuclei CC backup files
+- Format validation (only accepts Nuclei CC backups)
+- Transaction-safe restore
+- Shows restore statistics
+- Displays last restore details
+
+#### 3. Import Nuclei JSON Tab
+- Upload external Nuclei scan results
+- Validates standard Nuclei JSON format
+- Creates scan records
+- Automatic deduplication
+- Shows import statistics
+
+**Data Flow:**
+```
+Backup:
+User clicks Download  GET /api/backup/export  Database queries all tables  Returns JSON file
+
+Restore:
+User uploads file  Validates format  POST /api/backup/restore  SQLite transaction  Inserts data  Shows stats
+
+Import:
+User uploads Nuclei JSON  Validates format  POST /api/findings/import  Creates scan  Inserts findings  Shows stats
+```
+
+**Security:**
+- Authentication required for all operations
+- Format validation prevents incompatible imports
+- Transaction rollback on errors
+- Duplicate prevention with INSERT OR IGNORE
+
+---
+

@@ -190,6 +190,17 @@ function initializeSchema() {
     try {
         db.prepare("ALTER TABLE httpx_results ADD COLUMN screenshot_path TEXT").run();
     } catch (e) { /* ignore */ }
+
+    // Create access_logs table for Phase 7
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS access_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp INTEGER NOT NULL,
+            ip_address TEXT,
+            user_agent TEXT,
+            event_type TEXT DEFAULT 'LOGIN'
+        )
+    `);
 }
 
 
@@ -836,3 +847,20 @@ export function getHttpxDomainSummary() {
         .sort((a, b) => b.count - a.count);
 }
 
+
+// Access Log Helpers
+export function logAccess(ip: string, userAgent: string, eventType: string = 'LOGIN') {
+    const db = getDatabase();
+    const stmt = db.prepare(`
+        INSERT INTO access_logs (timestamp, ip_address, user_agent, event_type)
+        VALUES (?, ?, ?, ?)
+    `);
+    stmt.run(Date.now(), ip, userAgent, eventType);
+}
+
+export function getAccessLogs(limit: number = 50) {
+    const db = getDatabase();
+    return db.prepare(`
+        SELECT * FROM access_logs ORDER BY timestamp DESC LIMIT ?
+    `).all(limit);
+}

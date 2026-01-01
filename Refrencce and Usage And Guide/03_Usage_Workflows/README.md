@@ -54,3 +54,27 @@ This module defines the specific user interactions and command logic for the das
 1.  **UI**: Form with fields for `id`, `info` (name, author, severity), and `requests` (DSL).
 2.  **Action**: Save to `Costume Template` directory (as noted in guide typo "Custom template Create").
 3.  **Validation**: Run `nuclei -t <new_template> -validate`.
+
+## 5. Backup & Restore Workflows
+
+### Backup Workflow
+1. **User**: Navigates to Backup & Restore section.
+2. **User**: Clicks Download Backup button.
+3. **System**: Exports all data (Nuclei, Subfinder, HTTPX) to JSON.
+4. **System**: Downloads file as nuclei-cc-backup_{timestamp}.json.
+
+### Restore Workflow
+1. **User**: Navigates to Backup & Restore section.
+2. **User**: Selects Restore tab.
+3. **User**: Uploads Nuclei CC backup file.
+4. **System**: Validates backup format.
+5. **System**: Restores data using SQLite transaction.
+6. **System**: Shows restore statistics.
+
+### Import External Scan Workflow
+1. **User**: Navigates to Backup & Restore section.
+2. **User**: Selects Import Nuclei JSON tab.
+3. **User**: Uploads Nuclei JSON output file.
+4. **System**: Validates Nuclei format.
+5. **System**: Creates scan record and imports findings.
+6. **System**: Shows import statistics.

@@ -17,7 +17,7 @@ const DEFAULTS = {
     aiSummary: true,
 };
 
-export function Settings() {
+export function ScannerConfig() {
     const [config, setConfig] = useState(DEFAULTS);
     const [hasChanges, setHasChanges] = useState(false);
 

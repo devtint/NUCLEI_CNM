@@ -50,6 +50,11 @@ Turn ephemeral CLI output into a permanent, intelligent asset inventory.
 *   **"New Discoveries"**: Automatically diffs daily scans to highlight *only* fresh targets.
 *   **Global Search**: Instantly search across thousands of assets by IP, Title, Technology, or Subdomain.
 
+### 4. Scanner Management (System)
+*   **Centralized Control**: Manage Nuclei, Subfinder, and HTTPX versions from a single interface.
+*   **One-Click Updates**: Keep your engines and templates fresh with instant update actions.
+*   **Smart Detection**: Automatically finds installed versions and template snapshots, with cross-platform support for Windows/Linux paths (e.g., `~/.local`).
+
 ---
 
 ## 🔒 Security Features (Hardened)

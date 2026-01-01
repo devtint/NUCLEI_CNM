@@ -44,6 +44,15 @@ Real-time validation data.
     *   `change_status`: 'new', 'old', 'changed' (Diffs against previous scans).
     *   `screenshot_path`: Relative path to `public/screenshots/`.
 
+### 5. Scanner Management
+*   **API**: `/api/system/scanners`
+    *   **GET**: Parallel execution of `-version` checks for all tools.
+    *   **POST**: Triggers update commands (`-up`, `-ut`).
+    *   **Logic**:
+        *   **Portable Paths**: Uses system `$PATH` instead of hardcoded binaries.
+        *   **ANSI Stripping**: Cleans terminal color codes for readable UI logs.
+        *   **Cross-Platform**: Checks multiple directories for Nuclei Templates (`~/.config`, `~/.local`, `~/`).
+
 ---
 
 ## 🧩 Component Library Update

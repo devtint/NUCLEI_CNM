@@ -3,35 +3,42 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScannerConfig } from "./ScannerConfig";
 import { AccessLogTable } from "./AccessLogTable";
-import { Shield, Settings } from "lucide-react";
+import { ScannersManager } from "./ScannersManager";
+import { Settings, ShieldAlert, Cpu } from "lucide-react";
 
 export function SystemPanel() {
     return (
-        <div className="space-y-6 animate-in fade-in duration-500">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h2 className="text-3xl font-bold tracking-tight">System & Security</h2>
-                    <p className="text-muted-foreground">Manage global configuration and monitor security events.</p>
-                </div>
+        <div className="space-y-6">
+            <div>
+                <h1 className="text-3xl font-bold tracking-tight text-foreground">System & Security</h1>
+                <p className="text-muted-foreground">Manage global configuration and monitor security events.</p>
             </div>
 
-            <Tabs defaultValue="config" className="space-y-4">
-                <TabsList>
-                    <TabsTrigger value="config" className="flex items-center gap-2">
-                        <Settings className="h-4 w-4" />
+            <Tabs defaultValue="config" className="w-full">
+                <TabsList className="bg-muted">
+                    <TabsTrigger value="config" className="data-[state=active]:bg-background">
+                        <Settings className="mr-2 h-4 w-4" />
                         Scanner Config
                     </TabsTrigger>
-                    <TabsTrigger value="security" className="flex items-center gap-2">
-                        <Shield className="h-4 w-4" />
+                    <TabsTrigger value="scanners" className="data-[state=active]:bg-background">
+                        <Cpu className="mr-2 h-4 w-4" />
+                        Scanners
+                    </TabsTrigger>
+                    <TabsTrigger value="audit" className="data-[state=active]:bg-background">
+                        <ShieldAlert className="mr-2 h-4 w-4" />
                         Security Audit
                     </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="config" className="space-y-4">
+                <TabsContent value="config" className="mt-6">
                     <ScannerConfig />
                 </TabsContent>
 
-                <TabsContent value="security" className="space-y-4">
+                <TabsContent value="scanners" className="mt-6">
+                    <ScannersManager />
+                </TabsContent>
+
+                <TabsContent value="audit" className="mt-6">
                     <AccessLogTable />
                 </TabsContent>
             </Tabs>

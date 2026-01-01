@@ -39,6 +39,8 @@ nuclei.db
 # Logs, JSON results, and uploaded target lists
 scans/*.json
 scans/*.log
+scans/logs/*
+!scans/logs/.gitkeep
 scans/uploads/*
 !scans/uploads/.gitkeep
 

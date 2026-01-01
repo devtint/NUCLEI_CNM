@@ -34,8 +34,13 @@ export async function DELETE(req: NextRequest) {
 
     try {
         const scan = getHttpxScans().find(s => s.id === id);
-        if (scan && scan.log_path && fs.existsSync(scan.log_path)) {
-            try { fs.unlinkSync(scan.log_path); } catch (e) { }
+        if (scan && scan.log_path) {
+            try {
+                await fs.promises.access(scan.log_path);
+                await fs.promises.unlink(scan.log_path);
+            } catch (e) {
+                // Ignore if file doesn't exist
+            }
         }
         deleteHttpxScan(id);
         return NextResponse.json({ success: true, message: 'Scan deleted' });
@@ -63,9 +68,14 @@ export async function GET(req: NextRequest) {
     if (id) {
         if (logs === "true") {
             const scan = getHttpxScans().find(s => s.id === id);
-            if (scan && scan.log_path && fs.existsSync(scan.log_path)) {
-                const logContent = fs.readFileSync(scan.log_path, 'utf-8');
-                return new NextResponse(logContent);
+            if (scan && scan.log_path) {
+                try {
+                    await fs.promises.access(scan.log_path);
+                    const logContent = await fs.promises.readFile(scan.log_path, 'utf-8');
+                    return new NextResponse(logContent);
+                } catch (e) {
+                    return new NextResponse("");
+                }
             }
             return new NextResponse("");
         }
@@ -127,11 +137,17 @@ export async function POST(req: NextRequest) {
         }
 
         // Prepare Logs Directory
+        // Prepare Logs Directory
         const logsDir = path.join(process.cwd(), "scans", "logs");
-        if (!fs.existsSync(logsDir)) {
-            fs.mkdirSync(logsDir, { recursive: true });
-        }
+        try {
+            await fs.promises.mkdir(logsDir, { recursive: true });
+        } catch (e) { }
+
         const logPath = path.join(logsDir, `scan_${scanId}_httpx.log`);
+
+        // Create write stream for logs
+        await fs.promises.writeFile(logPath, '');
+        const logStream = fs.createWriteStream(logPath);
 
         // DB Entry
         insertHttpxScan({
@@ -145,9 +161,9 @@ export async function POST(req: NextRequest) {
 
         // Ensure screenshots directory exists
         const screenshotsDir = path.join(process.cwd(), "public", "screenshots");
-        if (!fs.existsSync(screenshotsDir)) {
-            fs.mkdirSync(screenshotsDir, { recursive: true });
-        }
+        try {
+            await fs.promises.mkdir(screenshotsDir, { recursive: true });
+        } catch (e) { }
 
         // Construct Command
         const args = ["-json"]; // JSON is mandatory for parsing
@@ -170,12 +186,14 @@ export async function POST(req: NextRequest) {
             args.push("-l", target); // 'target' is the absolute file path
         } else if (inputs && inputs.length > 0) {
             // Temporary file for "Enrich" functionality
+            // Temporary file for "Enrich" functionality
             const scansDir = path.join(process.cwd(), "scans");
-            if (!fs.existsSync(scansDir)) {
-                fs.mkdirSync(scansDir, { recursive: true });
-            }
+            try {
+                await fs.promises.mkdir(scansDir, { recursive: true });
+            } catch (e) { }
+
             tempFilePath = path.join(scansDir, `httpx_targets_${scanId}.txt`);
-            fs.writeFileSync(tempFilePath, inputs.join("\n"));
+            await fs.promises.writeFile(tempFilePath, inputs.join("\n"));
             args.push("-l", tempFilePath);
         } else {
             // Single target mode
@@ -189,7 +207,7 @@ export async function POST(req: NextRequest) {
 
         if (child.pid) {
             updateHttpxScan(scanId, { pid: child.pid });
-            fs.appendFileSync(logPath, `[INFO] Process started with PID: ${child.pid}\n`);
+            logStream.write(`[INFO] Process started with PID: ${child.pid}\n`);
         }
 
         let jsonOutput = "";
@@ -197,18 +215,23 @@ export async function POST(req: NextRequest) {
         child.stdout?.on("data", (data) => {
             const str = data.toString();
             jsonOutput += str;
-            fs.appendFileSync(logPath, str);
+            logStream.write(str);
         });
 
         child.stderr?.on("data", (data) => {
             const str = data.toString();
-            console.log(`[HTTPX STDERR] ${str}`);
-            fs.appendFileSync(logPath, str);
+            // console.log(`[HTTPX STDERR] ${str}`); // Keep console clean
+            logStream.write(str);
         });
 
-        child.on("close", (code) => {
-            if (tempFilePath && fs.existsSync(tempFilePath)) {
-                fs.unlinkSync(tempFilePath); // Cleanup
+        child.on("close", async (code) => {
+            // Close log stream
+            logStream.end();
+
+            if (tempFilePath) {
+                try {
+                    await fs.promises.unlink(tempFilePath);
+                } catch (e) { }
             }
 
             if (code !== 0) {
@@ -258,10 +281,14 @@ export async function POST(req: NextRequest) {
             }
         });
 
-        child.on("error", (err) => {
+        child.on("error", async (err) => {
             console.error("Failed to start httpx:", err);
-            if (tempFilePath && fs.existsSync(tempFilePath)) {
-                try { fs.unlinkSync(tempFilePath); } catch (e) { }
+            logStream.end(); // close stream on error
+
+            if (tempFilePath) {
+                try {
+                    await fs.promises.unlink(tempFilePath);
+                } catch (e) { }
             }
             updateHttpxScan(scanId, {
                 status: 'failed',

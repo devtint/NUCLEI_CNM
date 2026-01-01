@@ -7,21 +7,29 @@ import os from "os";
 // But using os.homedir() is safer for the specific machine running this.
 
 const HOME_DIR = os.homedir();
-const USER_NAME = path.basename(HOME_DIR);
+const isWindows = process.platform === 'win32';
 
 export const NUCLEI_PATHS = {
-    // Config: C:\Users\naing\AppData\Roaming\nuclei
-    CONFIG_DIR: path.join(HOME_DIR, "AppData", "Roaming", "nuclei"),
+    // Config:
+    // Windows: %APPDATA%\nuclei
+    // Linux/Mac: ~/.config/nuclei
+    CONFIG_DIR: isWindows
+        ? path.join(HOME_DIR, "AppData", "Roaming", "nuclei")
+        : path.join(HOME_DIR, ".config", "nuclei"),
 
-    // Cache: C:\Users\naing\AppData\Local\nuclei
-    CACHE_DIR: path.join(HOME_DIR, "AppData", "Local", "nuclei"),
+    // Cache:
+    // Windows: %LOCALAPPDATA%\nuclei
+    // Linux/Mac: ~/.cache/nuclei
+    CACHE_DIR: isWindows
+        ? path.join(HOME_DIR, "AppData", "Local", "nuclei")
+        : path.join(HOME_DIR, ".cache", "nuclei"),
 
-    // PDCP: C:\Users\naing\.pdcp
+    // PDCP: ~/.pdcp (Same on all platforms ideally)
     PDCP_DIR: path.join(HOME_DIR, ".pdcp"),
 
-    // Default Templates (Standard location, though often configurable)
-    // Usually in /nuclei-templates or AppData/Local/nuclei-templates depending on version.
-    // We will assume a standard implementation or allow override.
+    // Templates:
+    // Windows: %USERPROFILE%\nuclei-templates
+    // Linux/Mac: ~/nuclei-templates
     TEMPLATES_DIR: path.join(HOME_DIR, "nuclei-templates"),
 };
 

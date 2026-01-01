@@ -26,8 +26,11 @@ export async function POST(req: NextRequest) {
         const scansDir = path.join(process.cwd(), "scans");
 
         // Ensure scans directory exists
-        if (!fs.existsSync(scansDir)) {
-            fs.mkdirSync(scansDir, { recursive: true });
+        // Ensure scans directory exists
+        try {
+            await fs.promises.mkdir(scansDir, { recursive: true });
+        } catch (e) {
+            // Ignore if exists
         }
 
         const outputPath = path.join(scansDir, filename);
@@ -73,8 +76,9 @@ export async function POST(req: NextRequest) {
         });
 
         // Log file path - create it first to avoid ENOENT errors
+        // Log file path - create it first to avoid ENOENT errors
         const logPath = path.join(process.cwd(), "scans", `${scanId}.log`);
-        fs.writeFileSync(logPath, ''); // Create empty file first
+        await fs.promises.writeFile(logPath, ''); // Create empty file first
         const logStream = fs.createWriteStream(logPath);
 
         child.stdout.on("data", (data) => {
@@ -100,27 +104,35 @@ export async function POST(req: NextRequest) {
                 status: 'failed',
                 end_time: Date.now()
             });
+
         });
 
-        child.on("close", (code) => {
+        child.on("close", async (code) => {
             console.log(`Scan ${scanId} exited with code ${code}`);
             logStream.end();
+
 
             // Get file sizes for database storage
             let jsonFileSize = 0;
             let logFileSize = 0;
 
-            if (fs.existsSync(outputPath)) {
-                jsonFileSize = fs.statSync(outputPath).size;
-            }
-            if (fs.existsSync(logPath)) {
-                logFileSize = fs.statSync(logPath).size;
+            try {
+                if (fs.existsSync(outputPath)) {
+                    const stats = await fs.promises.stat(outputPath);
+                    jsonFileSize = stats.size;
+                }
+                if (fs.existsSync(logPath)) {
+                    const stats = await fs.promises.stat(logPath);
+                    logFileSize = stats.size;
+                }
+            } catch (e) {
+                console.error("Error getting file stats:", e);
             }
 
             // Parse and store findings in database
             if (fs.existsSync(outputPath)) {
                 try {
-                    const jsonContent = fs.readFileSync(outputPath, 'utf-8');
+                    const jsonContent = await fs.promises.readFile(outputPath, 'utf-8');
                     const findings = JSON.parse(jsonContent);
 
                     if (Array.isArray(findings) && findings.length > 0) {
@@ -148,7 +160,7 @@ export async function POST(req: NextRequest) {
                 }
             } else {
                 // Create empty file if no results
-                fs.writeFileSync(outputPath, "[]");
+                await fs.promises.writeFile(outputPath, "[]");
                 jsonFileSize = 2; // "[]" is 2 bytes
             }
 
@@ -160,6 +172,12 @@ export async function POST(req: NextRequest) {
                 scan.exitCode = code;
                 scan.endTime = Date.now();
                 scan.hasExited = true;
+
+                // Cleanup memory (Fix Memory Leak)
+                // We delay slightly to allow any final polls to see the status
+                setTimeout(() => {
+                    activeScans.delete(scanId);
+                }, 5000);
             }
 
             // Update database with file metadata in single operation

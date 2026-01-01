@@ -25,5 +25,10 @@ export async function authenticate(
 import { signOut } from '@/auth';
 
 export async function handleSignOut() {
-    await signOut();
+    try {
+        await signOut({ redirectTo: '/login' });
+    } catch (error) {
+        console.error("Sign out error:", error);
+        throw error;
+    }
 }

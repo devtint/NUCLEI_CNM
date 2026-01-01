@@ -50,6 +50,8 @@ Thumbs.db
 # We ignore these to prevent committing sensitive scan data
 dashboard/scans/*.json
 dashboard/scans/*.log
+dashboard/scans/logs/*
+!dashboard/scans/logs/.gitkeep
 dashboard/scans/uploads/*
 !dashboard/scans/uploads/.gitkeep
 dashboard/public/screenshots/*

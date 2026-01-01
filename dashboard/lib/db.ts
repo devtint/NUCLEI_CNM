@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import crypto from 'crypto';
+import { normalizeUrl } from './utils';
 
 // Database file location
 const DB_PATH = path.join(process.cwd(), 'nuclei.db');
@@ -312,7 +313,9 @@ export function generateFindingHash(
     // Use empty string if values are undefined to ensure consistent hashing
     // Include name AND matcher_name to differentiate findings from same template with different matchers
     // Example: http-missing-security-headers with different missing headers (x-frame-options, csp, etc.)
-    const data = `${templateId || ''}|${host || ''}|${matchedAt || ''}|${name || ''}|${matcherName || ''}`;
+    // URL Normalization (P1): Strip protocol/slash to prevent duplicates on scheme change
+    const normalizedUrl = normalizeUrl(matchedAt);
+    const data = `${templateId || ''}|${host || ''}|${normalizedUrl}|${name || ''}|${matcherName || ''}`;
     return crypto.createHash('sha256').update(data).digest('hex');
 }
 

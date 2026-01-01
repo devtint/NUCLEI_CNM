@@ -82,3 +82,6 @@ npm-debug.log
 # System Logs
 access_logs.json
 *.log*
+
+# Agent Workflows (Local Only)
+.agent/

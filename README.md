@@ -183,7 +183,7 @@ EOF
 5. Hash must start with `$2b$12$` and be on a SINGLE line
 
 **Example of CORRECT nuclei.env file:**
-```
+```env
 AUTH_SECRET=xK9j2pQ7vL3mR5nT8wY1zA4bC6dE0fG
 AUTH_TRUST_HOST=true
 NEXTAUTH_URL=https://localhost:3000
@@ -191,6 +191,8 @@ ADMIN_USERNAME=admin
 ADMIN_PASSWORD_HASH=$2b$12$K9j5XH8fGq1pN7vL2mR8euTxYzW4J6Qq3Fh5vN8kL1mP9oX7wQ2hK
 NODE_TLS_REJECT_UNAUTHORIZED=0
 ```
+
+**⚠️ CRITICAL:** NO quotes around any values! The hash must start with `$2b$12$` (exactly as shown).
 
 **What each variable does:**
 - `AUTH_SECRET`: Encryption key for NextAuth sessions (32+ random characters)
@@ -500,9 +502,10 @@ docker exec nuclei-command-center env | grep -E "AUTH_SECRET|AUTH_TRUST_HOST|NEX
    ```
 
 4. **Replace ADMIN_PASSWORD_HASH with the new hash (entire line):**
-   ```
+   ```env
    ADMIN_PASSWORD_HASH=$2b$12$K9j5XH8fGq1pN7vL2mR8euTxYzW4J6Qq3Fh5vN8kL1mP9oX7wQ2hK
    ```
+   **Note:** NO quotes around the hash!
 
 5. **⚠️ CRITICAL RULES:**
    - NO quotes around the hash
@@ -586,6 +589,8 @@ echo "Hash value: $hash"
    # Linux/Mac
    echo "ADMIN_PASSWORD_HASH=$paste_full_hash_here" >> .env
    ```
+   
+   **Result should be:** `ADMIN_PASSWORD_HASH=$2b$12$...` (NO quotes around the value)
 
 4. **Restart container:**
    ```bash
@@ -905,11 +910,16 @@ yourdomain.com {
 ```env
 AUTH_SECRET=<generate-new-long-random-string>
 AUTH_TRUST_HOST=true
-NEXTAUTH_URL=https://yourdomain.com  # ← Change this
+NEXTAUTH_URL=https://yourdomain.com
 ADMIN_USERNAME=admin
-ADMIN_PASSWORD_HASH=<your-hash>
+ADMIN_PASSWORD_HASH=$2b$12$<your-60-character-hash>
 # NODE_TLS_REJECT_UNAUTHORIZED removed for production
 ```
+
+**⚠️ Production Notes:**
+- Generate a NEW AUTH_SECRET (different from local)
+- Hash format: `$2b$12$...` (60 chars, NO quotes)
+- Remove `NODE_TLS_REJECT_UNAUTHORIZED` completely
 
 #### 3. Summary of Changes
 

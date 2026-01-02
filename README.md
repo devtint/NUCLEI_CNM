@@ -4,7 +4,7 @@
 ### The Self-Hosted Vulnerability Operations Platform
 
 [![License](https://img.shields.io/badge/license-MIT-emerald.svg?style=for-the-badge)](LICENSE)
-[![Docker Hub](https://img.shields.io/badge/Docker_Hub-mrtintnaingwin/nuclei--command--center-2496ED?style=for-the-badge&logo=docker)](https://hub.docker.com/r/mrtintnaingwin/nuclei-command-center)
+[![Docker Hub](https://img.shields.io/badge/Docker_Hub-mrtintnaingwin/nuclei_cnm-2496ED?style=for-the-badge&logo=docker)](https://hub.docker.com/r/mrtintnaingwin/nuclei_cnm)
 [![Stack](https://img.shields.io/badge/Stack-Next.js_15_&_React_19-black?style=for-the-badge)](https://nextjs.org/)
 [![Security](https://img.shields.io/badge/Security-Hardened-blue?style=for-the-badge)](#-security-features)
 
@@ -106,7 +106,7 @@ cd ~/nuclei-dashboard
 
 #### Step 2: Pull the Docker Image
 ```bash
-docker pull mrtintnaingwin/nuclei-command-center:latest
+docker pull mrtintnaingwin/nuclei_cnm:latest
 ```
 **What this does:** Downloads the pre-built container image (~500MB) with all scanners and dependencies included.
 
@@ -131,7 +131,7 @@ echo "AUTH_SECRET=$AUTH_SECRET"
 
 ```bash
 # Windows (PowerShell) - Using container's Node.js
-docker run --rm mrtintnaingwin/nuclei-command-center:latest node /app/scripts/hash-password.js YourPassword123
+docker run --rm mrtintnaingwin/nuclei_cnm:latest node /app/scripts/hash-password.js YourPassword123
 
 # Linux/Mac - Using Node.js with bcryptjs
 docker run --rm node:20-alpine sh -c "npm install bcryptjs && node -e \"console.log(require('bcryptjs').hashSync('YourPassword123', 12))\""
@@ -235,7 +235,7 @@ docker run -d `
   -v nuclei-config:/root/.config/nuclei `
   -v nuclei-templates:/root/nuclei-templates `
   --restart unless-stopped `
-  mrtintnaingwin/nuclei-command-center:latest
+  mrtintnaingwin/nuclei_cnm:latest
 ```
 
 **Linux/Mac (Bash):**
@@ -253,7 +253,7 @@ docker run -d \
   -v nuclei-config:/root/.config/nuclei \
   -v nuclei-templates:/root/nuclei-templates \
   --restart unless-stopped \
-  mrtintnaingwin/nuclei-command-center:latest
+  mrtintnaingwin/nuclei_cnm:latest
 ```
 
 **⚠️ Why not `--env-file`?**
@@ -296,7 +296,7 @@ docker ps | grep nuclei-command-center
 **Expected output:**
 ```
 CONTAINER ID   IMAGE                                          STATUS         PORTS
-abc123def456   mrtintnaingwin/nuclei-command-center:latest   Up 30 seconds  0.0.0.0:3000->3000/tcp
+abc123def456   mrtintnaingwin/nuclei_cnm:latest   Up 30 seconds  0.0.0.0:3000->3000/tcp
 ```
 
 #### Step 8: Check Application Logs
@@ -449,7 +449,7 @@ docker exec nuclei-command-center printenv ADMIN_PASSWORD_HASH
 1. **Generate NEW hash with 6+ character password:**
    ```bash
    # Windows (using container's built-in script)
-   docker run --rm mrtintnaingwin/nuclei-command-center:latest node /app/scripts/hash-password.js MyPassword123
+   docker run --rm mrtintnaingwin/nuclei_cnm:latest node /app/scripts/hash-password.js MyPassword123
    
    # Linux/Mac (using Node.js)
    docker run --rm node:20-alpine sh -c "npm install bcryptjs && node -e \"console.log(require('bcryptjs').hashSync('MyPassword123', 12))\""
@@ -479,7 +479,7 @@ docker exec nuclei-command-center printenv ADMIN_PASSWORD_HASH
 # ✅ CORRECT: admin123 (8 chars)
 
 # Generate hash for 6+ character password
-docker run --rm mrtintnaingwin/nuclei-command-center:latest node /app/scripts/hash-password.js admin123
+docker run --rm mrtintnaingwin/nuclei_cnm:latest node /app/scripts/hash-password.js admin123
 ```
 
 **Solution C: Verify All Required Environment Variables**
@@ -519,7 +519,7 @@ docker exec nuclei-command-center env | grep -E "AUTH_SECRET|AUTH_TRUST_HOST|NEX
    # OR for Method 1:
    docker run -d --name nuclei-command-center -p 3000:3000 \
      -v nuclei-data:/app/data -v nuclei-config:/root/.config/nuclei \
-     --env-file nuclei.env mrtintnaingwin/nuclei-command-center:latest
+     --env-file nuclei.env mrtintnaingwin/nuclei_cnm:latest
    ```
 
 **Solution B: Generate Hash Inside Container**
@@ -667,7 +667,7 @@ docker run -d --name nuclei-command-center \
   -p 8080:3000 \  # Changed from 3000:3000
   -v nuclei-data:/app/data \
   --env-file nuclei.env \
-  mrtintnaingwin/nuclei-command-center:latest
+  mrtintnaingwin/nuclei_cnm:latest
 
 # Access at https://localhost:8080
 ```
@@ -716,7 +716,7 @@ docker run -d \
   -v nuclei-data:/app/data \
   -v nuclei-config:/root/.config/nuclei \
   --env-file nuclei.env \
-  mrtintnaingwin/nuclei-command-center:latest
+  mrtintnaingwin/nuclei_cnm:latest
 
 # Verify database exists
 docker exec nuclei-command-center ls -lh /app/data/
@@ -749,7 +749,7 @@ docker-compose down
 docker-compose up -d --build
 
 # OR pull fresh image (Method 1)
-docker pull mrtintnaingwin/nuclei-command-center:latest
+docker pull mrtintnaingwin/nuclei_cnm:latest
 docker stop nuclei-command-center
 docker rm nuclei-command-center
 # Then re-run the docker run command from Step 6
@@ -850,7 +850,7 @@ Use a reverse proxy (Nginx/Caddy) with Let's Encrypt for free SSL:
 version: '3.8'
 services:
   app:
-    image: mrtintnaingwin/nuclei-command-center:latest
+    image: mrtintnaingwin/nuclei_cnm:latest
     environment:
       - AUTH_SECRET=${AUTH_SECRET}
       - AUTH_TRUST_HOST=true
@@ -944,10 +944,10 @@ ADMIN_PASSWORD_HASH=$2b$12$<your-60-character-hash>
 
 
 # Pull latest fixed image
-docker pull mrtintnaingwin/nuclei-command-center:latest
+docker pull mrtintnaingwin/nuclei_cnm:latest
 
 # Verify image date (should be January 2026 or later)
-docker images mrtintnaingwin/nuclei-command-center:latest
+docker images mrtintnaingwin/nuclei_cnm:latest
 
 # Restart with command from Step 6
 ```
@@ -979,7 +979,7 @@ curl -k -I https://localhost:3000  # Should see 307 redirect
   -p 3000:3000 \
   -v nuclei-data:/app/data \
   --env-file $(pwd)/nuclei.env \  # Use full path
-  mrtintnaingwin/nuclei-command-center:latest
+  mrtintnaingwin/nuclei_cnm:latest
 ```
 
 ---
@@ -1091,7 +1091,7 @@ docker exec nuclei-command-center env | grep ADMIN_PASSWORD_HASH
 ### Update Application
 ```bash
 # Method 1: Pull latest image
-docker pull mrtintnaingwin/nuclei-command-center:latest
+docker pull mrtintnaingwin/nuclei_cnm:latest
 docker stop nuclei-command-center
 docker rm nuclei-command-center
 # Re-run docker run command (data persists in volumes)
@@ -1131,7 +1131,7 @@ find ./backups -name "nuclei-*.db" -mtime +7 -delete
 docker exec nuclei-command-center nuclei -update-templates
 
 # Monthly image updates
-docker pull mrtintnaingwin/nuclei-command-center:latest
+docker pull mrtintnaingwin/nuclei_cnm:latest
 ```
 
 ### 4. Monitor Logs
@@ -1151,7 +1151,7 @@ docker run -d \
   -p 127.0.0.1:3000:3000 \  # Only accessible from localhost
   -v nuclei-data:/app/data \
   --env-file nuclei.env \
-  mrtintnaingwin/nuclei-command-center:latest
+  mrtintnaingwin/nuclei_cnm:latest
 ```
 
 ---
@@ -1210,6 +1210,6 @@ docker rm nuclei-command-center
 docker stop nuclei-command-center
 docker rm -v nuclei-command-center
 docker volume rm nuclei-data nuclei-config
-docker rmi mrtintnaingwin/nuclei-command-center:latest
+docker rmi mrtintnaingwin/nuclei_cnm:latest
 # Start fresh from Step 1
 ```

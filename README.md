@@ -127,19 +127,27 @@ echo "AUTH_SECRET=$AUTH_SECRET"
 **Save this output** - you'll need it in the next step.
 
 ##### 3b. Generate Password Hash
-Choose your admin password and generate its hash:
+**Choose a password with 6+ characters** (UI requirement) and generate its hash:
 
 ```bash
-# Replace 'YourSecurePassword123' with your actual password
-docker run --rm node:20-alpine sh -c "npm install bcryptjs && node -e \"console.log(require('bcryptjs').hashSync('YourSecurePassword123', 12))\""
+# Windows (PowerShell) - Using container's Node.js
+docker run --rm mrtintnaingwin/nuclei-command-center:latest node /app/scripts/hash-password.js YourPassword123
+
+# Linux/Mac - Using Node.js with bcryptjs
+docker run --rm node:20-alpine sh -c "npm install bcryptjs && node -e \"console.log(require('bcryptjs').hashSync('YourPassword123', 12))\""
 ```
 
 **Example output:**
 ```
-$2b$12$K9j5XH8fGq1pN7vL2mR8euTxYzW4J6Qq3Fh5vN8kL1mP9oX7wQ2hK
+✅ Password Hashed Successfully!
+Hash:     $2b$12$K9j5XH8fGq1pN7vL2mR8euTxYzW4J6Qq3Fh5vN8kL1mP9oX7wQ2hK
 ```
 
-**⚠️ CRITICAL:** Copy the ENTIRE hash including `$2b$12$...`. Do NOT modify or truncate it.
+**⚠️ CRITICAL RULES:**
+- Password must be **6+ characters** (UI validation requirement)
+- Copy the ENTIRE hash including `$2b$12$...` (exactly 60 characters)
+- Hash must be on a SINGLE line (no line breaks)
+- Do NOT modify or truncate the hash
 
 #### Step 4: Create Environment File
 
@@ -149,18 +157,20 @@ Create a file named `nuclei.env` in your project directory:
 # Windows (PowerShell)
 @"
 AUTH_SECRET=paste-your-auth-secret-here
+AUTH_TRUST_HOST=true
+NEXTAUTH_URL=https://localhost:3000
+ADMIN_USERNAME=admin
 ADMIN_PASSWORD_HASH=paste-your-full-hash-here
-NODE_ENV=production
-PORT=3000
 NODE_TLS_REJECT_UNAUTHORIZED=0
 "@ | Out-File -FilePath nuclei.env -Encoding utf8
 
 # Linux/Mac
 cat > nuclei.env << 'EOF'
 AUTH_SECRET=paste-your-auth-secret-here
+AUTH_TRUST_HOST=true
+NEXTAUTH_URL=https://localhost:3000
+ADMIN_USERNAME=admin
 ADMIN_PASSWORD_HASH=paste-your-full-hash-here
-NODE_ENV=production
-PORT=3000
 NODE_TLS_REJECT_UNAUTHORIZED=0
 EOF
 ```
@@ -169,17 +179,26 @@ EOF
 1. **NO spaces** around the `=` sign
 2. **NO quotes** around values
 3. Replace `paste-your-auth-secret-here` with the AUTH_SECRET from Step 3a
-4. Replace `paste-your-full-hash-here` with the ENTIRE hash from Step 3b
-5. The hash must start with `$2b$12$` and be exactly 60 characters long
+4. Replace `paste-your-full-hash-here` with the ENTIRE hash from Step 3b (60 characters)
+5. Hash must start with `$2b$12$` and be on a SINGLE line
 
-**Example of CORRECT .env file:**
+**Example of CORRECT nuclei.env file:**
 ```
 AUTH_SECRET=xK9j2pQ7vL3mR5nT8wY1zA4bC6dE0fG
+AUTH_TRUST_HOST=true
+NEXTAUTH_URL=https://localhost:3000
+ADMIN_USERNAME=admin
 ADMIN_PASSWORD_HASH=$2b$12$K9j5XH8fGq1pN7vL2mR8euTxYzW4J6Qq3Fh5vN8kL1mP9oX7wQ2hK
-NODE_ENV=production
-PORT=3000
 NODE_TLS_REJECT_UNAUTHORIZED=0
 ```
+
+**What each variable does:**
+- `AUTH_SECRET`: Encryption key for NextAuth sessions (32+ random characters)
+- `AUTH_TRUST_HOST`: Required for Docker/reverse proxy environments
+- `NEXTAUTH_URL`: Full URL where the app is accessible (change for production)
+- `ADMIN_USERNAME`: Login username (default: admin)
+- `ADMIN_PASSWORD_HASH`: Bcrypt hash of your password (NOT the password itself)
+- `NODE_TLS_REJECT_UNAUTHORIZED`: Allows self-signed certificates (remove in production)
 
 #### Step 5: Verify Your Environment File
 
@@ -191,32 +210,79 @@ Get-Content nuclei.env
 cat nuclei.env
 ```
 
-**Check that:**
-- AUTH_SECRET is a 32+ character random string
-- ADMIN_PASSWORD_HASH starts with `$2b$12$`
-- ADMIN_PASSWORD_HASH is exactly 60 characters long
-- NO lines have quotes around values
+**Verification Checklist:**
+- ✅ AUTH_SECRET is 32+ characters (random alphanumeric)
+- ✅ AUTH_TRUST_HOST is set to `true`
+- ✅ NEXTAUTH_URL is `https://localhost:3000` (or your domain)
+- ✅ ADMIN_USERNAME is set (default: `admin`)
+- ✅ ADMIN_PASSWORD_HASH starts with `$2b$12$`
+- ✅ ADMIN_PASSWORD_HASH is exactly 60 characters long
+- ✅ Hash is on a SINGLE line (no line breaks)
+**Windows (PowerShell):**
+```powershell
+docker run -d `
+  --name nuclei-command-center `
+  -p 3000:3000 `
+  -e AUTH_SECRET="$(Get-Content nuclei.env | Select-String 'AUTH_SECRET' | ForEach-Object {$_.ToString().Split('=')[1]})" `
+  -e AUTH_TRUST_HOST=true `
+  -e NEXTAUTH_URL=https://localhost:3000 `
+  -e ADMIN_USERNAME=admin `
+  -e ADMIN_PASSWORD_HASH="$(Get-Content nuclei.env | Select-String 'ADMIN_PASSWORD_HASH' | ForEach-Object {$_.ToString().Split('=')[1]})" `
+  -e NODE_TLS_REJECT_UNAUTHORIZED=0 `
+  -v nuclei-data:/app/data `
+  -v nuclei-config:/root/.config/nuclei `
+  -v nuclei-templates:/root/nuclei-templates `
+  --restart unless-stopped `
+  mrtintnaingwin/nuclei-command-center:latest
+```
 
-#### Step 6: Run the Container
-
+**Linux/Mac (Bash):**
 ```bash
 docker run -d \
   --name nuclei-command-center \
   -p 3000:3000 \
+  -e AUTH_SECRET="$(grep AUTH_SECRET nuclei.env | cut -d'=' -f2)" \
+  -e AUTH_TRUST_HOST=true \
+  -e NEXTAUTH_URL=https://localhost:3000 \
+  -e ADMIN_USERNAME=admin \
+  -e ADMIN_PASSWORD_HASH="$(grep ADMIN_PASSWORD_HASH nuclei.env | cut -d'=' -f2)" \
+  -e NODE_TLS_REJECT_UNAUTHORIZED=0 \
   -v nuclei-data:/app/data \
   -v nuclei-config:/root/.config/nuclei \
-  --env-file nuclei.env \
+  -v nuclei-templates:/root/nuclei-templates \
   --restart unless-stopped \
   mrtintnaingwin/nuclei-command-center:latest
 ```
 
-**What this does:**
-- `-d`: Runs container in background
+**⚠️ Why not `--env-file`?**
+Next.js applications read `.env.local` from the filesystem, not from `process.env` directly. Using `-e` flags ensures environment variables are properly set.
+
+**What each flag does:**
+- `-d`: Runs container in background (detached mode)
 - `--name nuclei-command-center`: Names the container for easy management
 - `-p 3000:3000`: Maps port 3000 (access via https://localhost:3000)
-- `-v nuclei-data:/app/data`: Persistent database storage
-- `-v nuclei-config:/root/.config/nuclei`: Persistent Nuclei templates
-- `--env-file nuclei.env`: Loads your credentials
+- `-e KEY=value`: Sets environment variables directly
+- `-v nuclei-data:/app/data`: Persistent database storage (survives container deletion)
+- `-v nuclei-config:/root/.config/nuclei`: Persistent Nuclei configuration
+- `-v nuclei-templates:/root/nuclei-templates`: Persistent templates (faster updates)
+- `--name nuclei-command-center`: Names the container for easy management
+- `**You'll see a security warning** (self-signed certificate):
+   - Chrome/Edge: Click "Advanced" → "Proceed to localhost (unsafe)"
+   - Firefox: Click "Advanced" → "Accept the Risk and Continue"
+   - This is NORMAL and safe for localhost
+3. **You should see the login page** (NOT the dashboard directly)
+4. Login with:
+   - **Username:** `admin` (or what you set in ADMIN_USERNAME)
+   - **Password:** The password you chose in Step 3b (6+ characters, NOT the hash)
+
+**✅ Security Check:**
+- If you see the **login page** → ✅ Authentication is working correctly
+- If you see the **dashboard directly** → ❌ Authentication is broken (see Troubleshooting)
+
+**⚠️ Common Login Issues:**
+- **"Invalid credentials"** → Hash is corrupted (see Error #1 in Troubleshooting)
+- **"Password must be 6+ characters"** → Your password is too short (minimum 6 chars)
+- **Dashboard shows without login** → Authentication not active (rebuild required
 - `--restart unless-stopped`: Auto-restart on system reboot
 
 #### Step 7: Verify Container is Running
@@ -282,13 +348,15 @@ git rebase --abort
 # Force clean checkout
 git reset --hard origin/docker
 git clean -fd
-```
+Add-Content .env "AUTH_TRUST_HOST=true"
+Add-Content .env "NEXTAUTH_URL=https://localhost:3000"
+Add-Content .env "ADMIN_USERNAME=admin"
+Add-Content .env "NODE_TLS_REJECT_UNAUTHORIZED=0"
 
-#### Step 2: Create Environment File
-
-```bash
-# Windows (PowerShell)
-Copy-Item .env.example .env
+# Linux/Mac
+echo "AUTH_TRUST_HOST=true" >> .env
+echo "NEXTAUTH_URL=https://localhost:3000" >> .env
+echo "ADMIN_USERNAME=admin" >> .envenv
 
 # Linux/Mac
 cp .env.example .env
@@ -309,8 +377,9 @@ echo "Generated AUTH_SECRET: $AUTH_SECRET"
 ```
 
 #### Step 4: Generate Password Hash
-
-```bash
+AUTH_TRUST_HOST=true
+NEXTAUTH_URL=https://localhost:3000
+ADMIN_USERNAME=admin
 # Replace 'YourSecurePassword123' with your desired password
 docker run --rm node:20-alpine sh -c "npm install bcryptjs && node -e \"console.log(require('bcryptjs').hashSync('YourSecurePassword123', 12))\""
 ```
@@ -358,73 +427,74 @@ PORT=3000
 NODE_TLS_REJECT_UNAUTHORIZED=0
 ```
 
-#### Step 7: Start the Application
+#### Step 7:s:**
+1. Password hash is corrupted (line breaks, truncated, or wrong format)
+2. Password is less than 6 characters (UI validation requirement)
+3. Environment variables not loaded correctly
+
+**Solution A: Verify Hash Format**
 
 ```bash
-docker-compose up -d --build
+# Check hash in container
+docker exec nuclei-command-center printenv ADMIN_PASSWORD_HASH
+
+# Should output exactly 60 characters starting with $2b$12$
+# Example: $2b$12$K9j5XH8fGq1pN7vL2mR8euTxYzW4J6Qq3Fh5vN8kL1mP9oX7wQ2hK
 ```
 
-**What this does:**
-- `up`: Starts the services
-- `-d`: Runs in background
-- `--build`: Builds the image from source
+**If hash is missing or wrong:**
 
-**⚠️ First build takes 5-10 minutes** (downloads Node.js, Go, scanners, etc.)
-
-#### Step 8: Monitor Build Progress
-
-```bash
-docker-compose logs -f
-```
-
-**Press `Ctrl+C` to stop following logs** (container keeps running)
-
-#### Step 9: Verify Deployment
-
-```bash
-docker-compose ps
-```
-
-**Expected output:**
-```
-NAME                    STATUS              PORTS
-nuclei-command-center   Up 2 minutes       0.0.0.0:3000->3000/tcp
-```
-
-#### Step 10: Access the Dashboard
-
-Visit **https://localhost:3000** and login with `admin` / your password.
-
----
-
-## 🔧 Troubleshooting & Error Solutions
-
-### Error 1: "Invalid Credentials" After Login
-
-**Symptom:** You enter correct credentials but keep seeing "Invalid credentials" error.
-
-**Root Cause:** Docker Compose corrupted the bcrypt hash by interpreting `$` as a variable.
-
-**Solution A: Fix the .env File (Recommended)**
-
-1. **Stop the container:**
+1. **Generate NEW hash with 6+ character password:**
    ```bash
-   docker-compose down
-   # OR for Method 1:
+   # Windows (using container's built-in script)
+   docker run --rm mrtintnaingwin/nuclei-command-center:latest node /app/scripts/hash-password.js MyPassword123
+   
+   # Linux/Mac (using Node.js)
+   docker run --rm node:20-alpine sh -c "npm install bcryptjs && node -e \"console.log(require('bcryptjs').hashSync('MyPassword123', 12))\""
+   ```
+
+2. **Restart container with new hash:**
+   ```bash
+   # Stop and remove container
    docker stop nuclei-command-center
    docker rm nuclei-command-center
-   ```
-
-2. **Regenerate password hash:**
-   ```bash
-   docker run --rm node:20-alpine sh -c "npm install bcryptjs && node -e \"console.log(require('bcryptjs').hashSync('YourPassword123', 12))\""
-   ```
-
-3. **Edit your .env file manually:**
-   ```bash
-   # Windows
-   notepad .env
    
+   # Update nuclei.env file with new hash
+   # Windows (PowerShell)
+   (Get-Content nuclei.env) -replace 'ADMIN_PASSWORD_HASH=.*', 'ADMIN_PASSWORD_HASH=NEW_HASH_HERE' | Set-Content nuclei.env
+   
+   # Linux/Mac
+   sed -i 's/ADMIN_PASSWORD_HASH=.*/ADMIN_PASSWORD_HASH=NEW_HASH_HERE/' nuclei.env
+   
+   # Restart container (use command from Step 6)
+   ```
+
+**Solution B: Test Password Requirements**
+
+```bash
+# Password must be 6+ characters
+# ❌ WRONG: admin (5 chars)
+# ✅ CORRECT: admin123 (8 chars)
+
+# Generate hash for 6+ character password
+docker run --rm mrtintnaingwin/nuclei-command-center:latest node /app/scripts/hash-password.js admin123
+```
+
+**Solution C: Verify All Required Environment Variables**
+
+```bash
+# Check all required variables are set
+docker exec nuclei-command-center env | grep -E "AUTH_SECRET|AUTH_TRUST_HOST|NEXTAUTH_URL|ADMIN_USERNAME|ADMIN_PASSWORD_HASH"
+
+# Should show ALL of these:
+# AUTH_SECRET=...
+# AUTH_TRUST_HOST=true
+# NEXTAUTH_URL=https://localhost:3000
+# ADMIN_USERNAME=admin
+# ADMIN_PASSWORD_HASH=$2b$12$...
+```
+
+**If any are missing, recreate container with ALL variables** (see Step 6).
    # Linux/Mac
    nano .env
    ```
@@ -726,7 +796,176 @@ cat nuclei.env  # or .env for Method 2
 # Recreate container with explicit env file
 docker stop nuclei-command-center
 docker rm nuclei-command-center
-docker run -d --name nuclei-command-center \
+doc
+
+---
+
+### Error 10: Dashboard Shows Without Login (Authentication Broken)
+
+**Symptom:** Opening https://localhost:3000 shows the dashboard directly instead of login page.
+
+**This is a CRITICAL SECURITY ISSUE** - the authentication middleware is not active.
+
+**Root Cause:** You're using an old image built before authentication fixes were applied.
+
+**Verification Test:**
+```bash
+# This should return HTTP 307 redirect to /login
+curl -k -I https://localhost:3000
+
+# ✅ CORRECT OUTPUT:
+# HTTP/1.1 307 Temporary Redirect
+# location: /login?callbackUrl=...
+
+# ❌ WRONG OUTPUT:
+# HTTP/1.1 200 OK
+# (Shows dashboard HTML)
+```
+
+**Solution: Rebuild the Image**
+
+**For Pre-Built Image (Method 1):**
+```bash
+# Stop and remove container
+docker stop nuclei-command-center
+docker rm nuclei-command-center
+---
+
+## 🌐 Production Deployment (Cloud/VPS)
+
+### Required Changes for Production
+
+**DO NOT use the same setup for internet-facing deployments!** Make these changes:
+
+#### 1. Remove Self-Signed Certificate Warning
+Use a reverse proxy (Nginx/Caddy) with Let's Encrypt for free SSL:
+
+```yaml
+# docker-compose.yml for production with Caddy
+version: '3.8'
+services:
+  app:
+    image: mrtintnaingwin/nuclei-command-center:latest
+    environment:
+      - AUTH_SECRET=${AUTH_SECRET}
+      - AUTH_TRUST_HOST=true
+      - NEXTAUTH_URL=https://yourdomain.com
+      - ADMIN_USERNAME=${ADMIN_USERNAME}
+      - ADMIN_PASSWORD_HASH=${ADMIN_PASSWORD_HASH}
+      # REMOVED: NODE_TLS_REJECT_UNAUTHORIZED
+    volumes:
+      - nuclei-data:/app/data
+      - nuclei-config:/root/.config/nuclei
+    expose:
+      - 3000
+    networks:
+      - web
+
+  caddy:
+    image: caddy:latest
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - web
+
+networks:
+  web:
+
+volumes:
+  nuclei-data:
+  nuclei-config:
+  caddy-data:
+  caddy-config:
+```
+
+**Caddyfile:**
+```
+yourdomain.com {
+    reverse_proxy app:3000
+    
+    # Automatic HTTPS with Let's Encrypt
+    encode gzip
+    
+    # Security headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+    }
+}
+```
+
+#### 2. Environment Variables for Production
+
+```env
+AUTH_SECRET=<generate-new-long-random-string>
+AUTH_TRUST_HOST=true
+NEXTAUTH_URL=https://yourdomain.com  # ← Change this
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD_HASH=<your-hash>
+# NODE_TLS_REJECT_UNAUTHORIZED removed for production
+```
+
+#### 3. Summary of Changes
+
+| Variable | Local | Production |
+|----------|-------|------------|
+| `NEXTAUTH_URL` | `https://localhost:3000` | `https://yourdomain.com` |
+| `NODE_TLS_REJECT_UNAUTHORIZED` | `0` | **REMOVE** |
+| SSL Certificates | Self-signed | Let's Encrypt (via Caddy) |
+| Port Binding | `3000:3000` | Reverse proxy only |
+
+**⚠️ Security Checklist for Production:**
+- ✅ Strong 32+ character AUTH_SECRET (different from local)
+- ✅ Strong password (12+ characters with mixed case/numbers/symbols)
+- ✅ HTTPS only (no HTTP access)
+- ✅ Firewall rules (only ports 80/443 open)
+- ✅ Regular backups (automated daily)
+- ✅ Update scanners weekly (`nuclei -update-templates`)
+- ✅ Monitor logs for failed login attempts
+- ✅ Change default username from `admin` to something unique
+
+---
+
+
+# Pull latest fixed image
+docker pull mrtintnaingwin/nuclei-command-center:latest
+
+# Verify image date (should be January 2026 or later)
+docker images mrtintnaingwin/nuclei-command-center:latest
+
+# Restart with command from Step 6
+```
+
+**For Source Build (Method 2):**
+```bash
+# Pull latest code
+cd NUCLEI_CNM/dashboard
+git pull origin docker
+
+# Rebuild
+docker-compose down
+docker-compose build --no-cache
+docker-compose up -d
+
+# Test authentication
+curl -k -I https://localhost:3000  # Should see 307 redirect
+```
+
+**Files That Must Be Correct:**
+1. **middleware.ts** (NOT proxy.ts) must exist in `dashboard/` folder
+2. **auth.config.ts** must have fixed authorization logic
+3. **.env.example** must include all required variables
+
+**After fixing, verify:**
+- Opening https://localhost:3000 shows **login page**
+- Cannot access dashboard without credentials
+- Login works with correct username/passwordker run -d --name nuclei-command-center \
   -p 3000:3000 \
   -v nuclei-data:/app/data \
   --env-file $(pwd)/nuclei.env \  # Use full path

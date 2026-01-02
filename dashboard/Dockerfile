@@ -33,6 +33,10 @@ RUN apk add --no-cache python3 make g++ && \
 # Copy application code
 COPY . .
 
+# Ensure middleware.ts exists for Next.js authentication
+# Note: Source should have middleware.ts (not proxy.ts)
+RUN if [ ! -f middleware.ts ]; then echo "ERROR: middleware.ts not found"; exit 1; fi
+
 # Build Next.js application
 RUN npm run build
 

@@ -146,6 +146,7 @@ Hash:     $2b$12$K9j5XH8fGq1pN7vL2mR8euTxYzW4J6Qq3Fh5vN8kL1mP9oX7wQ2hK
 **⚠️ CRITICAL RULES:**
 - Password must be **6+ characters** (UI validation requirement)
 - Copy the ENTIRE hash including `$2b$12$...` (exactly 60 characters)
+- **TRIM ALL SPACES**: Ensure there are no leading or trailing spaces or newlines when pasting the hash.
 - Hash must be on a SINGLE line (no line breaks)
 - Do NOT modify or truncate the hash
 
@@ -220,16 +221,16 @@ cat nuclei.env
 - ✅ ADMIN_PASSWORD_HASH starts with `$2b$12$`
 - ✅ ADMIN_PASSWORD_HASH is exactly 60 characters long
 - ✅ Hash is on a SINGLE line (no line breaks)
-**Windows (PowerShell):**
+**Option A: PowerShell (Advanced Parsing)**
 ```powershell
 docker run -d `
   --name nuclei-command-center `
   -p 3000:3000 `
-  -e AUTH_SECRET="$(Get-Content nuclei.env | Select-String 'AUTH_SECRET' | ForEach-Object {$_.ToString().Split('=')[1]})" `
+  -e AUTH_SECRET="$(Get-Content nuclei.env | Select-String 'AUTH_SECRET' | ForEach-Object {$_.ToString().Split('=')[1].Trim()})" `
   -e AUTH_TRUST_HOST=true `
   -e NEXTAUTH_URL=https://localhost:3000 `
   -e ADMIN_USERNAME=admin `
-  -e ADMIN_PASSWORD_HASH="$(Get-Content nuclei.env | Select-String 'ADMIN_PASSWORD_HASH' | ForEach-Object {$_.ToString().Split('=')[1]})" `
+  -e ADMIN_PASSWORD_HASH="$(Get-Content nuclei.env | Select-String 'ADMIN_PASSWORD_HASH' | ForEach-Object {$_.ToString().Split('=')[1].Trim()})" `
   -e NODE_TLS_REJECT_UNAUTHORIZED=0 `
   -v nuclei-data:/app/data `
   -v nuclei-config:/root/.config/nuclei `
@@ -238,16 +239,33 @@ docker run -d `
   mrtintnaingwin/nuclei_cnm:latest
 ```
 
-**Linux/Mac (Bash):**
+**Option B: Linux/Mac (Bash)**
 ```bash
 docker run -d \
   --name nuclei-command-center \
   -p 3000:3000 \
-  -e AUTH_SECRET="$(grep AUTH_SECRET nuclei.env | cut -d'=' -f2)" \
+  -e AUTH_SECRET="$(grep AUTH_SECRET nuclei.env | cut -d'=' -f2 | tr -d ' \r\n')" \
   -e AUTH_TRUST_HOST=true \
   -e NEXTAUTH_URL=https://localhost:3000 \
   -e ADMIN_USERNAME=admin \
-  -e ADMIN_PASSWORD_HASH="$(grep ADMIN_PASSWORD_HASH nuclei.env | cut -d'=' -f2)" \
+  -e ADMIN_PASSWORD_HASH="$(grep ADMIN_PASSWORD_HASH nuclei.env | cut -d'=' -f2 | tr -d ' \r\n')" \
+  -e NODE_TLS_REJECT_UNAUTHORIZED=0 \
+  -v nuclei-data:/app/data \
+  -v nuclei-config:/root/.config/nuclei \
+  -v nuclei-templates:/root/nuclei-templates \
+  --restart unless-stopped \
+  mrtintnaingwin/nuclei_cnm:latest
+```
+
+**Option C: Simplified (Recommended if the above fails)**
+If the parsing scripts fail due to special characters, run this manually by pasting your values:
+```bash
+docker run -d --name nuclei-command-center -p 3000:3000 \
+  -e AUTH_SECRET="YOUR_AUTH_SECRET" \
+  -e ADMIN_PASSWORD_HASH='YOUR_HASH_HERE' \
+  -e AUTH_TRUST_HOST=true \
+  -e NEXTAUTH_URL=https://localhost:3000 \
+  -e ADMIN_USERNAME=admin \
   -e NODE_TLS_REJECT_UNAUTHORIZED=0 \
   -v nuclei-data:/app/data \
   -v nuclei-config:/root/.config/nuclei \
@@ -263,31 +281,23 @@ Next.js applications read `.env.local` from the filesystem, not from `process.en
 - `-d`: Runs container in background (detached mode)
 - `--name nuclei-command-center`: Names the container for easy management
 - `-p 3000:3000`: Maps port 3000 (access via https://localhost:3000)
-- `-e KEY=value`: Sets environment variables directly
-- `-v nuclei-data:/app/data`: Persistent database storage (survives container deletion)
+- `-v nuclei-data:/app/data`: Persistent database storage
 - `-v nuclei-config:/root/.config/nuclei`: Persistent Nuclei configuration
-- `-v nuclei-templates:/root/nuclei-templates`: Persistent templates (faster updates)
-- `--name nuclei-command-center`: Names the container for easy management
-- `**You'll see a security warning** (self-signed certificate):
+- `-v nuclei-templates:/root/nuclei-templates`: Persistent templates
+- `--restart unless-stopped`: Auto-restart on system reboot
+
+#### Step 7: Access the Dashboard
+
+1. Open your browser to: **https://localhost:3000**
+2. **You'll see a security warning** (self-signed certificate):
    - Chrome/Edge: Click "Advanced" → "Proceed to localhost (unsafe)"
    - Firefox: Click "Advanced" → "Accept the Risk and Continue"
    - This is NORMAL and safe for localhost
-3. **You should see the login page** (NOT the dashboard directly)
-4. Login with:
+3. **Login with:**
    - **Username:** `admin` (or what you set in ADMIN_USERNAME)
    - **Password:** The password you chose in Step 3b (6+ characters, NOT the hash)
 
-**✅ Security Check:**
-- If you see the **login page** → ✅ Authentication is working correctly
-- If you see the **dashboard directly** → ❌ Authentication is broken (see Troubleshooting)
-
-**⚠️ Common Login Issues:**
-- **"Invalid credentials"** → Hash is corrupted (see Error #1 in Troubleshooting)
-- **"Password must be 6+ characters"** → Your password is too short (minimum 6 chars)
-- **Dashboard shows without login** → Authentication not active (rebuild required
-- `--restart unless-stopped`: Auto-restart on system reboot
-
-#### Step 7: Verify Container is Running
+#### Step 8: Verify Container is Running
 
 ```bash
 docker ps | grep nuclei-command-center
@@ -299,7 +309,7 @@ CONTAINER ID   IMAGE                                          STATUS         POR
 abc123def456   mrtintnaingwin/nuclei_cnm:latest   Up 30 seconds  0.0.0.0:3000->3000/tcp
 ```
 
-#### Step 8: Check Application Logs
+#### Step 9: Check Application Logs
 
 ```bash
 docker logs nuclei-command-center
@@ -312,17 +322,9 @@ docker logs nuclei-command-center
 ✓ Nuclei templates initialized
 ```
 
-#### Step 9: Access the Dashboard
-
-1. Open your browser to: **https://localhost:3000**
-2. You'll see a security warning (self-signed certificate) - click "Advanced" → "Proceed"
-3. Login with:
-   - **Username:** `admin`
-   - **Password:** The password you chose in Step 3b (NOT the hash)
-
 ---
 
-### Method 2: Build From Source (Docker Compose)
+### Method 2: Advanced - Build From Source (Development/Custom)
 
 This method builds the image locally. Setup time: ~10-15 minutes.
 
@@ -350,18 +352,24 @@ git rebase --abort
 # Force clean checkout
 git reset --hard origin/docker
 git clean -fd
+```
+
+#### Step 2: Create Environment File
+
+```bash
+# Windows (PowerShell)
+cp .env.example .env
 Add-Content .env "AUTH_TRUST_HOST=true"
 Add-Content .env "NEXTAUTH_URL=https://localhost:3000"
 Add-Content .env "ADMIN_USERNAME=admin"
 Add-Content .env "NODE_TLS_REJECT_UNAUTHORIZED=0"
 
 # Linux/Mac
+cp .env.example .env
 echo "AUTH_TRUST_HOST=true" >> .env
 echo "NEXTAUTH_URL=https://localhost:3000" >> .env
-echo "ADMIN_USERNAME=admin" >> .envenv
-
-# Linux/Mac
-cp .env.example .env
+echo "ADMIN_USERNAME=admin" >> .env
+echo "NODE_TLS_REJECT_UNAUTHORIZED=0" >> .env
 ```
 
 #### Step 3: Generate AUTH_SECRET
@@ -429,7 +437,24 @@ PORT=3000
 NODE_TLS_REJECT_UNAUTHORIZED=0
 ```
 
-#### Step 7:s:**
+#### Step 7: Build and Run
+
+```bash
+docker-compose up -d --build
+```
+
+#### Step 8: Access the Dashboard
+
+1. Open **https://localhost:3000**
+2. Login with your credentials.
+
+---
+
+## 🛠️ Troubleshooting
+
+### Error 1: "Invalid Credentials" or Login Fails
+
+**Possible Causes:**
 1. Password hash is corrupted (line breaks, truncated, or wrong format)
 2. Password is less than 6 characters (UI validation requirement)
 3. Environment variables not loaded correctly
@@ -801,7 +826,9 @@ cat nuclei.env  # or .env for Method 2
 # Recreate container with explicit env file
 docker stop nuclei-command-center
 docker rm nuclei-command-center
-doc
+
+# Re-run the docker run command from Step 6
+```
 
 ---
 
@@ -834,7 +861,10 @@ curl -k -I https://localhost:3000
 # Stop and remove container
 docker stop nuclei-command-center
 docker rm nuclei-command-center
----
+
+# Pull fresh image and restart (follow Step 6)
+docker pull mrtintnaingwin/nuclei_cnm:latest
+```
 
 ## 🌐 Production Deployment (Cloud/VPS)
 
@@ -975,10 +1005,14 @@ curl -k -I https://localhost:3000  # Should see 307 redirect
 **After fixing, verify:**
 - Opening https://localhost:3000 shows **login page**
 - Cannot access dashboard without credentials
-- Login works with correct username/passwordker run -d --name nuclei-command-center \
+- Login works with correct username/password
+
+```bash
+# Final check command
+docker run -d --name nuclei-command-center \
   -p 3000:3000 \
   -v nuclei-data:/app/data \
-  --env-file $(pwd)/nuclei.env \  # Use full path
+  --env-file $(pwd)/nuclei.env \
   mrtintnaingwin/nuclei_cnm:latest
 ```
 

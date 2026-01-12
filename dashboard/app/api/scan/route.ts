@@ -5,6 +5,7 @@ import fs from "fs";
 import { constructCommand, NUCLEI_BINARY } from "@/lib/nuclei/config";
 import { insertScan, updateScan, insertFindings, FindingRecord } from "@/lib/db";
 import { cache } from "@/lib/cache";
+import { auth } from "@/auth";
 
 // In-memory store for active scans (simple solution for local app)
 // In a production serverless env, this wouldn't work, but for a local dashboard this is fine.
@@ -12,6 +13,12 @@ import { cache } from "@/lib/cache";
 const activeScans = new Map<string, any>();
 
 export async function POST(req: NextRequest) {
+    // Check authentication
+    const session = await auth();
+    if (!session) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     try {
         const body = await req.json();
         const { target, targetMode, tags, severity, templateId, rateLimit, concurrency, bulkSize, customArgs } = body;
@@ -208,6 +215,12 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
+    // Check authentication
+    const session = await auth();
+    if (!session) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     // Get recent scans from database (last 20)
     try {
         const { getDatabase } = await import("@/lib/db");
@@ -245,6 +258,12 @@ export async function GET(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+    // Check authentication
+    const session = await auth();
+    if (!session) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
 

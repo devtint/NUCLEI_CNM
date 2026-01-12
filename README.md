@@ -1,155 +1,396 @@
-<div align="center">
+<p align="center">
+  <img src="https://raw.githubusercontent.com/projectdiscovery/nuclei/master/static/nuclei-logo.png" alt="Nuclei Command Center" width="200"/>
+</p>
 
-# 🛡️ Nuclei Command Center
-### The Self-Hosted Vulnerability Operations Platform
+<h1 align="center">Nuclei Command Center</h1>
 
-[![License](https://img.shields.io/badge/license-MIT-emerald.svg?style=for-the-badge)](LICENSE)
-[![Stack](https://img.shields.io/badge/Stack-Next.js_15_&_React_19-black?style=for-the-badge)](https://nextjs.org/)
-[![Security](https://img.shields.io/badge/Security-Hardened-blue?style=for-the-badge)](#-security-features)
+<p align="center">
+  <strong>Enterprise-Grade Vulnerability Management Dashboard</strong>
+</p>
 
-**Orchestrate your Nuclei & Subfinder scanners with a powerful, persistent dashboard.**
-Turn ephemeral CLI output into a permanent, intelligent asset inventory.
+<p align="center">
+  <a href="#features">Features</a> •
+  <a href="#architecture">Architecture</a> •
+  <a href="#installation">Installation</a> •
+  <a href="#security">Security</a> •
+  <a href="#documentation">Documentation</a>
+</p>
 
-[Features](#-features) • [Security](#-security-features) • [Installation](#-installation) • [Troubleshooting](#-troubleshooting)
-
-</div>
-
----
-
-## ⚡ Use Cases
-
-### 🔍 For Bug Bounty Hunters
-*   **Never Lose Context**: Every scan is saved. Compare today's findings with last month's.
-*   **Visual Recon**: See what targets look like before you visit them (HTTPX Screenshots).
-*   **Live Injection**: Fix findings in real-time without re-scanning.
-
-### 🏢 For SecOps Teams
-*   **Continuous Monitoring**: Run daily cron jobs via API to update your asset inventory.
-*   **Drift Detection**: Automatically flagged when a "Fixed" issue re-appears (**Regression**) or a new subdomain pops up.
-*   **Centralized Knowledge**: A single source of truth for all current exposures.
+<p align="center">
+  <img src="https://img.shields.io/badge/Next.js-15+-black?style=flat-square&logo=next.js" alt="Next.js"/>
+  <img src="https://img.shields.io/badge/TypeScript-5.0-blue?style=flat-square&logo=typescript" alt="TypeScript"/>
+  <img src="https://img.shields.io/badge/Auth.js-v5-green?style=flat-square&logo=auth0" alt="Auth.js"/>
+  <img src="https://img.shields.io/badge/SQLite-3-003B57?style=flat-square&logo=sqlite" alt="SQLite"/>
+  <img src="https://img.shields.io/badge/License-MIT-yellow?style=flat-square" alt="License"/>
+</p>
 
 ---
 
-## 🌟 Key Capabilities
+## Overview
 
-### 1. Smart Vulnerability Management
-*   **Modern Card Interface**: Rich, visual card-based feed with severity-coded borders and inline actions (Copy, Rescan, Delete).
-*   **Deduplication**: Intelligent hashing ensures you never see the same duplicate finding twice (even if protocols differ: `http` vs `https`).
-*   **Lifecycle Tracking**:
-    *   **🆕 NEW**: Fresh findings from recent scans.
-    *   **✅ FIXED**: Issues that were present but vanished in the latest scan.
-    *   **⚠️ REGRESSION**: Issues that were fixed but have returned.
+**Nuclei Command Center (NUCLEI_CNM)** is a production-ready, security-hardened web interface for orchestrating vulnerability assessments using [ProjectDiscovery's Nuclei](https://github.com/projectdiscovery/nuclei) scanner. Built by security professionals for security professionals, it transforms raw Nuclei output into actionable intelligence through a modern, authenticated dashboard.
 
-### 2. Live Asset Probing (HTTPX)
-*   **Visual Recon**: Full-screen drill-down with captured screenshots of every live target.
-*   **Tech Stack**: Automatic detection of WAFs (Cloudflare, AWS), CMS (WordPress, Drupal), and frameworks (React, Vue).
-*   **Change Detection**: Track when assets change status codes (e.g., 403 Forbidden -> 200 OK).
+### Why Nuclei Command Center?
 
-### 3. Attack Surface Monitoring (Subfinder)
-*   **Continuous Inventory**: Keep a database of every subdomain ever found.
-*   **"New Discoveries"**: Automatically diffs daily scans to highlight *only* fresh targets.
-*   **Global Search**: Instantly search across thousands of assets by IP, Title, Technology, or Subdomain.
-
-### 4. Scanner Management (System)
-*   **Centralized Control**: Manage Nuclei, Subfinder, and HTTPX versions from a single interface.
-*   **One-Click Updates**: Keep your engines and templates fresh with instant update actions.
-*   **Smart Detection**: Automatically finds installed versions and template snapshots, with cross-platform support for Windows/Linux paths (e.g., `~/.local`).
-
-### 5. Backup & Restore
-*   **Complete Data Export**: Create full backups of all Nuclei findings, Subfinder discoveries, and HTTPX results in a single JSON file.
-*   **Secure Format**: Proprietary backup format with version metadata prevents accidental imports of incompatible data.
-*   **Transaction-Safe Restore**: All-or-nothing restore with automatic rollback on errors ensures database integrity.
-*   **Import External Scans**: Upload Nuclei JSON output from CI/CD pipelines or remote scans for centralized management.
-*   **Duplicate Prevention**: Automatic deduplication during restore prevents data conflicts.
+| Challenge | Solution |
+|-----------|----------|
+| CLI-only workflow slows down operations | **One-click preset scans** with configurable parameters |
+| Findings scattered across JSON files | **Centralized SQLite database** with full-text search |
+| No vulnerability lifecycle tracking | **Status management**: New → Confirmed → Fixed → Closed |
+| Team collaboration is difficult | **Import/Export** capabilities with backup & restore |
+| No access control for scan operations | **NextAuth v5 integration** with bcrypt password hashing |
 
 ---
 
-## 🔒 Security Features (Hardened)
+## Features
 
-This dashboard is designed to be exposed to the internet safely.
+### 🎯 Vulnerability Management
 
-1.  **Bcrypt Password Hashing**: Passwords are never stored in plain text.
-2.  **HTTPS Enforcement**: Middleware automatically redirects all HTTP traffic to HTTPS in production.
-3.  **Strict Env Validation**: server fails fast if security keys are missing.
-4.  **Cross-Platform**: Full support for Linux, macOS, and Windows file systems.
+- **Unified Finding Feed**: Aggregate all scan results in a single, filterable interface
+- **Severity Classification**: Color-coded Critical/High/Medium/Low/Info badges
+- **Status Workflow**: Track findings through New → Confirmed → False Positive → Fixed → Closed
+- **Surgical Rescan**: Re-verify individual vulnerabilities with one click
+- **Bulk Export**: CSV exports filtered by severity level
+
+### ⚡ Scan Operations
+
+- **7 Pre-Configured Presets**:
+  | Preset | Nuclei Flags | Use Case |
+  |--------|--------------|----------|
+  | Full Scan | None | Comprehensive assessment |
+  | Critical Only | `-s critical` | High-priority triage |
+  | High & Critical | `-s critical,high` | Risk-focused scan |
+  | Technology Detection | `-tags tech` | Asset fingerprinting |
+  | Recent CVEs | `-tags cve2023,cve2024` | Patch verification |
+  | Misconfigurations | `-tags misconfig` | Security hardening |
+  | Admin Panels | `-tags panel,login` | Exposed interface detection |
+
+- **Custom Command Builder**: Full CLI flag support for advanced operators
+- **Real-time Activity Monitor**: Live scan status with duration tracking
+- **Background Processing**: Non-blocking scan execution with process management
+
+### 🔧 System Management
+
+- **Engine Updates**: One-click updates for Nuclei, Subfinder, and HTTPX binaries
+- **Template Management**: Create, edit, and execute custom YAML templates
+- **Performance Tuning**: Configurable rate limits, concurrency, and bulk sizes
+- **Access Logging**: Audit trail for authentication events
+
+### 💾 Data Management
+
+- **SQLite Persistence**: Indexed database with foreign key relationships
+- **Full Backup**: Export all scanners' data (Nuclei, Subfinder, HTTPX) to JSON
+- **Transaction-Safe Restore**: Atomic restore with rollback on failure
+- **External Import**: Ingest Nuclei JSON from CI/CD pipelines or other sources
 
 ---
 
-## 🚀 Installation
+## Architecture
 
-### Prerequisites
-*   **Node.js** v20+
-*   **Go** 1.21+ (for scanners)
-*   **OpenSSL** (for secret generation)
-
-### 1. Install Scanners
-Ensure `nuclei`, `subfinder`, and `httpx` are installed and in your global `$PATH`.
-```bash
-go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
-go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
-go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                           NUCLEI COMMAND CENTER                         │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐                 │
+│  │   Browser   │───▶│  proxy.ts   │───▶│  Next.js    │                 │
+│  │   Client    │    │ (Middleware)│    │  App Router │                 │
+│  └─────────────┘    └─────────────┘    └─────────────┘                 │
+│         │                  │                  │                         │
+│         │           ┌──────▼──────┐          │                         │
+│         │           │  NextAuth   │          │                         │
+│         │           │  Sessions   │          │                         │
+│         │           └─────────────┘          │                         │
+│         │                                    │                         │
+│         │           ┌────────────────────────▼─────────────────────┐   │
+│         │           │              API Routes (/api/*)              │   │
+│         │           │  ┌─────────┐ ┌─────────┐ ┌─────────────────┐ │   │
+│         │           │  │  scan   │ │findings │ │ system/scanners │ │   │
+│         │           │  └────┬────┘ └────┬────┘ └────────┬────────┘ │   │
+│         │           └───────┼───────────┼───────────────┼──────────┘   │
+│         │                   │           │               │              │
+│  ┌──────▼──────┐     ┌──────▼───────────▼───────────────▼──────┐       │
+│  │    React    │     │              SQLite Database             │       │
+│  │  Components │     │  ┌────────┐  ┌──────────┐  ┌─────────┐  │       │
+│  └─────────────┘     │  │ scans  │  │ findings │  │ access  │  │       │
+│                      │  │        │  │          │  │  logs   │  │       │
+│                      │  └────────┘  └──────────┘  └─────────┘  │       │
+│                      └─────────────────────────────────────────┘       │
+│                                        │                               │
+│                               ┌────────▼────────┐                      │
+│                               │  Nuclei Binary  │                      │
+│                               │   (System PATH) │                      │
+│                               └─────────────────┘                      │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 2. Clone & Setup
-```bash
-git clone https://github.com/devtint/NUCLEI_CNM.git
-cd NUCLEI_CNM/dashboard
+### Technology Stack
 
-# Install Dependencies (Compiles SQLite bindings)
+| Layer | Technology | Purpose |
+|-------|------------|---------|
+| **Frontend** | Next.js 15, React 19, Tailwind CSS | Server-side rendering, responsive UI |
+| **Components** | shadcn/ui (Radix primitives) | Accessible, customizable UI library |
+| **Authentication** | Auth.js v5 (NextAuth) | Session management, middleware protection |
+| **Password Security** | bcrypt (10 rounds) | Secure credential hashing |
+| **Database** | SQLite + better-sqlite3 | Embedded, zero-config persistence |
+| **API** | Next.js Route Handlers | RESTful endpoints with type safety |
+| **Process Mgmt** | Node.js child_process | Nuclei binary execution |
+| **Caching** | In-memory TTL cache | Reduced database load |
+
+---
+
+## Installation
+
+### Prerequisites
+
+| Requirement | Version | Verification |
+|-------------|---------|--------------|
+| Node.js | ≥ 18.0.0 | `node --version` |
+| npm | ≥ 9.0.0 | `npm --version` |
+| Go | ≥ 1.21 | `go version` |
+| Nuclei | ≥ 3.6.0 | `nuclei -version` |
+
+### Step 1: Install ProjectDiscovery Tools
+
+```bash
+# Install Nuclei
+go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
+
+# Install Subfinder (optional, for subdomain discovery)
+go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
+
+# Install HTTPX (optional, for HTTP probing)
+go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest
+
+# Ensure Go bin is in PATH
+# Windows: Add %USERPROFILE%\go\bin to PATH
+# Linux/macOS: export PATH=$PATH:$(go env GOPATH)/bin
+```
+
+### Step 2: Clone and Install
+
+```bash
+git clone https://github.com/yourusername/NUCLEI_CNM.git
+cd NUCLEI_CNM/dashboard
 npm install
 ```
 
-### 3. Configure Security
-Create your local environment file and secure your admin credentials.
+### Step 3: Configure Authentication
+
+Generate a secure password hash:
 
 ```bash
-cp .env.example .env.local
+# Using Node.js
+node -e "const bcrypt = require('bcrypt'); bcrypt.hash('YOUR_SECURE_PASSWORD', 10).then(h => console.log(h));"
+```
 
-# 1. Generate Auth Secret
+Generate an auth secret:
+
+```bash
+# Using OpenSSL
 openssl rand -base64 32
-# -> Paste result into .env.local as AUTH_SECRET
 
-# 2. Hash your Admin Password
-node scripts/hash-password.js mySuperSecretPassword
-# -> Paste extracted Hash into .env.local as ADMIN_PASSWORD_HASH
+# Or using Node.js
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 ```
 
-### 4. Run Development Server
+Create `dashboard/.env.local`:
+
+```env
+# Required: Bcrypt hash of your admin password
+ADMIN_PASSWORD_HASH="$2b$10$XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+
+# Required: Random secret for session signing (32+ characters)
+AUTH_SECRET="XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+```
+
+### Step 4: Initialize and Run
+
 ```bash
+# Development mode (with hot reload)
 npm run dev
-# Dashboard available at http://localhost:3000
-```
 
-### 5. Production Deployment (PM2)
-For 24/7 background running on a server:
-
-```bash
+# Production build
 npm run build
-npm install -g pm2
-pm2 start npm --name "nuclei-dashboard" -- start
-pm2 save
-pm2 startup
+npm start
+```
+
+Access the dashboard at **http://localhost:3000**
+
+---
+
+## Security
+
+### Authentication Architecture
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                    Security Layers                           │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│  Layer 1: Edge Middleware (proxy.ts)                        │
+│  ├─ Intercepts ALL requests before routing                  │
+│  ├─ Validates session existence                             │
+│  ├─ Redirects unauthenticated users to /login               │
+│  └─ Enforces HTTPS in production                            │
+│                                                              │
+│  Layer 2: API Route Guards                                   │
+│  ├─ Every API handler calls await auth()                    │
+│  ├─ Returns 401 Unauthorized if no session                  │
+│  └─ Prevents direct API access bypass                       │
+│                                                              │
+│  Layer 3: Password Security                                  │
+│  ├─ Bcrypt hashing with 10 salt rounds                      │
+│  ├─ Timing-safe comparison                                  │
+│  └─ No plaintext password storage                           │
+│                                                              │
+│  Layer 4: Session Management                                 │
+│  ├─ Secure HTTP-only cookies                                │
+│  ├─ CSRF protection (built-in)                              │
+│  └─ Configurable session lifetime                           │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### Security Best Practices
+
+| Practice | Implementation |
+|----------|----------------|
+| **Secrets Management** | All secrets in `.env.local` (gitignored) |
+| **Password Policy** | Minimum 12 characters recommended |
+| **SQL Injection** | Prepared statements via better-sqlite3 |
+| **XSS Prevention** | React's built-in escaping + CSP headers |
+| **CSRF Protection** | NextAuth automatic token validation |
+| **Access Logging** | Authentication events logged to database |
+| **Sensitive Data** | Database and scan results excluded from Git |
+
+### Protected Resources
+
+| Resource | Protection Method |
+|----------|-------------------|
+| `/` (Dashboard) | Middleware redirect |
+| `/vulnerabilities` | Middleware redirect |
+| `/api/scan` | 401 if no session |
+| `/api/findings` | 401 if no session |
+| `/api/backup/*` | 401 if no session |
+| `/api/system/*` | 401 if no session |
+
+---
+
+## Configuration
+
+### Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `ADMIN_PASSWORD_HASH` | ✅ | Bcrypt hash of admin password |
+| `AUTH_SECRET` | ✅ | Session signing secret (32+ chars) |
+| `NODE_ENV` | ❌ | `development` or `production` |
+
+### Performance Tuning
+
+Located in **Settings** within the dashboard:
+
+| Setting | Default | Range | Impact |
+|---------|---------|-------|--------|
+| Rate Limit | 150 req/s | 50-1000 | Target server load |
+| Concurrency | 25 | 25-300 | Parallel template execution |
+| Bulk Size | 25 | 25-100 | Hosts per batch |
+
+---
+
+## Project Structure
+
+```
+NUCLEI_CNM/
+├── dashboard/                          # Next.js Application
+│   ├── app/                            # App Router
+│   │   ├── api/                        # Backend API Routes
+│   │   │   ├── auth/                   # NextAuth endpoints
+│   │   │   ├── scan/                   # Scan CRUD operations
+│   │   │   ├── findings/               # Finding management
+│   │   │   ├── backup/                 # Export/restore
+│   │   │   └── system/                 # Engine updates, health
+│   │   ├── login/                      # Authentication page
+│   │   └── page.tsx                    # Main dashboard
+│   ├── components/                     # React Components
+│   │   ├── dashboard/                  # Overview, stats
+│   │   ├── findings/                   # Table, filters
+│   │   ├── scan/                       # Wizard, console
+│   │   └── ui/                         # shadcn/ui primitives
+│   ├── lib/                            # Core Logic
+│   │   ├── db.ts                       # Database operations
+│   │   ├── cache.ts                    # TTL caching
+│   │   ├── env.ts                      # Environment handling
+│   │   └── nuclei/                     # Config, presets
+│   ├── proxy.ts                        # Authentication middleware
+│   ├── auth.ts                         # Credentials provider
+│   ├── auth.config.ts                  # NextAuth config
+│   └── scans/                          # Scan output (gitignored)
+├── Refrencce and Usage And Guide/      # Technical Documentation
+│   ├── GETTING_STARTED.md
+│   ├── AUTHENTICATION.md
+│   ├── ARCHITECTURE.md
+│   ├── API_REFERENCE.md
+│   ├── FEATURES.md
+│   └── COMPONENTS.md
+├── .gitignore                          # Security-conscious ignores
+└── README.md                           # This file
 ```
 
 ---
 
-## 🔧 Troubleshooting
+## Documentation
 
-### "Invalid Credentials" Loop
-If you cannot log in despite setting the hash correctness:
-1.  Ensure you have **restarted the server** after changing `.env.local`.
-2.  The application uses a robust fallback loader. Check the server console logs on startup for `ℹ️ Manually loaded .env.local keys`.
-3.  Verify the hash matches using our test script:
-    ```bash
-    # Edit the script to use your password if needed
-    node scripts/verify-env.js
-    ```
-
-### Scans Failing
-*   **Permissions**: Ensure the process has write access to `dashboard/scans` and `dashboard/nuclei.db`.
-*   **Path**: Use `which nuclei` to verify the binary path and update `lib/nuclei/config.ts` if your path is non-standard.
+| Document | Description |
+|----------|-------------|
+| [GETTING_STARTED.md](./Refrencce%20and%20Usage%20And%20Guide/GETTING_STARTED.md) | Complete setup and first scan guide |
+| [AUTHENTICATION.md](./Refrencce%20and%20Usage%20And%20Guide/AUTHENTICATION.md) | Security implementation details |
+| [ARCHITECTURE.md](./Refrencce%20and%20Usage%20And%20Guide/ARCHITECTURE.md) | System design and data flow |
+| [API_REFERENCE.md](./Refrencce%20and%20Usage%20And%20Guide/API_REFERENCE.md) | Endpoint specifications |
+| [FEATURES.md](./Refrencce%20and%20Usage%20And%20Guide/FEATURES.md) | Feature catalog |
+| [COMPONENTS.md](./Refrencce%20and%20Usage%20And%20Guide/COMPONENTS.md) | React component documentation |
 
 ---
 
-## 📜 License
-Distributed under the **MIT License**.
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/enhancement`)
+3. Commit changes (`git commit -m 'feat: add new capability'`)
+4. Push to branch (`git push origin feature/enhancement`)
+5. Open a Pull Request
+
+### Commit Convention
+
+This project follows [Conventional Commits](https://www.conventionalcommits.org/):
+
+- `feat:` New feature
+- `fix:` Bug fix
+- `docs:` Documentation
+- `refactor:` Code refactoring
+- `security:` Security improvements
+
+---
+
+## License
+
+This project is licensed under the **MIT License**. See [LICENSE](./LICENSE) for details.
+
+Nuclei is a product of [ProjectDiscovery](https://projectdiscovery.io/) and is also licensed under the [MIT License](https://github.com/projectdiscovery/nuclei/blob/master/LICENSE).
+
+---
+
+## Acknowledgments
+
+- [ProjectDiscovery](https://projectdiscovery.io/) for Nuclei, Subfinder, and HTTPX
+- [Vercel](https://vercel.com/) for Next.js
+- [shadcn](https://ui.shadcn.com/) for the UI component library
+- [Auth.js](https://authjs.dev/) for authentication primitives
+
+---
+
+<p align="center">
+  <strong>Built with 🔐 Security in Mind</strong>
+</p>

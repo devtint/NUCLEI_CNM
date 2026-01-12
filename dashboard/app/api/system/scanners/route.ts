@@ -86,26 +86,31 @@ export async function POST(req: Request) {
     try {
         const { action } = await req.json();
         let command = "";
+        let timeout = 60000; // Default 1 minute timeout
 
         switch (action) {
             case "update-nuclei":
                 command = "nuclei -up";
+                timeout = 120000; // 2 minutes for binary update
                 break;
             case "update-templates":
                 command = "nuclei -ut";
+                timeout = 300000; // 5 minutes for template update (large download)
                 break;
             case "update-subfinder":
                 command = "subfinder -up";
+                timeout = 120000;
                 break;
             case "update-httpx":
                 command = "httpx -up";
+                timeout = 120000;
                 break;
             default:
                 return NextResponse.json({ error: "Invalid action" }, { status: 400 });
         }
 
-        // Execute update
-        const { stdout, stderr } = await execAsync(command);
+        // Execute update with timeout
+        const { stdout, stderr } = await execAsync(command, { timeout });
 
         const combined = (stdout || "") + (stderr || "");
         // Basic ANSI strip regex for clean UI logs
@@ -119,6 +124,16 @@ export async function POST(req: Request) {
 
     } catch (error: any) {
         console.error("Update failed:", error);
+
+        // Check if it was a timeout error
+        if (error.killed || error.signal === 'SIGTERM') {
+            return NextResponse.json({
+                success: false,
+                error: "Update timed out",
+                details: "The update is taking too long. Try running 'nuclei -ut' manually in terminal."
+            }, { status: 408 });
+        }
+
         return NextResponse.json({
             success: false,
             error: "Update failed",

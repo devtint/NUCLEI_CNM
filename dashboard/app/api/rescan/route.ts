@@ -4,8 +4,15 @@ import path from "path";
 import fs from "fs";
 import { constructCommand, NUCLEI_BINARY } from "@/lib/nuclei/config";
 import { getDatabase, FindingRecord } from "@/lib/db";
+import { auth } from "@/auth";
 
 export async function POST(req: NextRequest) {
+    // Check authentication
+    const session = await auth();
+    if (!session) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     try {
         const body = await req.json();
         const { findingId, target, templateId } = body;
@@ -34,7 +41,7 @@ export async function POST(req: NextRequest) {
         const child = spawn(NUCLEI_BINARY, args);
         child.stdin.end();
 
-        return new Promise((resolve) => {
+        return new Promise<Response>((resolve) => {
             let output = '';
 
             child.stdout.on("data", (data) => {

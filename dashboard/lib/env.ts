@@ -55,6 +55,5 @@ export const env = {
     get AUTH_SECRET() { return requireEnv('AUTH_SECRET'); },
 
     // Optional
-    get GEMINI_API_KEY() { return process.env.GEMINI_API_KEY; },
     get NODE_ENV() { return process.env.NODE_ENV || 'development'; },
 };

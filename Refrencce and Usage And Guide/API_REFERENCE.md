@@ -5,20 +5,37 @@ Complete documentation of all API endpoints in the Nuclei Dashboard with databas
 ---
 
 ## Table of Contents
-1. [Scan Management API](#scan-management-api)
-2. [Findings API](#findings-api)
-3. [History API](#history-api)
-4. [Templates API](#templates-api)
-5. [Backup & Restore API](#backup--restore-api)
-6. [Caching](#caching)
-7. [Error Handling](#error-handling)
+1. [Authentication](#authentication)
+2. [Scan Management API](#scan-management-api)
+3. [Findings API](#findings-api)
+4. [History API](#history-api)
+5. [Templates API](#templates-api)
+6. [Backup & Restore API](#backup--restore-api)
+7. [Caching](#caching)
+8. [Error Handling](#error-handling)
+
+---
+
+## Authentication
+
+All API endpoints (except `/api/auth/*`) require a valid session.
+
+**Authentication Method:** NextAuth v5 (Session Cookies)
+
+**Unauthorized Response:**
+```json
+{
+  "error": "Unauthorized"
+}
+```
+**Status Code:** `401 Unauthorized`
 
 ---
 
 ## Scan Management API
 
 ### POST `/api/scan`
-Start a new Nuclei scan with database tracking.
+Start a new Nuclei scan. **Requires Authentication.**
 
 **Request Body:**
 ```json
@@ -56,7 +73,7 @@ Start a new Nuclei scan with database tracking.
 ---
 
 ### GET `/api/scan`
-List recent scans from database (last 20).
+List recent scans from database (last 20). **Requires Authentication.**
 
 **Response:**
 ```json
@@ -92,7 +109,7 @@ LIMIT 20
 ---
 
 ### DELETE `/api/scan?id=<scanId>`
-Stop a running scan and update database.
+Stop a running scan. **Requires Authentication.**
 
 **Query Parameters:**
 - `id`: Scan ID to stop
@@ -116,7 +133,7 @@ Stop a running scan and update database.
 ## Findings API
 
 ### GET `/api/findings`
-List all vulnerability findings from database.
+List findings. **Requires Authentication.**
 
 **Query Parameters (Optional):**
 - `scanId`: Filter by specific scan ID
@@ -160,7 +177,7 @@ WHERE scan_id = ? OR ? IS NULL
 ---
 
 ### PATCH `/api/findings`
-Update finding status in database.
+Update finding status. **Requires Authentication.**
 
 **Request Body:**
 ```json
@@ -200,7 +217,7 @@ Update finding status in database.
 ---
 
 ### DELETE `/api/findings`
-Delete a specific finding from database.
+Delete a finding. **Requires Authentication.**
 
 **Request Body:**
 ```json
@@ -233,7 +250,7 @@ Delete a specific finding from database.
 ## History API
 
 ### GET `/api/history`
-List all scans with metadata from database.
+List scan history. **Requires Authentication.**
 
 **Response:**
 ```json
@@ -273,7 +290,7 @@ ORDER BY start_time DESC
 ---
 
 ### DELETE `/api/history?id=<scanId>`
-Delete scan and all associated data.
+Delete scan data. **Requires Authentication.**
 
 **Query Parameters:**
 - `id`: Scan ID to delete
@@ -325,7 +342,7 @@ Download scan results or logs.
 ## Templates API
 
 ### GET `/api/templates`
-List all available templates (standard + custom).
+List all templates. **Requires Authentication.**
 
 **Response:**
 ```json
@@ -348,7 +365,7 @@ List all available templates (standard + custom).
 ---
 
 ### POST `/api/templates`
-Create a new custom template.
+Create custom template. **Requires Authentication.**
 
 **Request Body:**
 ```json

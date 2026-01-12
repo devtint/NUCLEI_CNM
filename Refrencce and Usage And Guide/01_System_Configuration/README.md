@@ -35,3 +35,26 @@ The dashboard must interact with the following directory structures. Ensure the 
 - **Location**: *Managed via Nuclei Config*
 - **Default**: Usually in `C:\Users\name\nuclei-templates` or within the AppData structure depending on install method.
 - **Command to Verify**: `nuclei -version` (Outputs the paths as seen in logs).
+
+---
+
+## Dashboard Configuration (.env.local)
+
+The dashboard requires sensitive environment variables for security. These should be placed in `dashboard/.env.local`.
+
+### 1. ADMIN_PASSWORD_HASH
+- **Purpose**: Bcrypt hash of the admin password.
+- **Example**: `$2b$10$...`
+
+### 2. AUTH_SECRET
+- **Purpose**: Random string for signing session tokens.
+- **Generate**: `openssl rand -base64 32`
+
+---
+
+## Security Configuration
+
+### Middleware (proxy.ts)
+- Handles authentication redirects.
+- Enforces HTTPS in production environment.
+- Configured via `matcher` in `proxy.ts`.

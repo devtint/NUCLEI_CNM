@@ -2,8 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import os from "os";
+import { auth } from "@/auth";
 
 export async function POST(req: NextRequest) {
+    // Check authentication
+    const session = await auth();
+    if (!session) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     try {
         const { name, content } = await req.json();
         if (!name || !content) return NextResponse.json({ error: "Missing name or content" }, { status: 400 });
@@ -28,8 +35,13 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: String(e) }, { status: 500 });
     }
 }
-// List custom templates
 export async function GET(req: NextRequest) {
+    // Check authentication
+    const session = await auth();
+    if (!session) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     try {
         const home = os.homedir();
         const customDir = path.join(home, "nuclei-custom-templates");

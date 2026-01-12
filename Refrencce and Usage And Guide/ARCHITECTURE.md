@@ -25,6 +25,7 @@ The Nuclei Dashboard is a **Next.js-based web application** with **SQLite databa
 - **Vulnerability feed** with multi-select severity filtering
 - **Settings management** for performance tuning
 - **Response caching** for optimized performance
+- **Secured Authentication**: Integrated NextAuth v5 for protected access
 
 ### Key Design Principles
 
@@ -34,6 +35,7 @@ The Nuclei Dashboard is a **Next.js-based web application** with **SQLite databa
 4. **Real-time Updates**: Database polling for scan status
 5. **Client-Side State**: React hooks for UI state management
 6. **Response Caching**: In-memory caching with TTL for API optimization
+7. **Middleware-Based Security**: Route-level protection for pages and APIs
 
 ---
 
@@ -51,6 +53,7 @@ The Nuclei Dashboard is a **Next.js-based web application** with **SQLite databa
 ### Backend
 - **Runtime**: Node.js (Next.js API Routes)
 - **Database**: SQLite with better-sqlite3
+- **Authentication**: NextAuth.js v5 (Auth.js)
 - **Process Management**: `child_process.spawn` for Nuclei execution
 - **File System**: Node.js `fs` module for scan output storage
 - **Caching**: In-memory cache with TTL
@@ -70,49 +73,29 @@ d:\NCNC\
 ├── dashboard/                      # Next.js application root
 │   ├── app/                        # Next.js App Router
 │   │   ├── api/                    # API Routes (Backend)
+│   │   │   ├── auth/               # NextAuth authentication routes
 │   │   │   ├── findings/           # Vulnerability findings API
-│   │   │   │   └── route.ts        # GET, PATCH, DELETE
 │   │   │   ├── history/            # Scan history API
-│   │   │   │   ├── route.ts        # GET, DELETE
-│   │   │   │   └── download/       # File downloads
 │   │   │   ├── scan/               # Scan execution API
-│   │   │   │   └── route.ts        # POST, GET, DELETE
 │   │   │   ├── backup/             # Backup & Restore API
-│   │   │   │   ├── export/         # Export complete backup
-│   │   │   │   └── restore/        # Restore from backup
 │   │   │   ├── settings/           # Settings API
 │   │   │   ├── stream/             # Real-time log streaming
 │   │   │   └── templates/          # Custom template management
+│   │   ├── login/                  # Login page
 │   │   ├── layout.tsx              # Root layout with theme
 │   │   ├── page.tsx                # Main dashboard page
 │   │   └── globals.css             # Global styles & theme tokens
 │   ├── components/                 # React components
-│   │   ├── dashboard/              # Dashboard views
-│   │   │   ├── DashboardClient.tsx # Main orchestrator
-│   │   │   └── Stats.tsx           # Statistics with severity breakdown
-│   │   ├── findings/               # Vulnerability findings
-│   │   │   └── Table.tsx           # Findings table with filtering
-│   │   ├── layout/                 # Layout components
-│   │   │   └── Sidebar.tsx         # Navigation sidebar
-│   │   ├── scan/                   # Scan management
-│   │   │   ├── Wizard.tsx          # Scan configuration
-│   │   │   ├── LiveConsole.tsx     # Activity monitor
-│   │   │   └── History.tsx         # Scan history
-│   │   ├── import/                 # Backup & Restore
-│   │   │   └── ImportPanel.tsx     # Backup/Restore/Import UI
-│   │   ├── settings/               # Settings UI
-│   │   ├── templates/              # Template management
-│   │   └── ui/                     # shadcn/ui components
 │   ├── lib/                        # Utility libraries
 │   │   ├── db.ts                   # Database operations
 │   │   ├── cache.ts                # Response caching
-│   │   ├── errors.ts               # Error handling
-│   │   ├── nuclei/                 # Nuclei-specific logic
-│   │   │   ├── config.ts           # Command construction & paths
-│   │   │   └── presets.ts          # One-click preset definitions
-│   │   └── utils.ts                # General utilities
+│   │   ├── env.ts                  # Environment variable handling
+│   │   └── ...
 │   ├── scans/                      # Scan results storage (gitignored)
 │   ├── nuclei.db                   # SQLite database (gitignored)
+│   ├── proxy.ts                    # Next.js 16 Middleware (Route protection)
+│   ├── auth.ts                     # Auth configuration and providers
+│   ├── auth.config.ts              # Core Auth config schema
 │   ├── next.config.ts              # Next.js configuration
 │   ├── package.json                # Dependencies
 │   └── tsconfig.json               # TypeScript configuration
@@ -129,7 +112,12 @@ d:\NCNC\
 - Client components handle interactive features
 - API routes provide backend functionality
 
-### 2. Hybrid Storage Strategy
+### 2. Middleware-Based Security (proxy.ts)
+- Intercepts all requests at the edge.
+- Enforces authentication for both Page routes and API routes.
+- Handles production HTTPS redirects.
+
+### 3. Hybrid Storage Strategy
 - **Database**: Structured data (scans, findings, metadata)
 - **Files**: Raw output (JSON results, log files)
 - **File Metadata**: Stored in database for fast access
@@ -153,6 +141,16 @@ d:\NCNC\
 ---
 
 ## Data Flow
+
+### Authentication Flow
+```
+1. User requests '/' or '/templates'
+2. Middleware (proxy.ts) checks for session
+3. If no session: Redirects to '/login'
+4. User submits password to /api/auth/callback/credentials
+5. auth.ts validates against ADMIN_PASSWORD_HASH
+6. Session established, user redirected back to target
+```
 
 ### Scan Execution Flow
 ```
@@ -257,6 +255,10 @@ Scan history with:
 ---
 
 ## API Architecture
+
+### Security
+- All API routes utilize `await auth()` to verify session.
+- Returns `401 Unauthorized` if no session is present.
 
 ### `/api/scan`
 **GET** - List recent scans (last 20 from database)
@@ -522,28 +524,17 @@ Dynamically resolved using `os.homedir()`
 
 ✅ Database integration (SQLite)  
 ✅ Finding status management  
-✅ Multi-select severity filtering  
 ✅ Response caching  
 ✅ Activity Monitor from database  
-✅ Severity breakdown dashboard  
-✅ File metadata storage  
-✅ Error handling improvements  
 ✅ Backup & Restore system  
 ✅ Import external Nuclei scans  
-
-## Future Enhancements
-
-- [ ] User authentication
-- [ ] Multi-user support
-- [ ] Scan scheduling
-- [ ] Email notifications
-- [ ] Report generation
-- [ ] Webhook integrations
-- [ ] Advanced analytics
-- [ ] Finding deduplication
+✅ **Integrated Authentication (NextAuth)**  
+✅ **Middleware Protection (Next.js 16 proxy.ts)**  
+✅ **System Management and Scanners Update** (added timeout handling)
 
 ---
 
 For detailed API documentation, see [API_REFERENCE.md](./API_REFERENCE.md)  
+For details on security, see [AUTHENTICATION.md](./AUTHENTICATION.md)  
 For component documentation, see [COMPONENTS.md](./COMPONENTS.md)  
 For features documentation, see [FEATURES.md](./FEATURES.md)

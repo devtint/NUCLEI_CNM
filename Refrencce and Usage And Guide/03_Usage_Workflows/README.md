@@ -78,3 +78,18 @@ This module defines the specific user interactions and command logic for the das
 4. **System**: Validates Nuclei format.
 5. **System**: Creates scan record and imports findings.
 6. **System**: Shows import statistics.
+
+## 6. Authentication Workflow
+
+### Initial Setup
+1. **Admin**: Generates a bcrypt hash of their chosen password.
+2. **Admin**: Sets `ADMIN_PASSWORD_HASH` and `AUTH_SECRET` in `.env.local`.
+3. **Admin**: Restarts the dashboard server.
+
+### User Interaction
+1. **User**: Accesses the dashboard URL.
+2. **System**: Middleware detects no session and redirects to `/login`.
+3. **User**: Enters password on the login page.
+4. **System**: Validates password hash and creates a secure session.
+5. **User**: Accesses protected dashboard features.
+6. **User**: Clicks "Log Out" to terminate the session.

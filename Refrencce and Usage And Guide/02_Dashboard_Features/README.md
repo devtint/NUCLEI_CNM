@@ -65,3 +65,11 @@ This document outlines the functional requirements, core features, and architect
   - Import external Nuclei JSON scans.
 - **Security**: Format validation, transaction safety, duplicate prevention.
 
+#### F. User Authentication
+- **Purpose**: Secure access control.
+- **Capabilities**:
+  - Password-protected login.
+  - Secure session management (NextAuth).
+  - Global route protection (Middleware).
+  - Admin logout functionality.
+

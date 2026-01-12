@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import { writeFile, readdir } from "fs/promises";
+import { auth } from "@/auth";
 
 const UPLOAD_DIR = path.join(process.cwd(), "scans", "uploads");
 
@@ -12,6 +13,12 @@ async function ensureUploadDir() {
 }
 
 export async function GET(req: NextRequest) {
+    // Check authentication
+    const session = await auth();
+    if (!session) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     try {
         await ensureUploadDir();
         const files = await readdir(UPLOAD_DIR);
@@ -29,6 +36,12 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+    // Check authentication
+    const session = await auth();
+    if (!session) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     try {
         await ensureUploadDir();
         const contentType = req.headers.get("content-type") || "";

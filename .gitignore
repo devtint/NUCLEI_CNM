@@ -24,9 +24,13 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# Local env files
+# Local env files (CRITICAL - Contains passwords and secrets)
 .env
 .env*.local
+.env.production
+.env.development
+**/.env
+**/.env*.local
 
 # Vercel
 .vercel
@@ -57,7 +61,7 @@ dashboard/scans/uploads/*
 dashboard/public/screenshots/*
 !dashboard/public/screenshots/.gitkeep
 
-# Database (SQLite)
+# Database (SQLite) - Contains all scan data
 *.db
 *.db-shm
 *.db-wal
@@ -65,23 +69,36 @@ dashboard/*.db
 dashboard/*.db-shm
 dashboard/*.db-wal
 
-# Backup Files (Sensitive Data)
+# Backup Files (Sensitive Data - Contains all scans, findings, users)
 nuclei-cc-backup*.json
 *-backup*.json
 *.backup.json
+backup/
+backups/
+dashboard/backup/
+dashboard/backups/
 
 # Logs
 logs/
 *.log
 npm-debug.log
+dashboard/logs/
 
 # Temp
 *.tmp
 *.temp
+temp/
+tmp/
 
 # System Logs
 access_logs.json
 *.log*
+
+# Session & Auth (NextAuth)
+.auth/
+sessions/
+dashboard/.auth/
+dashboard/sessions/
 
 # Agent Workflows (Local Only)
 .agent/

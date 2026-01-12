@@ -291,6 +291,29 @@ New → Confirmed → Fixed
 
 ---
 
+### 15. Security & Authentication
+
+**NextAuth.js Integration**
+- Secured access to all dashboard pages and APIs
+- Admin login with bcrypt hashed password
+- Next.js 16 Middleware (proxy.ts) for route-level protection
+- Secure session management with Auth.js v5
+
+**Security Features:**
+- HTTPS enforcement in production
+- Password hashing with bcrypt (10 rounds)
+- Access logging for login events
+- CSRF protection out-of-the-box
+- Protected API endpoints returning 401 for unauthorized access
+
+**Benefits:**
+- Prevents unauthorized scan execution
+- Protects sensitive vulnerability data
+- Secure multi-device access
+- Audit trail for access events
+
+---
+
 ## Technical Features
 
 ### Database Schema
@@ -352,7 +375,6 @@ CREATE TABLE findings (
 
 ## Future Enhancements
 
-- [ ] User authentication
 - [ ] Multi-user support
 - [ ] Scheduled scans
 - [ ] Email notifications

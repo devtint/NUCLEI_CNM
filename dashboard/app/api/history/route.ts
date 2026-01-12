@@ -4,8 +4,15 @@ import { withCache, cache } from "@/lib/cache";
 import { handleApiError, dbOperation, ErrorType, ApiError } from "@/lib/errors";
 import fs from "fs";
 import path from "path";
+import { auth } from "@/auth";
 
 export async function GET() {
+    // Check authentication
+    const session = await auth();
+    if (!session) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     try {
         // Use cache with 30-second TTL
         const history = withCache("scan-history", 30000, () => {
@@ -74,6 +81,12 @@ export async function GET() {
 }
 
 export async function DELETE(req: NextRequest) {
+    // Check authentication
+    const session = await auth();
+    if (!session) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     try {
         const { searchParams } = new URL(req.url);
         const scanId = searchParams.get("id");

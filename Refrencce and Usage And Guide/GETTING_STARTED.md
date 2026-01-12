@@ -27,7 +27,7 @@ Complete guide to setting up and using the Nuclei Dashboard.
 ### 1. Clone the Repository
 ```bash
 git clone <repository-url>
-cd NCNC
+cd NUCLEI_CNM
 ```
 
 ### 2. Install Dependencies
@@ -36,7 +36,34 @@ cd dashboard
 npm install
 ```
 
-### 3. Verify Nuclei Installation
+### 3. Configure Authentication
+
+#### Generate Password Hash
+```bash
+# Using Node.js (recommended)
+node -e "const bcrypt = require('bcrypt'); bcrypt.hash('your-secure-password', 10).then(hash => console.log(hash));"
+
+# Or using PowerShell
+npm install -g bcrypt-cli
+bcrypt-cli hash "your-secure-password"
+```
+
+#### Create Environment File
+Create `dashboard/.env.local`:
+```env
+# Admin Password (bcrypt hash)
+ADMIN_PASSWORD_HASH="$2b$10$..."
+
+# NextAuth Secret (generate with: openssl rand -base64 32)
+AUTH_SECRET="your-random-secret-key-here"
+```
+
+**Security Notes:**
+- Never commit `.env.local` to Git (already in `.gitignore`)
+- Use a strong password (12+ characters)
+- Keep the `AUTH_SECRET` secure and random
+
+### 4. Verify Nuclei Installation
 ```bash
 nuclei -version
 ```
@@ -58,12 +85,37 @@ npm run dev
 
 The dashboard will be available at: **http://localhost:3000**
 
+**First Time Access:**
+1. Navigate to `http://localhost:3000`
+2. You'll be automatically redirected to `/login`
+3. Enter your admin password
+4. Click "Authenticate"
+
 ### Production Build
 ```bash
 cd dashboard
 npm run build
 npm start
 ```
+
+---
+
+## Authentication
+
+### Login
+- **URL**: `http://localhost:3000/login`
+- **Password**: The password you set during configuration
+- **Session**: Persists until you log out or clear browser data
+
+### Logout
+Click the "Log Out" button in the sidebar to end your session.
+
+### Security Features
+✅ **Password Protection**: All pages and API routes require authentication  
+✅ **Bcrypt Hashing**: Passwords are securely hashed  
+✅ **Session Management**: NextAuth v5 with secure sessions  
+✅ **HTTPS Enforcement**: Automatic redirect in production  
+✅ **Access Logging**: Login attempts are logged  
 
 ---
 
@@ -171,7 +223,7 @@ Click any vulnerability row to see:
 ### Deleting Findings
 Click the trash icon (🗑️) next to any finding to delete it.
 
-**Warning:** This permanently removes the finding from the scan file.
+**Warning:** This permanently removes the finding from the database.
 
 ### Rescanning
 Click "Rescan" to re-test a specific vulnerability.
@@ -201,6 +253,7 @@ Click "Export" and choose:
 - All Subfinder subdomain discoveries
 - All HTTPX live asset data
 - Scan history and metadata
+- **Note**: Does NOT include user credentials
 
 ### Restoring from Backup
 
@@ -246,6 +299,17 @@ For each scan, you can download:
 
 ## Troubleshooting
 
+### Cannot Access Dashboard
+**Cause:** Not logged in  
+**Fix:** Navigate to `http://localhost:3000/login` and enter your password
+
+### Forgot Password
+**Cause:** Lost admin password  
+**Fix:** 
+1. Generate a new password hash
+2. Update `ADMIN_PASSWORD_HASH` in `.env.local`
+3. Restart the dashboard
+
 ### Scan Stuck in "Running"
 **Cause:** Nuclei process waiting for input  
 **Fix:** Restart the dashboard server
@@ -266,6 +330,10 @@ For each scan, you can download:
 **Cause:** Nuclei not in PATH  
 **Fix:** Add Nuclei to your system PATH
 
+### Template Update Taking Too Long
+**Cause:** Large template repository (~1000+ files)  
+**Fix:** Template updates can take 2-5 minutes. Be patient or run `nuclei -ut` manually in terminal
+
 ---
 
 ## Best Practices
@@ -280,13 +348,19 @@ Always test on targets you own or have permission to scan.
 Watch CPU and memory usage during scans, especially with high concurrency.
 
 ### 4. Regular Updates
-Keep Nuclei templates updated:
+Keep Nuclei templates updated via the System page or:
 ```bash
 nuclei -update-templates
 ```
 
 ### 5. Backup Scan Results
-Scan results are stored in `dashboard/scans/`. Back up this directory regularly.
+Use the built-in backup feature regularly to preserve your scan data.
+
+### 6. Secure Your Environment
+- Use a strong admin password
+- Keep `.env.local` secure
+- Don't expose the dashboard to the internet without additional security
+- Regularly review access logs in the System page
 
 ---
 
@@ -326,8 +400,18 @@ Add to custom args:
 
 ## Security Considerations
 
-### Local Use Only
-The dashboard has no authentication. Only use on trusted networks.
+### Authentication Required
+✅ The dashboard now requires authentication for all pages and API routes.
+
+### Password Security
+- Use a strong password (12+ characters, mix of letters, numbers, symbols)
+- Store the password hash securely in `.env.local`
+- Never commit `.env.local` to version control
+
+### Network Security
+- **Development**: Only accessible on localhost by default
+- **Production**: Use HTTPS (automatic redirect enabled)
+- **Firewall**: Consider restricting access to trusted IPs
 
 ### Scan Permissions
 Only scan targets you own or have explicit permission to test.
@@ -336,7 +420,11 @@ Only scan targets you own or have explicit permission to test.
 High scan rates can be considered DoS attacks. Use responsibly.
 
 ### Data Privacy
-Scan results contain sensitive information. Protect the `scans/` directory.
+Scan results contain sensitive information:
+- Database (`nuclei.db`) is gitignored
+- Backup files contain all scan data
+- Protect the `scans/` directory
+- Review access logs regularly
 
 ---
 

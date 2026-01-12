@@ -31,5 +31,13 @@ This document maps every single requirement from `guide.txt` to the correspondin
 | **6.0** | **Meta** | | | |
 | 6.1 | Ref Links (Docs, Dashboard, Lib) | Covered | `04_Reference_Links` | ✅ |
 | 6.2 | Right to Auth (Google/GitHub) | Covered | `04_Reference_Links` > Auth Note | ✅ |
+| **7.0** | **Advanced Security** | | | |
+| 7.1 | Dashboard Authentication (NextAuth) | Covered | `AUTHENTICATION.md` | ✅ |
+| 7.2 | Middleware Route Protection | Covered | `AUTHENTICATION.md` | ✅ |
+| 7.3 | Bcrypt Password Hashing | Covered | `AUTHENTICATION.md` | ✅ |
+| 7.4 | Access Logging | Covered | `AUTHENTICATION.md` | ✅ |
+| **8.0** | **System Management** | | | |
+| 8.1 | Scanner Engine Updates | Covered | `ARCHITECTURE.md` | ✅ |
+| 8.2 | Template Update with Timeout | Covered | `FEATURES.md` | ✅ |
 
-**Result**: All conditions met.
+**Result**: All conditions met including newly added security features.

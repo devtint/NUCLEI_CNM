@@ -1,7 +1,7 @@
-
 import { NextResponse } from "next/server";
 import { exec } from "child_process";
 import util from "util";
+import { auth } from "@/auth";
 
 const execAsync = util.promisify(exec);
 
@@ -19,6 +19,12 @@ async function checkTool(command: string): Promise<{ installed: boolean; version
 }
 
 export async function GET() {
+    // Check authentication
+    const session = await auth();
+    if (!session) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const [nuclei, subfinder, httpx] = await Promise.all([
         checkTool("nuclei"),
         checkTool("subfinder"),

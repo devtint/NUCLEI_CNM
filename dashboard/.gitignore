@@ -18,9 +18,11 @@
 .DS_Store
 *.pem
 
-# Local env files
+# Local env files (CRITICAL - Contains passwords and secrets)
 .env
 .env*.local
+.env.production
+.env.development
 
 # Vercel
 .vercel
@@ -29,16 +31,18 @@
 *.tsbuildinfo
 next-env.d.ts
 
-# Database (SQLite)
+# Database (SQLite) - Contains all scan data and findings
 *.db
 *.db-shm
 *.db-wal
 nuclei.db
 
-# Backup Files (Sensitive Data)
+# Backup Files (Sensitive Data - Contains all scans, findings, users)
 nuclei-cc-backup*.json
 *-backup*.json
 *.backup.json
+backup/
+backups/
 
 # Scan Artifacts (Runtime Generated)
 # Logs, JSON results, and uploaded target lists
@@ -49,10 +53,23 @@ scans/logs/*
 scans/uploads/*
 !scans/uploads/.gitkeep
 
-# Screenshots (HTTPX)
+# Screenshots (HTTPX) - May contain sensitive web page content
 public/screenshots/*
 !public/screenshots/.gitkeep
+
+# Session & Auth (NextAuth)
+.auth/
+sessions/
+
+# Temporary files that may contain sensitive data
+*.tmp
+*.temp
+temp/
+tmp/
 
 # IDE
 .vscode/
 .idea/
+*.swp
+*.swo
+*~

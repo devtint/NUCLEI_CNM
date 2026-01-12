@@ -2,8 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { getFindingsByScan, deleteFinding, updateFinding, getDatabase } from "@/lib/db";
 import { withCache, cache } from "@/lib/cache";
 import { handleApiError, dbOperation, ErrorType, ApiError } from "@/lib/errors";
+import { auth } from "@/auth";
 
 export async function GET(req: NextRequest) {
+    // Check authentication
+    const session = await auth();
+    if (!session) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     try {
         const { searchParams } = new URL(req.url);
         const scanId = searchParams.get("scanId");
@@ -49,6 +56,12 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
+    // Check authentication
+    const session = await auth();
+    if (!session) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     try {
         const body = await req.json();
         const { id, status } = body;
@@ -87,6 +100,12 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+    // Check authentication
+    const session = await auth();
+    if (!session) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     try {
         const body = await req.json();
         const id = body.id || body._dbId;

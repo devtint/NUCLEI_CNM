@@ -25,3 +25,11 @@ A curated list of external resources essential for the development and understan
 
 -   **Permission**: Explicitly granted to use Google/GitHub login for research purposes.
 -   **Goal**: To better understand the backend logic and frontend presentation of the official tool.
+
+## Technical Frameworks
+- **NextAuth.js (Auth.js v5)**: [https://authjs.dev/](https://authjs.dev/)
+  - *Usage*: Main authentication framework for dashboard security.
+- **Next.js Middleware**: [https://nextjs.org/docs/app/building-your-application/routing/middleware](https://nextjs.org/docs/app/building-your-application/routing/middleware)
+  - *Usage*: Global route protection and redirects.
+- **Bcrypt**: [https://github.com/kelektiv/node.bcrypt.js](https://github.com/kelektiv/node.bcrypt.js)
+  - *Usage*: Secure password hashing.

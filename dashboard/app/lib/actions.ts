@@ -25,5 +25,6 @@ export async function authenticate(
 import { signOut } from '@/auth';
 
 export async function handleSignOut() {
-    await signOut({ redirect: false });
+    await signOut({ redirectTo: '/login' });
 }
+

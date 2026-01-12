@@ -52,6 +52,19 @@ interface Props {
 
 ---
 
+### Login/page.tsx
+**Location:** `dashboard/app/login/page.tsx`
+
+**Purpose:** Authentication entry point for the dashboard.
+
+**Features:**
+- Password-only authentication form.
+- Redirects to `/` on success.
+- Displays error messages for invalid credentials.
+- Full-screen layout with Nuclei branding.
+
+---
+
 ### Stats.tsx
 **Location:** `dashboard/components/dashboard/Stats.tsx`
 
@@ -477,9 +490,8 @@ const items = [
 ```
 
 **Features:**
-- Highlights active view
-- Icon + label for each item
 - Click to change view
+- **Logout Button**: Located at the bottom. Calls `handleSignOut()` server action.
 
 ---
 
@@ -690,6 +702,23 @@ Real-time status updates
 Scan completes
   ↓ (Database: INSERT INTO findings, UPDATE scans)
 Cache invalidation
+```
+
+### Authentication Flow (UI)
+```
+Browser
+  ↓
+Request page
+  ↓ (Middleware: proxy.ts check)
+Not Logged In? → Redirect to /login
+  ↓
+User enters password
+  ↓
+Submit to authenticate() server action
+  ↓
+NextAuth: Validates & Creates Session
+  ↓
+Redirect to Dashboard
 ```
 
 ### Finding Status Update Flow

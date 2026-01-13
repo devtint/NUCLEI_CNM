@@ -42,6 +42,93 @@
 
 ---
 
+## Screenshots
+
+### 🔐 Authentication
+
+<p align="center">
+  <img src="./screenshots/login_page.png" alt="Login Page" width="800"/>
+  <br/>
+  <em>Secure login with bcrypt-hashed credentials</em>
+</p>
+
+---
+
+### 📊 Dashboard & Monitoring
+
+<p align="center">
+  <img src="./screenshots/dashboard.png" alt="Dashboard Overview" width="800"/>
+  <br/>
+  <em>Real-time overview with vulnerability statistics and recent findings</em>
+</p>
+
+<p align="center">
+  <img src="./screenshots/activity_monitor.png" alt="Activity Monitor" width="800"/>
+  <br/>
+  <em>Live scan activity tracking with process management</em>
+</p>
+
+---
+
+### 🎯 Vulnerability Scanning
+
+| Nuclei Scanner | Scan History |
+|:--------------:|:------------:|
+| ![Nuclei Scan](./screenshots/nuclei_scan.png) | ![Scan History](./screenshots/scan_history.png) |
+| *Configure and launch Nuclei scans* | *View all past scan results* |
+
+<p align="center">
+  <img src="./screenshots/vuln.png" alt="Vulnerability Findings" width="800"/>
+  <br/>
+  <em>Detailed vulnerability findings with severity classification</em>
+</p>
+
+---
+
+### 🌐 Subdomain Discovery (Subfinder)
+
+| Subdomain Scan | Inventory View |
+|:--------------:|:--------------:|
+| ![Subfinder Scan](./screenshots/subfinder_scan.png) | ![Subfinder Inventory](./screenshots/subfinder_inventory.png) |
+| *Launch subdomain enumeration* | *Browse discovered subdomains* |
+
+<p align="center">
+  <img src="./screenshots/subfinder_monitor.png" alt="Subfinder Monitor" width="800"/>
+  <br/>
+  <em>Monitor subdomain discovery progress</em>
+</p>
+
+---
+
+### 🔍 HTTP Probing (HTTPX)
+
+| HTTPX Scan | HTTPX Results |
+|:----------:|:-------------:|
+| ![HTTPX Scan](./screenshots/httpx_scan.png) | ![HTTPX Results](./screenshots/httpx_result.png) |
+| *Configure HTTP probing parameters* | *View live host analysis results* |
+
+---
+
+### ⚙️ System Administration
+
+| System Settings | Scanner Management |
+|:---------------:|:------------------:|
+| ![System Settings](./screenshots/system_setting.png) | ![System Scanner](./screenshots/system_scanner.png) |
+| *Configure rate limits and performance* | *Manage scanner binaries* |
+
+| Login Records | Backup & Restore |
+|:-------------:|:----------------:|
+| ![Login Records](./screenshots/system_login_record.png) | ![Backup Restore](./screenshots/backup_restore.png) |
+| *Audit authentication events* | *Export and restore all data* |
+
+<p align="center">
+  <img src="./screenshots/custom_templates.png" alt="Custom Templates" width="800"/>
+  <br/>
+  <em>Create and manage custom Nuclei templates</em>
+</p>
+
+---
+
 ## Features
 
 ### 🎯 Vulnerability Management

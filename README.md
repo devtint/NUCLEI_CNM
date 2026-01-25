@@ -311,6 +311,8 @@ Access the dashboard at **http://localhost:3000**
 
 The easiest way to run Nuclei Command Center with all tools pre-installed.
 
+[![Docker Pulls](https://img.shields.io/docker/pulls/mrtintnaingwin/nucleicnm?style=flat-square&logo=docker)](https://hub.docker.com/r/mrtintnaingwin/nucleicnm)
+
 ### Quick Start
 
 ```bash
@@ -320,7 +322,7 @@ docker run -d \
   -p 3000:3000 \
   -v nuclei-data:/app/data \
   -v nuclei-scans:/app/scans \
-  nuclei-cnm:latest
+  mrtintnaingwin/nucleicnm:latest
 ```
 
 On first visit to `http://localhost:3000`, you'll be redirected to a setup wizard to create your admin password. **No manual hash generation required!**
@@ -332,7 +334,7 @@ Create `docker-compose.yml`:
 ```yaml
 services:
   nuclei-cnm:
-    image: nuclei-cnm:latest
+    image: mrtintnaingwin/nucleicnm:latest
     container_name: nuclei-command-center
     ports:
       - "3000:3000"
@@ -362,7 +364,7 @@ docker-compose up -d
 docker-compose logs -f
 ```
 
-### Build from Source
+### Build from Source (Alternative)
 
 ```bash
 git clone https://github.com/devtint/NUCLEI_CNM.git

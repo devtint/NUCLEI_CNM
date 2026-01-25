@@ -11,6 +11,7 @@ import {
     deleteSubfinderScan,
     getRecentSubdomains
 } from "@/lib/db";
+import { SUBFINDER_BINARY } from "@/lib/nuclei/config";
 import { auth } from "@/auth";
 
 export async function POST(req: NextRequest) {
@@ -70,8 +71,8 @@ export async function POST(req: NextRequest) {
             cmdArgs.push(...extraArgs);
         }
 
-        console.log(`Starting subfinder: subfinder ${cmdArgs.join(" ")}`);
-        const child = spawn("subfinder", cmdArgs);
+        console.log(`Starting subfinder: ${SUBFINDER_BINARY} ${cmdArgs.join(" ")}`);
+        const child = spawn(SUBFINDER_BINARY, cmdArgs);
 
         // Create log file
         const logPath = path.join(process.cwd(), "scans", `subfinder_${scanId}.log`);

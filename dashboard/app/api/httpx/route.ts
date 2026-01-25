@@ -13,6 +13,7 @@ import {
     getHttpxDomainSummary,
     clearHttpxResults
 } from "@/lib/db";
+import { HTTPX_BINARY } from "@/lib/nuclei/config";
 import { auth } from "@/auth";
 
 
@@ -228,7 +229,7 @@ export async function POST(req: NextRequest) {
         args.push("-no-color");
         console.log(`[API] Starting httpx scan ${scanId} with args: ${args.join(" ")}`);
 
-        const child = spawn("httpx", args, { stdio: ['ignore', 'pipe', 'pipe'] });
+        const child = spawn(HTTPX_BINARY, args, { stdio: ['ignore', 'pipe', 'pipe'] });
 
         if (child.pid) {
             updateHttpxScan(scanId, { pid: child.pid });

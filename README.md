@@ -374,6 +374,11 @@ Access the dashboard at **http://localhost:3000**
 | `ADMIN_PASSWORD_HASH` | ✅ | Bcrypt hash of admin password |
 | `AUTH_SECRET` | ✅ | Session signing secret (32+ chars) |
 | `NODE_ENV` | ❌ | `development` or `production` |
+| `NUCLEI_BINARY` | ❌ | Custom path to Nuclei binary (auto-detected via PATH by default) |
+| `SUBFINDER_BINARY` | ❌ | Custom path to Subfinder binary (auto-detected via PATH by default) |
+| `HTTPX_BINARY` | ❌ | Custom path to HTTPX binary (auto-detected via PATH by default) |
+
+> **Note**: Tool binary paths are optional. If Nuclei, Subfinder, and HTTPX are installed and accessible via your system PATH (e.g., after `go install`), no configuration is needed. Only set these variables if you encounter `ENOENT` errors indicating the tools are not found.
 
 ### Performance Tuning
 

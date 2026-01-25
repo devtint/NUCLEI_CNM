@@ -33,7 +33,9 @@ export const NUCLEI_PATHS = {
     TEMPLATES_DIR: path.join(HOME_DIR, "nuclei-templates"),
 };
 
-export const NUCLEI_BINARY = "nuclei"; // Assuming it is in PATH as per guide
+export const NUCLEI_BINARY = process.env.NUCLEI_BINARY || "nuclei";
+export const SUBFINDER_BINARY = process.env.SUBFINDER_BINARY || "subfinder";
+export const HTTPX_BINARY = process.env.HTTPX_BINARY || "httpx";
 
 export interface ScanConfig {
     target: string;

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcrypt";
-import { isSetupRequired, saveConfig, generateAuthSecret, AppConfig } from "@/lib/setup";
+import { isSetupRequired, saveConfig, generateAuthSecret, AppConfig, getConfig } from "@/lib/setup";
 
 export async function POST(req: NextRequest) {
     // Security: Only allow setup if not already configured

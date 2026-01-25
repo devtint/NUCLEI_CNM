@@ -8,8 +8,10 @@ import bcrypt from 'bcrypt';
 import { logAccess } from './lib/db';
 import { headers } from 'next/headers';
 
-export const { auth, signIn, signOut } = NextAuth({
+export const { handlers, auth, signIn, signOut } = NextAuth({
     ...authConfig,
+    secret: env.AUTH_SECRET,
+    trustHost: true,
     providers: [
         Credentials({
             async authorize(credentials) {

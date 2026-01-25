@@ -377,11 +377,19 @@ docker run -d -p 3000:3000 -v ./data:/app/data nuclei-cnm:latest
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
+| `AUTH_TRUST_HOST` | ❌ | `true` | Fixes "UntrustedHost" error (auto-set in container) |
 | `ALLOWED_ORIGINS` | ❌ | `localhost:3000` | Comma-separated list of allowed origins |
 | `ALLOWED_DEV_ORIGINS` | ❌ | - | Development origins (no port needed) |
 | `DATABASE_PATH` | ❌ | `/app/data/nuclei.db` | Custom database location |
 
 > **Note**: Password and AUTH_SECRET are configured via the first-run setup wizard and stored in `/app/data/config.json`. No environment variables needed!
+
+### Troubleshooting
+
+**Error: `[auth][error] UntrustedHost: Host must be trusted`**
+- This happens if you are running behind a reverse proxy or non-standard port.
+- **Fix:** Set `AUTH_TRUST_HOST=true` or set `AUTH_URL=http://your-domain.com`.
+- **Note:** The `nuclei-cnm:latest` image sets `AUTH_TRUST_HOST=true` by default.
 
 ### Pre-installed Tools
 

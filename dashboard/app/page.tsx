@@ -1,8 +1,13 @@
 import fs from "fs";
 import path from "path";
 import { DashboardClient } from "@/components/dashboard/DashboardClient";
+import { auth } from "@/auth";
+import { redirect } from "next/navigation";
 
-export default function Home() {
+export default async function Home() {
+  const session = await auth();
+  if (!session) redirect("/login");
+
   const scansDir = path.join(process.cwd(), "scans");
   let totalScans = 0;
   let lastScan = "Never";

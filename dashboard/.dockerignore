@@ -20,6 +20,7 @@ dist/
 
 # Scan artifacts (use volume mount)
 scans/
+data/
 public/screenshots/
 
 # Development files

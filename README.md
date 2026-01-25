@@ -307,6 +307,93 @@ Access the dashboard at **http://localhost:3000**
 
 ---
 
+## 🐳 Docker Deployment
+
+The easiest way to run Nuclei Command Center with all tools pre-installed.
+
+### Quick Start
+
+```bash
+# Pull and run (first time)
+docker run -d \
+  --name nuclei-cnm \
+  -p 3000:3000 \
+  -v nuclei-data:/app/data \
+  -v nuclei-scans:/app/scans \
+  nuclei-cnm:latest
+```
+
+On first visit to `http://localhost:3000`, you'll be redirected to a setup wizard to create your admin password. **No manual hash generation required!**
+
+### Docker Compose (Recommended)
+
+Create `docker-compose.yml`:
+
+```yaml
+services:
+  nuclei-cnm:
+    image: nuclei-cnm:latest
+    container_name: nuclei-command-center
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data          # Database & config (REQUIRED)
+      - ./scans:/app/scans        # Scan results
+      - nuclei-templates:/home/nextjs/nuclei-templates
+    environment:
+      # Optional: Override allowed origins for remote access
+      - ALLOWED_ORIGINS=localhost:3000,your-server.local:3000
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/login"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  nuclei-templates:
+```
+
+```bash
+# Start the container
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+```
+
+### Build from Source
+
+```bash
+git clone https://github.com/devtint/NUCLEI_CNM.git
+cd NUCLEI_CNM/dashboard
+docker build -t nuclei-cnm:latest .
+
+# Run
+docker run -d -p 3000:3000 -v ./data:/app/data nuclei-cnm:latest
+```
+
+### Docker Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `ALLOWED_ORIGINS` | ❌ | `localhost:3000` | Comma-separated list of allowed origins |
+| `ALLOWED_DEV_ORIGINS` | ❌ | - | Development origins (no port needed) |
+| `DATABASE_PATH` | ❌ | `/app/data/nuclei.db` | Custom database location |
+
+> **Note**: Password and AUTH_SECRET are configured via the first-run setup wizard and stored in `/app/data/config.json`. No environment variables needed!
+
+### Pre-installed Tools
+
+The Docker image includes:
+- **Nuclei** v3.6.2+
+- **Subfinder** v2.12.0+
+- **HTTPX** v1.8.1+
+
+All tools are automatically available - no additional configuration required.
+
+---
+
 ## Security
 
 ### Authentication Architecture
@@ -369,16 +456,28 @@ Access the dashboard at **http://localhost:3000**
 
 ### Environment Variables
 
+#### Local Development
+
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `ADMIN_PASSWORD_HASH` | ✅ | Bcrypt hash of admin password |
 | `AUTH_SECRET` | ✅ | Session signing secret (32+ chars) |
 | `NODE_ENV` | ❌ | `development` or `production` |
-| `NUCLEI_BINARY` | ❌ | Custom path to Nuclei binary (auto-detected via PATH by default) |
-| `SUBFINDER_BINARY` | ❌ | Custom path to Subfinder binary (auto-detected via PATH by default) |
-| `HTTPX_BINARY` | ❌ | Custom path to HTTPX binary (auto-detected via PATH by default) |
+| `ALLOWED_ORIGINS` | ❌ | Comma-separated allowed origins (default: `localhost:3000`) |
+| `NUCLEI_BINARY` | ❌ | Custom path to Nuclei binary (auto-detected via PATH) |
+| `SUBFINDER_BINARY` | ❌ | Custom path to Subfinder binary (auto-detected via PATH) |
+| `HTTPX_BINARY` | ❌ | Custom path to HTTPX binary (auto-detected via PATH) |
 
-> **Note**: Tool binary paths are optional. If Nuclei, Subfinder, and HTTPX are installed and accessible via your system PATH (e.g., after `go install`), no configuration is needed. Only set these variables if you encounter `ENOENT` errors indicating the tools are not found.
+#### Docker Deployment
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `ADMIN_PASSWORD_HASH` | ❌ | **Auto-configured via setup wizard** |
+| `AUTH_SECRET` | ❌ | **Auto-generated via setup wizard** |
+| `ALLOWED_ORIGINS` | ❌ | Override for remote access |
+| `DATABASE_PATH` | ❌ | Custom database location (default: `/app/data/nuclei.db`) |
+
+> **Docker Note**: Password and auth secret are configured via the first-run setup wizard. No manual bcrypt hash generation required!
 
 ### Performance Tuning
 

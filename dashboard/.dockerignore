@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+.next/
+out/
+build/
+dist/
+
+# Database (use volume mount instead)
+*.db
+*.db-shm
+*.db-wal
+
+# Local environment (use docker env instead)
+.env.local
+.env*.local
+
+# Scan artifacts (use volume mount)
+scans/
+public/screenshots/
+
+# Development files
+.git/
+.gitignore
+*.md
+!README.md
+
+# IDE
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# TypeScript build cache
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# Test files
+*.test.*
+*.spec.*
+__tests__/
+coverage/

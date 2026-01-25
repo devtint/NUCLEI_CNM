@@ -73,3 +73,7 @@ tmp/
 *.swp
 *.swo
 *~
+
+# Docker data directory (contains config.json with password hash)
+data/
+docker-build.log

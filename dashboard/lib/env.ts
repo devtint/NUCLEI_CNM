@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { getPasswordHash, getAuthSecret } from './setup';
 
 let manualEnvCache: Record<string, string> | null = null;
 
@@ -50,9 +51,24 @@ function requireEnv(key: string): string {
 }
 
 export const env = {
-    // Critical Security Variables
-    get ADMIN_PASSWORD_HASH() { return requireEnv('ADMIN_PASSWORD_HASH'); },
-    get AUTH_SECRET() { return requireEnv('AUTH_SECRET'); },
+    // Auth credentials - now support config file fallback for Docker
+    get ADMIN_PASSWORD_HASH() {
+        // Try env first, then config file
+        const hash = getPasswordHash();
+        if (hash) return hash;
+
+        // Fallback to manual env parsing
+        return getManualEnv('ADMIN_PASSWORD_HASH') || '';
+    },
+
+    get AUTH_SECRET() {
+        // Try env first, then config file
+        const secret = getAuthSecret();
+        if (secret) return secret;
+
+        // Fallback to manual env parsing
+        return getManualEnv('AUTH_SECRET') || '';
+    },
 
     // Optional
     get NODE_ENV() { return process.env.NODE_ENV || 'development'; },

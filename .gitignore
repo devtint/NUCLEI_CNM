@@ -102,3 +102,9 @@ dashboard/sessions/
 
 # Agent Workflows (Local Only)
 .agent/
+
+# Docker
+.env.docker
+dashboard/data/
+test-data/
+docker-build.log

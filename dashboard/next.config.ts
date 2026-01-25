@@ -1,13 +1,23 @@
 import type { NextConfig } from "next";
 
+// Parse allowed origins from environment or use defaults
+const defaultOrigins = ["localhost:3000"];
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
+  : defaultOrigins;
+
+const allowedDevOrigins = process.env.ALLOWED_DEV_ORIGINS
+  ? process.env.ALLOWED_DEV_ORIGINS.split(",").map((o) => o.trim())
+  : [];
+
 const nextConfig: NextConfig = {
-  /* config options here */
+  output: "standalone", // Optimized for Docker deployment
   experimental: {
     serverActions: {
-      allowedOrigins: ["192.168.1.34:3000", "localhost:3000"],
+      allowedOrigins: allowedOrigins,
     },
   },
-  allowedDevOrigins: ["192.168.1.34"],
+  ...(allowedDevOrigins.length > 0 && { allowedDevOrigins }),
 };
 
 export default nextConfig;

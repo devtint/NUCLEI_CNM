@@ -3,8 +3,8 @@ import path from 'path';
 import crypto from 'crypto';
 import { normalizeUrl } from './utils';
 
-// Database file location
-const DB_PATH = path.join(process.cwd(), 'nuclei.db');
+// Database file location - configurable for Docker volume mounting
+const DB_PATH = process.env.DATABASE_PATH || path.join(process.cwd(), 'nuclei.db');
 
 // Initialize database
 let db: Database.Database | null = null;

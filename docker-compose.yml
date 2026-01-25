@@ -1,0 +1,29 @@
+services:
+  nuclei-cnm:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    container_name: nuclei-command-center
+    ports:
+      - "3000:3000"
+    volumes:
+      # Persistent data storage
+      - ./data:/app/data
+      - ./scans:/app/scans
+      # Nuclei templates (optional - speeds up container restarts)
+      - nuclei-templates:/home/nextjs/nuclei-templates
+    env_file:
+      - .env.docker
+    environment:
+      - NODE_ENV=production
+      - DATABASE_PATH=/app/data/nuclei.db
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost:3000/login" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  nuclei-templates:

@@ -316,12 +316,12 @@ The easiest way to run Nuclei Command Center with all tools pre-installed.
 ### Quick Start
 
 ```bash
-# Pull and run (first time)
-docker run -d \
-  --name nuclei-cnm \
-  -p 3000:3000 \
-  -v nuclei-data:/app/data \
-  -v nuclei-scans:/app/scans \
+# Pull and run (PowerShell)
+docker run -d `
+  --name nuclei-cnm `
+  -p 3000:3000 `
+  -v ${PWD}/data:/app/data `
+  -v ${PWD}/scans:/app/scans `
   mrtintnaingwin/nucleicnm:latest
 ```
 
@@ -372,7 +372,7 @@ cd NUCLEI_CNM/dashboard
 docker build -t nuclei-cnm:latest .
 
 # Run
-docker run -d -p 3000:3000 -v ./data:/app/data nuclei-cnm:latest
+docker run -d -p 3000:3000 -v ${PWD}/data:/app/data nuclei-cnm:latest
 ```
 
 ### Docker Environment Variables

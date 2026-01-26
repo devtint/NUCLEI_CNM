@@ -31,51 +31,24 @@ go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest
 ## Step 2: Clone and Install
 
 ```bash
-git clone https://github.com/yourusername/NUCLEI_CNM.git
+git clone https://github.com/devtint/NUCLEI_CNM.git
 cd NUCLEI_CNM/dashboard
 npm install
 ```
 
-## Step 3: Configure Authentication
+## Step 3: Initialize and Run
 
-Generate a secure password hash:
-
-```bash
-# Using Node.js (Run inside dashboard folder)
-cd dashboard
-node -e "const bcrypt = require('bcrypt'); bcrypt.hash('YOUR_SECURE_PASSWORD', 10).then(h => console.log(h));"
-cd ..
-```
-
-Generate an auth secret:
+Start the development server:
 
 ```bash
-# Using OpenSSL
-openssl rand -base64 32
-
-# Or using Node.js
-node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
-```
-
-Create `dashboard/.env.local`:
-
-```env
-# Required: Bcrypt hash of your admin password
-ADMIN_PASSWORD_HASH="$2b$10$XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-
-# Required: Random secret for session signing (32+ characters)
-AUTH_SECRET="XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-```
-
-## Step 4: Initialize and Run
-
-```bash
-# Development mode (with hot reload)
 npm run dev
-
-# Production build
-npm run build
-npm start
 ```
 
-Access the dashboard at **http://localhost:3000**
+## Step 4: Setup
+
+1. Open your browser to **http://localhost:3000**
+2. You will see the **Setup Wizard**.
+3. Create your **Admin Password**.
+4. Done!
+
+> **Note:** The setup wizard creates a `data/config.json` file. You do NOT need to manually configure `.env.local` unless you want to override defaults.

@@ -244,26 +244,22 @@ cd nuclei-cnm
 ```
 
 **Step 2:** Create `docker-compose.yml`:
-*(Copy this exact content - it is production ready)*
+
+> **Easier Option:** [Download this file from GitHub](https://github.com/devtint/NUCLEI_CNM/blob/main/docker-compose.yml) and save it as `docker-compose.yml`.
+
+Or copy this exact content - it is production ready & includes Cloudflare Tunnel:
 
 ```yaml
 services:
   nuclei-cnm:
     image: mrtintnaingwin/nucleicnm:latest
-    # build:
-    #   context: ./dashboard
-    #   dockerfile: Dockerfile
     container_name: nuclei-command-center
     ports:
       - "3000:3000"
     volumes:
-      # Persistent data storage (Named Volumes)
       - nuclei_data:/app/data
       - nuclei_scans:/app/scans
-      # Nuclei templates (speeds up container restarts)
       - nuclei_templates:/home/nextjs/nuclei-templates
-    # env_file:
-    #   - .env.docker
     environment:
       - NODE_ENV=production
       - DATABASE_PATH=/app/data/nuclei.db
@@ -274,6 +270,14 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: nuclei-cnm-tunnel
+    command: tunnel --no-autoupdate --url http://nuclei-cnm:3000
+    depends_on:
+      - nuclei-cnm
+    restart: unless-stopped
 
 volumes:
   nuclei_data:

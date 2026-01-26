@@ -11,8 +11,7 @@
 <p align="center">
   <a href="#features">Features</a> •
   <a href="#architecture">Architecture</a> •
-  <a href="#docker-deployment-easiest-way">Docker</a> •
-  <a href="#installation">Installation</a> •
+  <a href="#-installation--deployment">Installation</a> •
   <a href="#security">Security</a> •
   <a href="#documentation">Documentation</a>
 </p>
@@ -228,36 +227,25 @@
 
 ---
 
-## Installation
+## 🚀 Installation & Deployment
 
-**We strongly recommend using Docker.** It comes with all tools pre-installed and security hardened.
-
-### [🐳 Go to Docker Deployment Guide (Recommended)](#-docker-deployment-easiest-way)
-
----
-
-### Manual Installation (Developers Only)
-If you are a developer contributor and want to run from source (requires installing Go, Node.js, Nuclei manually), please see [MANUAL_INSTALL.md](MANUAL_INSTALL.md).
-
----
-
-## 🐳 Docker Deployment (Easiest Way)
-The easiest way to run Nuclei Command Center. No need to install Node.js, Go, or Nuclei manually.
+**We strongly recommend using Docker.** It allows you to run the full vulnerability dashboard without installing Node.js, Go, or configuring complex dependencies manually.
 
 ### Prerequisites
-1. Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows/Mac/Linux).
-2. Ensure Docker is running.
+1.  **Docker Desktop** (running).
+2.  That's it.
 
 ### Method 1: Docker Compose (Recommended)
-This method allows you to easily update and manage the tool.
 
-**Step 1:** Create a folder for the project:
+**Step 1:** Create a project folder:
 ```bash
 mkdir nuclei-cnm
 cd nuclei-cnm
 ```
 
-**Step 2:** Create a file named `docker-compose.yml`:
+**Step 2:** Create `docker-compose.yml`:
+*(Copy this exact content - it is production ready)*
+
 ```yaml
 services:
   nuclei-cnm:
@@ -297,18 +285,15 @@ volumes:
 ```bash
 docker-compose up -d
 ```
-*Wait about 30 seconds for the database to initialize.*
+*Wait ~30 seconds for the database to initialize.*
 
-**Step 4:** Open your browser:
-* Go to: http://localhost:3000
-* You will see the **Setup Wizard**.
-* Create your **Admin Password**.
-* Done!
+**Step 4:** Finish Setup:
+*   Open **http://localhost:3000**
+*   Follow the **Setup Wizard** to create your admin password.
 
 ---
 
 ### Method 2: One-Line Command (Quick Test)
-If you don't want to create any files, just run this single command in your terminal:
 
 ```bash
 docker run -d \
@@ -318,34 +303,13 @@ docker run -d \
   -v nuclei_scans:/app/scans \
   mrtintnaingwin/nucleicnm:latest
 ```
-*Access at http://localhost:3000*
 
-### Docker Environment Variables
+---
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `AUTH_TRUST_HOST` | ❌ | `true` | Fixes "UntrustedHost" error (auto-set in container) |
-| `ALLOWED_ORIGINS` | ❌ | `localhost:3000` | Comma-separated list of allowed origins |
-| `ALLOWED_DEV_ORIGINS` | ❌ | - | Development origins (no port needed) |
-| `DATABASE_PATH` | ❌ | `/app/data/nuclei.db` | Custom database location |
+### Alternative: Build from Source
+If you are a developer contributor and want to run from source code (requires installing Go, Node.js manually), please follow the **[Manual Installation Guide](MANUAL_INSTALL.md)**.
 
-> **Note**: Password and AUTH_SECRET are configured via the first-run setup wizard and stored in `/app/data/config.json`. No environment variables needed!
-
-### Troubleshooting
-
-**Error: `[auth][error] UntrustedHost: Host must be trusted`**
-- This happens if you are running behind a reverse proxy or non-standard port.
-- **Fix:** Set `AUTH_TRUST_HOST=true` or set `AUTH_URL=http://your-domain.com`.
-- **Note:** The `nuclei-cnm:latest` image sets `AUTH_TRUST_HOST=true` by default.
-
-### Pre-installed Tools
-
-The Docker image includes:
-- **Nuclei** v3.6.2+
-- **Subfinder** v2.12.0+
-- **HTTPX** v1.8.1+
-
-All tools are automatically available - no additional configuration required.
+---
 
 ---
 

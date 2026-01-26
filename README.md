@@ -297,6 +297,23 @@ docker compose up -d
 ```
 *Wait ~30 seconds for the database to initialize.*
 
+> [!IMPORTANT]
+> ### 🛑 First Run: "No templates provided" Error?
+>
+> If your first scan fails with **"no templates provided"**, it is because the templates folder is empty.
+>
+> **1. Fix Permissions (One-time):**
+> Docker creates the folder as `root`, but the app needs to write to it. Run this:
+> ```bash
+> docker exec -u 0 nuclei-command-center chown -R nextjs:nodejs /home/nextjs/nuclei-templates
+> ```
+>
+> **2. Download Templates:**
+> ```bash
+> docker exec nuclei-command-center nuclei -ut
+> ```
+> *Or click "Update" in the System > Scanners dashboard.*
+
 **Step 4:** Get your HTTPS URL (Cloudflare Tunnel)
 This setup includes a free, secure Cloudflare Tunnel so you can access the dashboard from anywhere without opening ports.
 
@@ -506,19 +523,6 @@ Located in **Settings** within the dashboard:
 | Bulk Size | 25 | 25-100 | Hosts per batch |
 
 ---
-
-## ❓ Troubleshooting
-
-### "No templates provided for scan"
-If you see this error on your first run, it means the Nuclei templates haven't been downloaded yet.
-1.  Go to **System > Scanners** in the dashboard.
-2.  Click the **Update** button next to **Nuclei Templates**.
-3.  Wait for the process to complete (can take ~2-5 minutes).
-
-Alternatively, run this command in your terminal:
-```bash
-docker compose exec nuclei-cnm nuclei -ut
-```
 
 ---
 

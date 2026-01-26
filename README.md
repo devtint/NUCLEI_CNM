@@ -314,10 +314,35 @@ You will see a URL like: `https://silent-snowflake-9d2a.trycloudflare.com`
 ---
 
 ### 🏠 Localhost Only (No Tunnel)
-If you do **NOT** want public access and only want to use the dashboard on your local network:
-1.  Delete the `docker-compose.yml` file.
-2.  Rename `docker-compose.yml.back` to `docker-compose.yml`.
-3.  Run `docker compose up -d`.
+If you do **NOT** want public access and only want to use the dashboard on your local network, use this clean `docker-compose.yml` instead:
+
+```yaml
+services:
+  nuclei-cnm:
+    image: mrtintnaingwin/nucleicnm:latest
+    container_name: nuclei-command-center
+    ports:
+      - "3000:3000"
+    volumes:
+      - nuclei_data:/app/data
+      - nuclei_scans:/app/scans
+      - nuclei_templates:/home/nextjs/nuclei-templates
+    environment:
+      - NODE_ENV=production
+      - DATABASE_PATH=/app/data/nuclei.db
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost:3000/login" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  nuclei_data:
+  nuclei_scans:
+  nuclei_templates:
+```
 
 ---
 

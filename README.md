@@ -262,21 +262,30 @@ cd nuclei-cnm
 services:
   nuclei-cnm:
     image: mrtintnaingwin/nucleicnm:latest
+    # build:
+    #   context: ./dashboard
+    #   dockerfile: Dockerfile
     container_name: nuclei-command-center
     ports:
       - "3000:3000"
     volumes:
-      - nuclei_data:/app/data          # Stores Database & Config
-      - nuclei_scans:/app/scans        # Stores Scan Results
+      # Persistent data storage (Named Volumes)
+      - nuclei_data:/app/data
+      - nuclei_scans:/app/scans
+      # Nuclei templates (speeds up container restarts)
       - nuclei_templates:/home/nextjs/nuclei-templates
+    # env_file:
+    #   - .env.docker
     environment:
-      - ALLOWED_ORIGINS=localhost:3000 # Add your domain if deploying remotely
+      - NODE_ENV=production
+      - DATABASE_PATH=/app/data/nuclei.db
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/login"]
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost:3000/login" ]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 40s
 
 volumes:
   nuclei_data:

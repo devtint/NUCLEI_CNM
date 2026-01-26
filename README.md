@@ -287,49 +287,31 @@ volumes:
 
 **Step 3:** Start the application:
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 *Wait ~30 seconds for the database to initialize.*
 
-**Step 4:** Finish Setup:
-*   Open **http://localhost:3000**
-*   Follow the **Setup Wizard** to create your admin password.
+**Step 4:** Get your HTTPS URL (Cloudflare Tunnel)
+This setup includes a free, secure Cloudflare Tunnel so you can access the dashboard from anywhere without opening ports.
 
-#### 🌐 Option: Public HTTPS Access (Cloudflare Tunnel)
-
-Expose your local instance to the public internet using Cloudflare Tunnel (No ports opened, no domain needed).
-
-**Commands (exact order):**
-
-**1️⃣ Stop everything**
-```bash
-docker compose down
-```
-
-**2️⃣ Start everything**
-```bash
-docker compose up -d
-```
-
-**3️⃣ Get your HTTPS URL**
 ```bash
 docker compose logs -f cloudflared
 ```
+You will see a URL like: `https://silent-snowflake-9d2a.trycloudflare.com`
 
-You will see something like: `https://silent-snowflake-9d2a.trycloudflare.com`
+> **Note**: This URL changes if the container restarts.
 
-**How to use it:**
-From home / anywhere: `https://silent-snowflake-9d2a.trycloudflare.com`
+**Step 5:** Finish Setup:
+*   Open your **Cloudflare URL** (or `http://localhost:3000` if on the same machine)
+*   Follow the **Setup Wizard** to create your admin password.
 
-> **Note**: The URL will change if the container restarts. This is normal behavior for free Cloudflare Quick Tunnels.
+---
 
-> [!TIP]
-> **Prefer Standard HTTP?**
-> We have included a backup file `docker-compose.yml.back` if you do not want to use Cloudflare Tunnel.
-> To switch:
-> 1. Delete the current `docker-compose.yml`
-> 2. Rename `docker-compose.yml.back` to `docker-compose.yml`
-> 3. Run `docker compose up -d`
+### 🏠 Localhost Only (No Tunnel)
+If you do **NOT** want public access and only want to use the dashboard on your local network:
+1.  Delete the `docker-compose.yml` file.
+2.  Rename `docker-compose.yml.back` to `docker-compose.yml`.
+3.  Run `docker compose up -d`.
 
 ---
 

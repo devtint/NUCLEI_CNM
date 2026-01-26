@@ -14,6 +14,7 @@ import { HttpxPanel } from "@/components/httpx/HttpxPanel";
 import { SystemStatus } from "@/components/dashboard/SystemStatus";
 import { SystemPanel } from "@/components/system/SystemPanel";
 import { BackupRestorePanel } from "@/components/import/ImportPanel";
+import { AnalysisRow } from "@/components/dashboard/AnalysisRow";
 
 export function DashboardClient({ initialStats }: { initialStats: any }) {
     const [activeScanId, setActiveScanId] = useState<string | null>(null);
@@ -58,26 +59,18 @@ export function DashboardClient({ initialStats }: { initialStats: any }) {
                                 refreshTrigger={statsRefresh}
                             />
                             {/* ... Content ... */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="p-6 rounded-xl border border-border bg-card shadow-sm">
-                                    <h3 className="text-lg font-medium text-foreground mb-2">Quick Actions</h3>
-                                    <p className="text-zinc-400 text-sm mb-4">Start a new scan or manage templates.</p>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => setActiveView("scan")} className="text-sm bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-md">Start Scan</button>
-                                        <button onClick={() => setActiveView("templates")} className="text-sm border border-zinc-700 hover:bg-zinc-800 text-zinc-300 px-4 py-2 rounded-md">Manage Templates</button>
-                                    </div>
-                                </div>
+                            {/* Analysis Row */}
+                            <AnalysisRow />
 
-                                {activeScanId && (
-                                    <div className="p-6 rounded-xl border border-emerald-500/20 bg-emerald-500/5">
-                                        <div className="flex justify-between items-center mb-2">
-                                            <h3 className="text-lg font-medium text-emerald-400">Scan Running</h3>
-                                            <span className="animate-pulse h-2 w-2 bg-emerald-500 rounded-full"></span>
-                                        </div>
-                                        <button onClick={() => setActiveView("activity")} className="text-sm underline text-muted-foreground hover:text-foreground">View Details &rarr;</button>
+                            {activeScanId && (
+                                <div className="p-6 rounded-xl border border-emerald-500/20 bg-emerald-500/5 mt-6">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <h3 className="text-lg font-medium text-emerald-400">Scan Running</h3>
+                                        <span className="animate-pulse h-2 w-2 bg-emerald-500 rounded-full"></span>
                                     </div>
-                                )}
-                            </div>
+                                    <button onClick={() => setActiveView("activity")} className="text-sm underline text-muted-foreground hover:text-foreground">View Details &rarr;</button>
+                                </div>
+                            )}
                         </div>
                     )}
 

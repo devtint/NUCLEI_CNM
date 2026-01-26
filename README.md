@@ -507,6 +507,21 @@ Located in **Settings** within the dashboard:
 
 ---
 
+## ❓ Troubleshooting
+
+### "No templates provided for scan"
+If you see this error on your first run, it means the Nuclei templates haven't been downloaded yet.
+1.  Go to **System > Scanners** in the dashboard.
+2.  Click the **Update** button next to **Nuclei Templates**.
+3.  Wait for the process to complete (can take ~2-5 minutes).
+
+Alternatively, run this command in your terminal:
+```bash
+docker compose exec nuclei-cnm nuclei -ut
+```
+
+---
+
 ## Project Structure
 
 ```

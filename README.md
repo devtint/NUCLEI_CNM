@@ -11,6 +11,7 @@
 <p align="center">
   <a href="#features">Features</a> •
   <a href="#architecture">Architecture</a> •
+  <a href="#docker-deployment-easiest-way">Docker</a> •
   <a href="#installation">Installation</a> •
   <a href="#security">Security</a> •
   <a href="#documentation">Documentation</a>
@@ -309,30 +310,23 @@ Access the dashboard at **http://localhost:3000**
 
 ---
 
-## 🐳 Docker Deployment
+## 🐳 Docker Deployment (Easiest Way)
+The easiest way to run Nuclei Command Center. No need to install Node.js, Go, or Nuclei manually.
 
-The easiest way to run Nuclei Command Center with all tools pre-installed.
+### Prerequisites
+1. Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows/Mac/Linux).
+2. Ensure Docker is running.
 
-[![Docker Pulls](https://img.shields.io/docker/pulls/mrtintnaingwin/nucleicnm?style=flat-square&logo=docker)](https://hub.docker.com/r/mrtintnaingwin/nucleicnm)
+### Method 1: Docker Compose (Recommended)
+This method allows you to easily update and manage the tool.
 
-### Quick Start
-
+**Step 1:** Create a folder for the project:
 ```bash
-# Pull and run (PowerShell)
-docker run -d `
-  --name nuclei-cnm `
-  -p 3000:3000 `
-  -v ${PWD}/data:/app/data `
-  -v ${PWD}/scans:/app/scans `
-  mrtintnaingwin/nucleicnm:latest
+mkdir nuclei-cnm
+cd nuclei-cnm
 ```
 
-On first visit to `http://localhost:3000`, you'll be redirected to a setup wizard to create your admin password. **No manual hash generation required!**
-
-### Docker Compose (Recommended)
-
-Create `docker-compose.yml`:
-
+**Step 2:** Create a file named `docker-compose.yml`:
 ```yaml
 services:
   nuclei-cnm:
@@ -341,12 +335,11 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./data:/app/data          # Database & config (REQUIRED)
-      - ./scans:/app/scans        # Scan results
-      - nuclei-templates:/home/nextjs/nuclei-templates
+      - nuclei_data:/app/data          # Stores Database & Config
+      - nuclei_scans:/app/scans        # Stores Scan Results
+      - nuclei_templates:/home/nextjs/nuclei-templates
     environment:
-      # Optional: Override allowed origins for remote access
-      - ALLOWED_ORIGINS=localhost:3000,your-server.local:3000
+      - ALLOWED_ORIGINS=localhost:3000 # Add your domain if deploying remotely
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/login"]
@@ -355,27 +348,37 @@ services:
       retries: 3
 
 volumes:
-  nuclei-templates:
+  nuclei_data:
+  nuclei_scans:
+  nuclei_templates:
 ```
 
+**Step 3:** Start the application:
 ```bash
-# Start the container
 docker-compose up -d
-
-# View logs
-docker-compose logs -f
 ```
+*Wait about 30 seconds for the database to initialize.*
 
-### Build from Source (Alternative)
+**Step 4:** Open your browser:
+* Go to: http://localhost:3000
+* You will see the **Setup Wizard**.
+* Create your **Admin Password**.
+* Done!
+
+---
+
+### Method 2: One-Line Command (Quick Test)
+If you don't want to create any files, just run this single command in your terminal:
 
 ```bash
-git clone https://github.com/devtint/NUCLEI_CNM.git
-cd NUCLEI_CNM/dashboard
-docker build -t nuclei-cnm:latest .
-
-# Run
-docker run -d -p 3000:3000 -v ${PWD}/data:/app/data nuclei-cnm:latest
+docker run -d \
+  --name nuclei-cnm \
+  -p 3000:3000 \
+  -v nuclei_data:/app/data \
+  -v nuclei_scans:/app/scans \
+  mrtintnaingwin/nucleicnm:latest
 ```
+*Access at http://localhost:3000*
 
 ### Docker Environment Variables
 
@@ -403,6 +406,46 @@ The Docker image includes:
 - **HTTPX** v1.8.1+
 
 All tools are automatically available - no additional configuration required.
+
+---
+
+## 🛠 Maintenance
+
+### How to Update
+To update to the latest version without losing data:
+
+#### Using Docker Compose (Recommended)
+```bash
+# 1. Pull the latest image
+docker-compose pull
+
+# 2. Recreate the container
+# This REPLACES the container but KEEPS your data (mounted in ./data and ./scans)
+docker-compose up -d
+```
+
+#### Using Docker Run
+You must manually stop, remove, and restart:
+```bash
+docker stop nuclei-cnm
+docker rm nuclei-cnm
+# Run the start command again (ensure -v flags point to the SAME folders)
+docker run ... -v ${PWD}/data:/app/data ...
+```
+
+### Data Persistence
+We use **Docker Named Volumes** by default (`nuclei_data`, `nuclei_scans`). This ensures your data survives container updates and is independent of your host directory.
+
+- **Backup Data**:
+  ```bash
+  # Copy database to host
+  docker cp nuclei-command-center:/app/data/nuclei.db ./nuclei.db
+  ```
+- **Access Logs/Scans**:
+  ```bash
+  # List scan results
+  docker exec nuclei-command-center ls -l /app/scans
+  ```
 
 ---
 

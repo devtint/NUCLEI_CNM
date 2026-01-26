@@ -503,20 +503,53 @@ export function HttpxPanel({ onScanTarget }: { onScanTarget?: (target: string) =
         a.click();
     };
 
-    const copyList = () => {
-        const content = filteredResults.map(r => r.url).join("\n");
-        navigator.clipboard.writeText(content);
-        toast.success("Copied " + filteredResults.length + " URLs");
+    const copyToClipboard = async (text: string) => {
+        // Try modern API first (if available and secure)
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            try {
+                await navigator.clipboard.writeText(text);
+                return true;
+            } catch (err) {
+                // Continue to fallback
+            }
+        }
+
+        // Fallback for insecure contexts (HTTP)
+        try {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed"; // Avoid scrolling
+            textArea.style.left = "-9999px";
+            textArea.style.top = "0";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+
+            const successful = document.execCommand('copy');
+            document.body.removeChild(textArea);
+            return successful;
+        } catch (err) {
+            console.error("Copy failed", err);
+            return false;
+        }
     };
 
-    const exportHosts = () => {
+    const copyList = async () => {
+        const content = filteredResults.map(r => r.url).join("\n");
+        const success = await copyToClipboard(content);
+        if (success) toast.success("Copied " + filteredResults.length + " URLs");
+        else toast.error("Failed to copy to clipboard");
+    };
+
+    const exportHosts = async () => {
         const content = filteredResults.map(r => {
             try {
                 return new URL(r.url).hostname;
             } catch { return r.url; }
         }).join("\n");
-        navigator.clipboard.writeText(content);
-        toast.success("Copied " + filteredResults.length + " hostnames");
+        const success = await copyToClipboard(content);
+        if (success) toast.success("Copied " + filteredResults.length + " hostnames");
+        else toast.error("Failed to copy to clipboard");
     };
 
     const exportFullCsv = () => {

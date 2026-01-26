@@ -286,7 +286,13 @@ volumes:
 ```
 
 **Step 3:** Start the application:
+Run these commands in order to ensure a clean start:
+
 ```bash
+# 1. Stop any existing containers (prevents conflicts)
+docker compose down
+
+# 2. Start the application
 docker compose up -d
 ```
 *Wait ~30 seconds for the database to initialize.*

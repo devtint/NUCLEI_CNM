@@ -129,7 +129,7 @@ export function DashboardClient({ initialStats }: { initialStats: any }) {
 
                     {activeView === "httpx" && (
                         <div className="animate-in fade-in duration-500">
-                            <HttpxPanel />
+                            <HttpxPanel onScanTarget={startMainScan} />
                         </div>
                     )}
 

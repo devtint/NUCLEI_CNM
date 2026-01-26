@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Loader2, Play, Activity, List, StopCircle, Terminal, Globe, RefreshCw, Trash2, ChevronRight, Download, Copy, Folder, ArrowLeft, Upload, Plus } from "lucide-react";
+import { Loader2, Play, Activity, List, StopCircle, Terminal, Globe, RefreshCw, Trash2, ChevronRight, Download, Copy, Folder, ArrowLeft, Upload, Plus, Target } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -78,7 +78,7 @@ import {
 
 // ... imports
 
-export function HttpxPanel() {
+export function HttpxPanel({ onScanTarget }: { onScanTarget?: (target: string) => void }) {
     const [scans, setScans] = useState<HttpxScan[]>([]);
     const [selectedScanId, setSelectedScanId] = useState<string | null>(null);
     const [results, setResults] = useState<HttpxResult[]>([]);
@@ -948,6 +948,14 @@ export function HttpxPanel() {
                                                                             }}>
                                                                                 <Copy className="h-3 w-3" />
                                                                             </Button>
+                                                                            {onScanTarget && (
+                                                                                <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-emerald-500 shrink-0" onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    onScanTarget(r.url);
+                                                                                }} title="Start Nuclei Scan">
+                                                                                    <Target className="h-3 w-3" />
+                                                                                </Button>
+                                                                            )}
                                                                             {/* Status Badges Mobile/Inline */}
                                                                             <div className="flex md:hidden items-center gap-2">
                                                                                 <Badge variant="outline" className={cn(

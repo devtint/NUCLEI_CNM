@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { getPasswordHash, getAuthSecret } from './setup';
 
 let manualEnvCache: Record<string, string> | null = null;
@@ -73,3 +74,21 @@ export const env = {
     // Optional
     get NODE_ENV() { return process.env.NODE_ENV || 'development'; },
 };
+
+// --- FIX FOR MAC/LINUX PATH ISSUE (#22) ---
+// Automatically add common Go bin paths to PATH
+if (typeof process !== 'undefined' && process.platform !== 'win32') {
+    const commonGoPaths = [
+        path.join(os.homedir(), 'go', 'bin'),
+        '/usr/local/go/bin',
+        '/opt/homebrew/bin'
+    ];
+
+    const currentPath = process.env.PATH || '';
+    const newPaths = commonGoPaths.filter(p => !currentPath.includes(p) && fs.existsSync(p));
+
+    if (newPaths.length > 0) {
+        console.log(`[ENV] Adding missing Go paths to PATH: ${newPaths.join(':')}`);
+        process.env.PATH = `${newPaths.join(':')}:${currentPath}`;
+    }
+}

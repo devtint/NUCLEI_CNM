@@ -268,8 +268,10 @@ npm install
 Generate a secure password hash:
 
 ```bash
-# Using Node.js
+# Using Node.js (Run inside dashboard folder)
+cd dashboard
 node -e "const bcrypt = require('bcrypt'); bcrypt.hash('YOUR_SECURE_PASSWORD', 10).then(h => console.log(h));"
+cd ..
 ```
 
 Generate an auth secret:

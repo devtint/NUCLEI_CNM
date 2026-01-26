@@ -63,6 +63,31 @@ export function ResultsFeed({ initialTarget, onScanTarget }: { initialTarget?: s
     const [filterStatus, setFilterStatus] = useState<string[]>([]); // Empty = All
     const [targetToDelete, setTargetToDelete] = useState<Target | null>(null);
 
+    // Fallback Copy Function
+    const copyToClipboard = async (text: string) => {
+        try {
+            await navigator.clipboard.writeText(text);
+            return true;
+        } catch (err) {
+            // Fallback for non-secure contexts or failed permission
+            try {
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-9999px";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                return true;
+            } catch (e) {
+                console.error("Copy failed", e);
+                return false;
+            }
+        }
+    };
+
     // Fetch Targets (Inventory)
     const fetchTargets = async () => {
         setLoading(true);
@@ -174,7 +199,7 @@ export function ResultsFeed({ initialTarget, onScanTarget }: { initialTarget?: s
                             variant="default"
                             size="sm"
                             className="bg-emerald-600 hover:bg-emerald-700"
-                            onClick={() => {
+                            onClick={async () => {
                                 const activeSubs = subdomains
                                     .filter(s => {
                                         if (filterStatus.length > 0 && s.status && !filterStatus.includes(s.status)) return false;
@@ -186,8 +211,9 @@ export function ResultsFeed({ initialTarget, onScanTarget }: { initialTarget?: s
                                     toast.error("No subdomains to copy");
                                     return;
                                 }
-                                navigator.clipboard.writeText(activeSubs.join("\n"));
-                                toast.success(`Copied ${activeSubs.length} subdomains to clipboard`);
+                                const success = await copyToClipboard(activeSubs.join("\n"));
+                                if (success) toast.success(`Copied ${activeSubs.length} subdomains to clipboard`);
+                                else toast.error("Failed to copy to clipboard");
                             }}
                         >
                             <Copy className="mr-2 h-4 w-4" /> Copy Subdomains
@@ -291,9 +317,10 @@ export function ResultsFeed({ initialTarget, onScanTarget }: { initialTarget?: s
                                                         variant="ghost"
                                                         size="icon"
                                                         className="h-6 w-6"
-                                                        onClick={() => {
-                                                            navigator.clipboard.writeText(sub.subdomain);
-                                                            toast.success("Subdomain copied");
+                                                        onClick={async () => {
+                                                            const success = await copyToClipboard(sub.subdomain);
+                                                            if (success) toast.success("Subdomain copied");
+                                                            else toast.error("Failed to copy");
                                                         }}
                                                         title="Copy Subdomain"
                                                     >
@@ -303,12 +330,12 @@ export function ResultsFeed({ initialTarget, onScanTarget }: { initialTarget?: s
                                                         variant="ghost"
                                                         size="icon"
                                                         className="h-6 w-6"
-                                                        onClick={() => {
+                                                        onClick={async () => {
                                                             if (onScanTarget) {
                                                                 onScanTarget(sub.subdomain);
                                                             } else {
-                                                                navigator.clipboard.writeText(sub.subdomain);
-                                                                toast.info("Copied for scanning (Scanner not linked)");
+                                                                const success = await copyToClipboard(sub.subdomain);
+                                                                if (success) toast.info("Copied for scanning (Scanner not linked)");
                                                             }
                                                         }}
                                                         title="Start Nuclei Scan"

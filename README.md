@@ -314,7 +314,11 @@ You will see a URL like: `https://silent-snowflake-9d2a.trycloudflare.com`
 ---
 
 ### 🏠 Localhost Only (No Tunnel)
-If you do **NOT** want public access and only want to use the dashboard on your local network, use this clean `docker-compose.yml` instead:
+If you do **NOT** want public access and only want to use the dashboard on your local network:
+
+> **Option A:** [Download `docker-compose.local.yml`](https://github.com/devtint/NUCLEI_CNM/blob/main/docker-compose.local.yml), rename it to `docker-compose.yml`, and run `docker compose up -d`.
+
+> **Option B:** Copy the code below into a new `docker-compose.yml` file:
 
 ```yaml
 services:

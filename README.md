@@ -392,14 +392,16 @@ If you are a developer contributor and want to run from source code (requires in
 ### How to Update
 To update to the latest version without losing data:
 
-#### Using Docker Compose (Recommended)
+#### Using Docker Compose (Safe Method)
 ```bash
-# 1. Pull the latest image
-docker-compose pull
+# 1. Stop the current version
+docker compose down
 
-# 2. Recreate the container
-# This REPLACES the container but KEEPS your data (mounted in ./data and ./scans)
-docker-compose up -d
+# 2. Pull the latest updates
+docker compose pull
+
+# 3. Start the application
+docker compose up -d
 ```
 
 #### Using Docker Run

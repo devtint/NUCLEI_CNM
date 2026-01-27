@@ -235,7 +235,7 @@
 1.  **Docker Desktop** (running).
 2.  That's it.
 
-### Method 1: Docker Compose (Recommended)
+### Method 1: Docker Compose / docker-compose (Recommended)
 
 **Step 1:** Create a project folder:
 ```bash
@@ -291,12 +291,18 @@ Run these commands in order to ensure a clean start:
 ```bash
 # 1. Stop any existing containers (prevents conflicts)
 docker compose down
+# OR (for older versions)
+docker-compose down
 
 # 2. Pull the latest image
 docker compose pull
+# OR
+docker-compose pull
 
 # 3. Start the application
 docker compose up -d
+# OR
+docker-compose up -d
 ```
 *Wait ~30 seconds for the database to initialize.*
 
@@ -322,6 +328,8 @@ This setup includes a free, secure Cloudflare Tunnel so you can access the dashb
 
 ```bash
 docker compose logs -f cloudflared
+# OR
+docker-compose logs -f cloudflared
 ```
 You will see a URL like: `https://silent-snowflake-9d2a.trycloudflare.com`
 
@@ -336,7 +344,7 @@ You will see a URL like: `https://silent-snowflake-9d2a.trycloudflare.com`
 ### 🏠 Localhost Only (No Tunnel)
 If you do **NOT** want public access and only want to use the dashboard on your local network:
 
-> **Option A:** [Download `docker-compose.local.yml`](https://github.com/devtint/NUCLEI_CNM/blob/main/docker-compose.local.yml), rename it to `docker-compose.yml`, and run `docker compose up -d`.
+> **Option A:** [Download `docker-compose.local.yml`](https://github.com/devtint/NUCLEI_CNM/blob/main/docker-compose.local.yml), rename it to `docker-compose.yml`, and run `docker compose up -d` (or `docker-compose up -d`).
 
 > **Option B:** Copy the code below into a new `docker-compose.yml` file:
 
@@ -395,16 +403,22 @@ If you are a developer contributor and want to run from source code (requires in
 ### How to Update
 To update to the latest version without losing data:
 
-#### Using Docker Compose (Safe Method)
+#### Using Docker Compose / docker-compose (Safe Method)
 ```bash
 # 1. Stop the current version
 docker compose down
+# OR
+docker-compose down
 
 # 2. Pull the latest updates
 docker compose pull
+# OR
+docker-compose pull
 
 # 3. Start the application
 docker compose up -d
+# OR
+docker-compose up -d
 ```
 
 #### Using Docker Run

@@ -162,7 +162,28 @@
 
 ### Prerequisites
 1.  **Docker Desktop** (running).
-2.  That's it.
+2.  **Python 3** (for quick start script) - *optional but recommended*
+
+### 🎯 Quick Start Script (Easiest)
+
+Download and run the auto-start script - it handles everything for you:
+
+```bash
+# Download the script
+curl -O https://raw.githubusercontent.com/devtint/NUCLEI_CNM/main/start-nuclei.py
+
+# Run it
+python start-nuclei.py
+```
+
+The script will:
+- ✅ Verify Docker is running
+- ✅ Download `docker-compose.yml` if missing
+- ✅ Pull latest images and start containers
+- ✅ Wait for health check
+- ✅ Copy Cloudflare URL to clipboard
+
+---
 
 ### Method 1: Docker Compose (Recommended)
 

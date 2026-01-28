@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -25,99 +25,89 @@ interface TopTech {
     count: number;
 }
 
+// Fetch functions (shared queryKey with Stats.tsx)
+const fetchFindings = async () => {
+    const res = await fetch("/api/findings");
+    if (!res.ok) throw new Error("Failed to fetch findings");
+    return res.json();
+};
+
+const fetchHttpx = async () => {
+    const res = await fetch("/api/httpx?view=all");
+    if (!res.ok) throw new Error("Failed to fetch httpx");
+    return res.json();
+};
+
 export function AnalysisRow() {
-    const [loading, setLoading] = useState(true);
-    const [vulns, setVulns] = useState<TopVuln[]>([]);
-    const [targets, setTargets] = useState<TopTarget[]>([]);
-    const [techs, setTechs] = useState<TopTech[]>([]);
+    // Use React Query for cached data fetching
+    const { data: findings = [], isLoading: loadingFindings } = useQuery({
+        queryKey: ["findings"],
+        queryFn: fetchFindings,
+        staleTime: 60 * 1000,
+        gcTime: 5 * 60 * 1000,
+    });
 
-    useEffect(() => {
-        const fetchData = async () => {
+    const { data: httpxData = [], isLoading: loadingHttpx } = useQuery({
+        queryKey: ["httpx", "all"],
+        queryFn: fetchHttpx,
+        staleTime: 60 * 1000,
+        gcTime: 5 * 60 * 1000,
+    });
+
+    const loading = loadingFindings || loadingHttpx;
+
+    // Process findings for analysis (computed from cached data)
+    const vulnMap = new Map<string, { count: number, severity: string }>();
+    const targetMap = new Map<string, { score: number, critical: number, high: number, medium: number }>();
+
+    findings.forEach((f: any) => {
+        const name = f.info?.name || "Unknown Issue";
+        const sev = f.info?.severity?.toLowerCase() || "info";
+        if (sev === 'info') return;
+
+        const currentVuln = vulnMap.get(name) || { count: 0, severity: sev };
+        currentVuln.count++;
+        vulnMap.set(name, currentVuln);
+
+        const url = f.host || "";
+        let host = url;
+        try { host = new URL(url).hostname; } catch { }
+        if (!host) host = "Unknown Target";
+
+        const currentTarget = targetMap.get(host) || { score: 0, critical: 0, high: 0, medium: 0 };
+        if (sev === 'critical') { currentTarget.score += 10; currentTarget.critical++; }
+        else if (sev === 'high') { currentTarget.score += 5; currentTarget.high++; }
+        else if (sev === 'medium') { currentTarget.score += 2; currentTarget.medium++; }
+        targetMap.set(host, currentTarget);
+    });
+
+    const vulns: TopVuln[] = Array.from(vulnMap.entries())
+        .map(([name, data]) => ({ name, ...data }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5);
+
+    const targets: TopTarget[] = Array.from(targetMap.entries())
+        .map(([host, data]) => ({ host, ...data }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 5);
+
+    // Process HTTPX for tech stack
+    const techMap = new Map<string, number>();
+    httpxData.forEach((h: any) => {
+        if (h.technologies) {
             try {
-                // 1. Fetch Findings
-                const findingsRes = await fetch("/api/findings");
-                const findings = await findingsRes.json();
-
-                // Aggregations
-                const vulnMap = new Map<string, { count: number, severity: string }>();
-                const targetMap = new Map<string, { score: number, critical: number, high: number, medium: number }>();
-
-                findings.forEach((f: any) => {
-                    // Vuln Stats
-                    const name = f.info?.name || "Unknown Issue";
-                    const sev = f.info?.severity?.toLowerCase() || "info";
-
-                    // Exclude info from analysis
-                    if (sev === 'info') return;
-
-                    const currentVuln = vulnMap.get(name) || { count: 0, severity: sev };
-                    currentVuln.count++;
-                    vulnMap.set(name, currentVuln);
-
-                    // Target Stats
-                    // Extract host from URL or use host field
-                    const url = f.host || "";
-                    let host = url;
-                    try { host = new URL(url).hostname; } catch { }
-                    if (!host) host = "Unknown Target";
-
-                    const currentTarget = targetMap.get(host) || { score: 0, critical: 0, high: 0, medium: 0 };
-
-                    // Simple Risk Scoring
-                    if (sev === 'critical') { currentTarget.score += 10; currentTarget.critical++; }
-                    else if (sev === 'high') { currentTarget.score += 5; currentTarget.high++; }
-                    else if (sev === 'medium') { currentTarget.score += 2; currentTarget.medium++; }
-
-                    targetMap.set(host, currentTarget);
+                const tList = JSON.parse(h.technologies);
+                tList.forEach((t: string) => {
+                    techMap.set(t, (techMap.get(t) || 0) + 1);
                 });
+            } catch { }
+        }
+    });
 
-                // Sort & Slice Vulns
-                const sortedVulns = Array.from(vulnMap.entries())
-                    .map(([name, data]) => ({ name, ...data }))
-                    .sort((a, b) => b.count - a.count)
-                    .slice(0, 5);
-
-                // Sort & Slice Targets
-                const sortedTargets = Array.from(targetMap.entries())
-                    .map(([host, data]) => ({ host, ...data }))
-                    .sort((a, b) => b.score - a.score)
-                    .slice(0, 5);
-
-                setVulns(sortedVulns);
-                setTargets(sortedTargets);
-
-                // 2. Fetch Tech (HTTPX)
-                const httpxRes = await fetch("/api/httpx?view=all");
-                const httpxData = await httpxRes.json();
-
-                const techMap = new Map<string, number>();
-                httpxData.forEach((h: any) => {
-                    if (h.technologies) {
-                        try {
-                            const tList = JSON.parse(h.technologies);
-                            tList.forEach((t: string) => {
-                                techMap.set(t, (techMap.get(t) || 0) + 1);
-                            });
-                        } catch { }
-                    }
-                });
-
-                const sortedTech = Array.from(techMap.entries())
-                    .map(([name, count]) => ({ name, count }))
-                    .sort((a, b) => b.count - a.count)
-                    .slice(0, 20); // Top 20 tags
-
-                setTechs(sortedTech);
-
-            } catch (e) {
-                console.error("Analysis load failed", e);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchData();
-    }, []);
+    const techs: TopTech[] = Array.from(techMap.entries())
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 20);
 
     const getSevColor = (sev: string) => {
         switch (sev.toLowerCase()) {

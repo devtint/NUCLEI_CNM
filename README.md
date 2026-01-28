@@ -1,3 +1,14 @@
+> [!WARNING]
+> **CRITICAL UPDATE (v1.5.6+): Custom Templates Persistence**
+>
+> If you are upgrading from an older version, you **MUST** update your `docker-compose.yml` and fix permissions to ensure custom templates are saved.
+>
+> 1. **Update Config**: Add `- nuclei_custom_templates:/home/nextjs/nuclei-custom-templates` to your volumes.
+> 2. **Fix Permissions**: Run `docker exec -u 0 nuclei-command-center chown -R nextjs:nodejs /home/nextjs/nuclei-custom-templates`
+> 3. **Restart**: Run `docker compose up -d`
+>
+> *See the [Reference Guide below](#-installation--deployment) for full details.*
+
 <p align="center">
   <img src="https://raw.githubusercontent.com/projectdiscovery/nuclei/master/static/nuclei-logo.png" alt="Nuclei Command Center" width="200"/>
 </p>

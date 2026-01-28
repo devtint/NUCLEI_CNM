@@ -209,6 +209,13 @@ function initializeSchema() {
             value TEXT
         )
     `);
+
+    // Migration: Add scheduler_enabled column to monitored_targets
+    try {
+        db.exec("ALTER TABLE monitored_targets ADD COLUMN scheduler_enabled INTEGER DEFAULT 1");
+    } catch (e: any) {
+        if (!e.message.includes("duplicate column")) { /* ignore */ }
+    }
 }
 
 

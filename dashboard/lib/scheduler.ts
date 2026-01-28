@@ -70,6 +70,32 @@ export function saveNucleiSettings(settings: Partial<NucleiSettings>) {
     if (settings.maxNewThreshold !== undefined) setSetting("nuclei_max_threshold", settings.maxNewThreshold.toString());
 }
 
+// Backup settings interface
+interface BackupSettings {
+    backupEnabled: boolean;
+    backupMode: "local" | "telegram";
+    backupHour: number;
+    notifyDetail: "summary" | "detailed";
+}
+
+// Get backup settings from DB (secure defaults)
+export function getBackupSettings(): BackupSettings {
+    return {
+        backupEnabled: getSetting("backup_enabled") === "true",
+        backupMode: (getSetting("backup_mode") as BackupSettings["backupMode"]) || "local",
+        backupHour: parseInt(getSetting("backup_hour") || "3", 10),
+        notifyDetail: (getSetting("notify_detail") as BackupSettings["notifyDetail"]) || "summary"
+    };
+}
+
+// Save backup settings to DB
+export function saveBackupSettings(settings: Partial<BackupSettings>) {
+    if (settings.backupEnabled !== undefined) setSetting("backup_enabled", settings.backupEnabled.toString());
+    if (settings.backupMode !== undefined) setSetting("backup_mode", settings.backupMode);
+    if (settings.backupHour !== undefined) setSetting("backup_hour", settings.backupHour.toString());
+    if (settings.notifyDetail !== undefined) setSetting("notify_detail", settings.notifyDetail);
+}
+
 // Toggle nuclei_enabled for a specific domain
 export function toggleDomainNuclei(targetId: number, enabled: boolean) {
     const db = getDatabase();
@@ -209,66 +235,94 @@ export async function runScheduledScans() {
                 const shouldNotify = settings.notifyMode === "always" || result.newCount > 0;
 
                 if (shouldNotify) {
+                    const backupSettings = getBackupSettings();
+                    const isSummary = backupSettings.notifyDetail === "summary";
+
                     let msg = `🔍 *Scheduled Recon Scan*\n\n`;
                     msg += `🎯 *Target:* \`${domain.target}\`\n`;
                     msg += `⏰ *Completed:* ${new Date().toISOString().replace('T', ' ').substring(0, 19)} UTC\n\n`;
 
-                    // Subfinder results section
-                    msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
-                    msg += `📡 *Subfinder Results*\n`;
-                    msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
-                    msg += `📊 Total: ${result.total} subdomains\n`;
+                    if (isSummary) {
+                        // Summary mode - counts only, no names
+                        msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+                        msg += `📡 Subfinder: ${result.total} total`;
+                        if (result.newCount > 0) msg += `, ${result.newCount} new`;
+                        msg += `\n`;
 
-                    if (result.newCount > 0) {
-                        const newList = result.newSubdomains.slice(0, 10);
-                        const hasMore = result.newSubdomains.length > 10;
-
-                        msg += `🆕 New: ${result.newCount} subdomains\n`;
-                        newList.forEach(sub => {
-                            msg += `   • ${sub}\n`;
-                        });
-                        if (hasMore) {
-                            msg += `   _...and ${result.newSubdomains.length - 10} more_\n`;
+                        if (httpxResult && httpxResult.total > 0) {
+                            msg += `🌐 HTTPX: ${httpxResult.liveCount}/${httpxResult.total} live\n`;
                         }
+
+                        if (nucleiResult && nucleiResult.findingsCount > 0) {
+                            msg += `🔬 Nuclei: ${nucleiResult.findingsCount} findings`;
+                            if (nucleiResult.criticalCount > 0) msg += ` (${nucleiResult.criticalCount} critical)`;
+                            msg += `\n`;
+                        } else if (nucleiResult && nucleiResult.findingsCount === 0) {
+                            msg += `✓ Nuclei: No vulnerabilities\n`;
+                        } else if (nucleiSkipped) {
+                            msg += `⚠️ Nuclei skipped\n`;
+                        }
+
+                        msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+                        msg += `📊 _View details in dashboard_`;
                     } else {
-                        msg += `✓ No new subdomains detected\n`;
-                    }
-
-                    // HTTPX results section (if enabled and ran)
-                    if (httpxResult && httpxResult.total > 0) {
-                        msg += `\n━━━━━━━━━━━━━━━━━━━━━━\n`;
-                        msg += `🌐 *HTTPX Probe Results*\n`;
+                        // Detailed mode - includes names (existing behavior)
                         msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
-                        msg += `✅ Live: ${httpxResult.liveCount}/${httpxResult.total}\n`;
+                        msg += `📡 *Subfinder Results*\n`;
+                        msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+                        msg += `📊 Total: ${result.total} subdomains\n`;
 
-                        const liveList = httpxResult.liveHosts.slice(0, 10);
-                        const hasMoreLive = httpxResult.liveHosts.length > 10;
+                        if (result.newCount > 0) {
+                            const newList = result.newSubdomains.slice(0, 10);
+                            const hasMore = result.newSubdomains.length > 10;
 
-                        liveList.forEach(host => {
-                            const title = host.title ? ` - ${host.title.substring(0, 30)}` : '';
-                            msg += `   • ${host.host} [${host.statusCode}]${title}\n`;
-                        });
-
-                        if (hasMoreLive) {
-                            msg += `   _...and ${httpxResult.liveHosts.length - 10} more_\n`;
+                            msg += `🆕 New: ${result.newCount} subdomains\n`;
+                            newList.forEach(sub => {
+                                msg += `   • ${sub}\n`;
+                            });
+                            if (hasMore) {
+                                msg += `   _...and ${result.newSubdomains.length - 10} more_\n`;
+                            }
+                        } else {
+                            msg += `✓ No new subdomains detected\n`;
                         }
-                    } else if (settings.autoHttpx && result.newCount > 0 && !httpxResult) {
-                        msg += `\n⚠️ HTTPX probe failed\n`;
-                    }
 
-                    // Nuclei results section
-                    if (nucleiResult && nucleiResult.findingsCount > 0) {
-                        msg += `\n━━━━━━━━━━━━━━━━━━━━━━\n`;
-                        msg += `🔬 *Nuclei Scan Results*\n`;
-                        msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
-                        msg += `🎯 Findings: ${nucleiResult.findingsCount}\n`;
-                        if (nucleiResult.criticalCount > 0) msg += `   🔴 Critical: ${nucleiResult.criticalCount}\n`;
-                        if (nucleiResult.highCount > 0) msg += `   🟠 High: ${nucleiResult.highCount}\n`;
-                    } else if (nucleiResult && nucleiResult.findingsCount === 0) {
-                        msg += `\n✓ Nuclei: No vulnerabilities found\n`;
-                    } else if (nucleiSkipped) {
-                        msg += `\n⚠️ *Nuclei Skipped*\n`;
-                        msg += `   ${nucleiSkipReason}\n`;
+                        // HTTPX results section (if enabled and ran)
+                        if (httpxResult && httpxResult.total > 0) {
+                            msg += `\n━━━━━━━━━━━━━━━━━━━━━━\n`;
+                            msg += `🌐 *HTTPX Probe Results*\n`;
+                            msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+                            msg += `✅ Live: ${httpxResult.liveCount}/${httpxResult.total}\n`;
+
+                            const liveList = httpxResult.liveHosts.slice(0, 10);
+                            const hasMoreLive = httpxResult.liveHosts.length > 10;
+
+                            liveList.forEach(host => {
+                                const title = host.title ? ` - ${host.title.substring(0, 30)}` : '';
+                                msg += `   • ${host.host} [${host.statusCode}]${title}\n`;
+                            });
+
+                            if (hasMoreLive) {
+                                msg += `   _...and ${httpxResult.liveHosts.length - 10} more_\n`;
+                            }
+                        } else if (settings.autoHttpx && result.newCount > 0 && !httpxResult) {
+                            msg += `\n⚠️ HTTPX probe failed\n`;
+                        }
+
+                        // Nuclei results section
+                        if (nucleiResult && nucleiResult.findingsCount > 0) {
+                            msg += `\n━━━━━━━━━━━━━━━━━━━━━━\n`;
+                            msg += `🔬 *Nuclei Scan Results*\n`;
+                            msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+                            msg += `🎯 Findings: ${nucleiResult.findingsCount}\n`;
+                            if (nucleiResult.criticalCount > 0) msg += `   🔴 Critical: ${nucleiResult.criticalCount}\n`;
+                            if (nucleiResult.highCount > 0) msg += `   🟠 High: ${nucleiResult.highCount}\n`;
+                        } else if (nucleiResult && nucleiResult.findingsCount === 0) {
+                            msg += `\n✓ Nuclei: No vulnerabilities found\n`;
+                        } else if (nucleiSkipped) {
+                            msg += `\n⚠️ *Nuclei Skipped*\n`;
+                            msg += `   ${nucleiSkipReason}\n`;
+                        }
                     }
 
                     await sendTelegramNotification(msg);
@@ -717,4 +771,93 @@ export async function triggerManualRun() {
         throw new Error("Scheduler is already running");
     }
     await runScheduledScans();
+}
+
+// Trigger backup based on settings
+export async function triggerBackup(): Promise<{ success: boolean; message: string; stats?: any }> {
+    const fs = await import("fs");
+    const path = await import("path");
+    const backupSettings = getBackupSettings();
+
+    try {
+        const db = getDatabase();
+        const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+
+        // Build backup data (same as /api/backup/export)
+        const backup = {
+            metadata: {
+                version: "1.0.0",
+                exportedAt: new Date().toISOString(),
+                exportedBy: "Nuclei CC Scheduled Backup",
+                format: "nuclei-cc-backup"
+            },
+            nuclei: {
+                scans: db.prepare("SELECT * FROM scans").all(),
+                findings: db.prepare("SELECT * FROM findings").all()
+            },
+            subfinder: {
+                scans: db.prepare("SELECT * FROM subfinder_scans").all(),
+                results: db.prepare("SELECT * FROM subfinder_results").all(),
+                monitored_targets: db.prepare("SELECT * FROM monitored_targets").all(),
+                monitored_subdomains: db.prepare("SELECT * FROM monitored_subdomains").all()
+            },
+            httpx: {
+                scans: db.prepare("SELECT * FROM httpx_scans").all(),
+                results: db.prepare("SELECT * FROM httpx_results").all()
+            }
+        };
+
+        const jsonData = JSON.stringify(backup, null, 2);
+        const filename = `nuclei-cc-backup_${timestamp}.json`;
+        const fileSizeKb = Math.round(Buffer.byteLength(jsonData, 'utf8') / 1024);
+
+        // Stats for notification
+        const stats = {
+            findings: backup.nuclei.findings.length,
+            subdomains: backup.subfinder.results.length,
+            httpxResults: backup.httpx.results.length,
+            sizeKb: fileSizeKb
+        };
+
+        if (backupSettings.backupMode === "telegram") {
+            // Save to temp file and send via Telegram
+            const tempPath = path.join("/tmp", filename);
+            fs.writeFileSync(tempPath, jsonData);
+
+            const msg = `🗄️ *Scheduled Backup Complete*\n\n` +
+                `📅 ${new Date().toISOString().replace('T', ' ').substring(0, 19)} UTC\n` +
+                `📊 ${stats.findings} findings | ${stats.subdomains} subdomains | ${stats.httpxResults} assets\n` +
+                `💾 Size: ${fileSizeKb} KB`;
+
+            await sendTelegramNotification(msg, tempPath);
+
+            // Clean up temp file
+            try { fs.unlinkSync(tempPath); } catch { }
+
+            return { success: true, message: "Backup sent to Telegram", stats };
+        } else {
+            // Save locally
+            const backupDir = "/data/backups";
+            if (!fs.existsSync(backupDir)) {
+                fs.mkdirSync(backupDir, { recursive: true });
+            }
+
+            const filePath = path.join(backupDir, filename);
+            fs.writeFileSync(filePath, jsonData);
+
+            const msg = `🗄️ *Scheduled Backup Complete*\n\n` +
+                `📅 ${new Date().toISOString().replace('T', ' ').substring(0, 19)} UTC\n` +
+                `📊 ${stats.findings} findings | ${stats.subdomains} subdomains | ${stats.httpxResults} assets\n` +
+                `💾 Size: ${fileSizeKb} KB\n` +
+                `📍 Saved to: \`${filePath}\``;
+
+            await sendTelegramNotification(msg);
+
+            return { success: true, message: `Backup saved to ${filePath}`, stats };
+        }
+    } catch (error: any) {
+        console.error("[Backup] Error:", error);
+        await sendTelegramNotification(`⚠️ *Backup Failed*\n\n${error.message}`);
+        return { success: false, message: error.message };
+    }
 }

@@ -13,7 +13,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Clock, Play, Calendar, Bell, BellOff, Globe, Loader2, CheckCircle2, XCircle, Radar, Zap, Shield, FlaskConical, AlertTriangle } from "lucide-react";
+import { Clock, Play, Calendar, Bell, BellOff, Globe, Loader2, CheckCircle2, XCircle, Radar, Zap, Shield, FlaskConical, AlertTriangle, HardDrive, Send, FileText, Eye } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
 interface SchedulerSettings {
@@ -49,9 +49,17 @@ interface Domain {
     total_count: number;
 }
 
+interface BackupSettings {
+    backupEnabled: boolean;
+    backupMode: "local" | "telegram";
+    backupHour: number;
+    notifyDetail: "summary" | "detailed";
+}
+
 export function SchedulerPanel() {
     const [settings, setSettings] = useState<SchedulerSettings | null>(null);
     const [nucleiSettings, setNucleiSettings] = useState<NucleiSettings | null>(null);
+    const [backupSettings, setBackupSettings] = useState<BackupSettings | null>(null);
     const [status, setStatus] = useState<SchedulerStatus | null>(null);
     const [domains, setDomains] = useState<Domain[]>([]);
     const [loading, setLoading] = useState(true);
@@ -71,6 +79,7 @@ export function SchedulerPanel() {
             if (data) {
                 setSettings(data.settings);
                 setNucleiSettings(data.nucleiSettings);
+                setBackupSettings(data.backupSettings);
                 setStatus(data.status);
                 setDomains(data.domains || []);
             }
@@ -187,6 +196,29 @@ export function SchedulerPanel() {
             }
         } catch (e) {
             toast.error("Error saving Nuclei settings");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleBackupSettingsSave = async (updates: Partial<BackupSettings>) => {
+        setSaving(true);
+        try {
+            const res = await fetch("/api/scheduler", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ backupUpdate: updates }),
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                setBackupSettings(data.backupSettings);
+                toast.success("Backup settings saved");
+            } else {
+                toast.error("Failed to save backup settings");
+            }
+        } catch (e) {
+            toast.error("Error saving backup settings");
         } finally {
             setSaving(false);
         }
@@ -486,6 +518,122 @@ export function SchedulerPanel() {
                             />
                             <p className="text-xs text-muted-foreground">Skip auto-Nuclei if more than this many new subdomains</p>
                         </div>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Notification & Backup Settings */}
+            <Card className="border-border bg-card">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Bell className="h-5 w-5 text-amber-400" />
+                        Notification & Backup Settings
+                    </CardTitle>
+                    <CardDescription>
+                        Configure notification detail level and automatic backups.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    {/* Notification Detail Level */}
+                    <div className="space-y-2">
+                        <Label>Notification Detail Level</Label>
+                        <Select
+                            value={backupSettings?.notifyDetail || "summary"}
+                            onValueChange={(value: "summary" | "detailed") => handleBackupSettingsSave({ notifyDetail: value })}
+                            disabled={saving}
+                        >
+                            <SelectTrigger>
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="summary">
+                                    <div className="flex items-center gap-2">
+                                        <FileText className="h-4 w-4 text-green-500" />
+                                        Summary Only (recommended)
+                                    </div>
+                                </SelectItem>
+                                <SelectItem value="detailed">
+                                    <div className="flex items-center gap-2">
+                                        <Eye className="h-4 w-4 text-amber-500" />
+                                        Detailed (includes names)
+                                    </div>
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+
+                        {/* Warning for Detailed mode */}
+                        {backupSettings?.notifyDetail === "detailed" && (
+                            <div className="flex items-start gap-3 rounded-lg border border-amber-500/50 bg-amber-500/10 p-3 text-amber-600 dark:text-amber-400 mt-2">
+                                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                                <div className="text-xs">
+                                    <p className="font-medium">Security Notice</p>
+                                    <p className="text-muted-foreground">Detailed notifications include subdomain names and live host URLs in your Telegram chat.</p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Backup Settings */}
+                    <div className="space-y-4 pt-4 border-t border-border">
+                        <div className="flex items-center justify-between">
+                            <div className="space-y-0.5">
+                                <div className="flex items-center gap-2">
+                                    <HardDrive className="h-4 w-4 text-blue-400" />
+                                    <Label className="text-base">Enable Daily Backup</Label>
+                                </div>
+                                <p className="text-sm text-muted-foreground">
+                                    Automatically backup all data daily at 03:00 UTC
+                                </p>
+                            </div>
+                            <Switch
+                                checked={backupSettings?.backupEnabled || false}
+                                onCheckedChange={(checked) => handleBackupSettingsSave({ backupEnabled: checked })}
+                                disabled={saving}
+                            />
+                        </div>
+
+                        {backupSettings?.backupEnabled && (
+                            <>
+                                <div className="space-y-2">
+                                    <Label>Backup Destination</Label>
+                                    <Select
+                                        value={backupSettings?.backupMode || "local"}
+                                        onValueChange={(value: "local" | "telegram") => handleBackupSettingsSave({ backupMode: value })}
+                                        disabled={saving}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="local">
+                                                <div className="flex items-center gap-2">
+                                                    <HardDrive className="h-4 w-4 text-blue-500" />
+                                                    Local Storage (/data/backups/)
+                                                </div>
+                                            </SelectItem>
+                                            <SelectItem value="telegram">
+                                                <div className="flex items-center gap-2">
+                                                    <Send className="h-4 w-4 text-blue-500" />
+                                                    Telegram (off-site)
+                                                </div>
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                {/* Warning for Telegram backup */}
+                                {backupSettings?.backupMode === "telegram" && (
+                                    <div className="flex items-start gap-3 rounded-lg border border-amber-500/50 bg-amber-500/10 p-3 text-amber-600 dark:text-amber-400">
+                                        <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                                        <div className="text-xs">
+                                            <p className="font-medium">Security Notice</p>
+                                            <p className="text-muted-foreground">Backup files contain all vulnerability findings, subdomains, and HTTPX results. This data will be stored in Telegram&apos;s cloud.</p>
+                                            <p className="text-green-500 mt-1">✓ Benefit: Off-site backup survives server failure</p>
+                                        </div>
+                                    </div>
+                                )}
+                            </>
+                        )}
                     </div>
                 </CardContent>
             </Card>

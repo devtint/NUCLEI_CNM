@@ -10,7 +10,10 @@ import {
     toggleDomainScheduler,
     getNucleiSettings,
     saveNucleiSettings,
-    toggleDomainNuclei
+    toggleDomainNuclei,
+    getBackupSettings,
+    saveBackupSettings,
+    triggerBackup
 } from "@/lib/scheduler";
 
 // GET: Return scheduler settings and status
@@ -23,6 +26,7 @@ export async function GET(req: NextRequest) {
     try {
         const settings = getSchedulerSettings();
         const nucleiSettings = getNucleiSettings();
+        const backupSettings = getBackupSettings();
         const status = getSchedulerStatus();
         const domains = getEnabledDomainsForScheduler();
 
@@ -38,6 +42,7 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({
             settings,
             nucleiSettings,
+            backupSettings,
             status,
             domains: allDomains,
             enabledCount: domains.length
@@ -63,6 +68,28 @@ export async function POST(req: NextRequest) {
         if (body.action === "trigger") {
             await triggerManualRun();
             return NextResponse.json({ success: true, message: "Manual scan triggered" });
+        }
+
+        // Manual backup trigger
+        if (body.action === "backup") {
+            const result = await triggerBackup();
+            return NextResponse.json(result);
+        }
+
+        // Update backup settings
+        if (body.backupUpdate) {
+            const { backupEnabled, backupMode, backupHour, notifyDetail } = body.backupUpdate;
+            const backupUpdates: any = {};
+            if (backupEnabled !== undefined) backupUpdates.backupEnabled = backupEnabled;
+            if (backupMode !== undefined) backupUpdates.backupMode = backupMode;
+            if (backupHour !== undefined) backupUpdates.backupHour = backupHour;
+            if (notifyDetail !== undefined) backupUpdates.notifyDetail = notifyDetail;
+
+            saveBackupSettings(backupUpdates);
+            return NextResponse.json({
+                success: true,
+                backupSettings: getBackupSettings()
+            });
         }
 
         // Toggle domain scheduler

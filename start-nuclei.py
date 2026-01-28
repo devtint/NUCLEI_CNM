@@ -209,6 +209,32 @@ def prompt_update_choice():
         print()
         return False
 
+def prompt_permissions_choice():
+    """Ask user if they want to automatically fix permissions"""
+    print_colored(f"\n{icon('🔧')} Permissions Check", Colors.CYAN)
+    print("If this is your first run, you might see 'no templates provided' errors.")
+    print("This script can fix folder permissions automatically.")
+    print()
+    
+    try:
+        choice = input("Run permission fix? [Y/n] (default: Y): ").strip().lower()
+        print()
+        return choice != 'n'
+    except (KeyboardInterrupt, EOFError):
+        print()
+        return False
+
+def check_permissions_needed():
+    """Check if permission fix is actually needed"""
+    # Check ownership of templates directory inside container
+    cmd = "docker exec nuclei-command-center stat -c '%U' /home/nextjs/nuclei-templates"
+    owner = run_command(cmd, capture_output=True)
+    
+    # If owner is 'root', we need to fix it (should be 'nextjs')
+    if owner and 'root' in owner:
+        return True
+    return False
+
 def main():
     """Main execution flow"""
     # Change to script directory
@@ -245,6 +271,23 @@ def main():
     print_colored(f"\n{icon('🚀')} Starting containers...", Colors.CYAN)
     run_command('docker compose up -d')
     time.sleep(3)
+    
+    # Smart Permission Fix
+    print_colored(f"\n{icon('🔍')} Checking file permissions...", Colors.CYAN)
+    
+    if check_permissions_needed():
+        print_colored(f"   {icon('⚠️', '!')} Detected incorrectly owned files (root)", Colors.YELLOW)
+        
+        # Interactive prompt for fix
+        if prompt_permissions_choice():
+            print_colored(f"{icon('🔧')} Enforcing Correct Permissions...", Colors.CYAN)
+            fix_cmd = "docker exec -u 0 nuclei-command-center chown -R nextjs:nodejs /home/nextjs/nuclei-templates /home/nextjs/nuclei-custom-templates"
+            run_command(fix_cmd, silent=True)
+            print_colored(f"   {icon('✓', '+')} Permissions fixed", Colors.GREEN)
+        else:
+            print_colored(f"   {icon('ℹ', 'i')} Skipping permission fix", Colors.GRAY)
+    else:
+        print_colored(f"   {icon('✓', '+')} Permissions are correct (owned by nextjs)", Colors.GREEN)
     
     # Wait for health
     wait_for_health()

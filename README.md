@@ -248,14 +248,14 @@ docker compose up -d     # Start the application
 > [!IMPORTANT]
 > ### 🛑 First Run: "No templates provided" Error?
 >
-> If your first scan fails with **"no templates provided"**, the templates folder is empty.
+> **The Quick Start Script (`python start-nuclei.py`) will ask to fix this automatically.**
 >
-> **1. Fix Permissions (One-time):**
+> If running manually and you see this error (permissions issue):
 > ```bash
 > docker exec -u 0 nuclei-command-center chown -R nextjs:nodejs /home/nextjs/nuclei-templates /home/nextjs/nuclei-custom-templates
 > ```
 >
-> **2. Download Templates:**
+> **Then Download Templates:**
 > ```bash
 > docker exec nuclei-command-center nuclei -ut
 > ```

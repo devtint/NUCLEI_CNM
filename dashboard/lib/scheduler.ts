@@ -186,16 +186,22 @@ export async function runScheduledScans() {
                 let nucleiSkipped = false;
                 let nucleiSkipReason = "";
 
-                if (domain.nuclei_enabled && httpxResult && httpxResult.liveCount > 0) {
-                    // Safety check: skip if too many new subdomains
-                    if (result.newCount > nucleiSettings.maxNewThreshold) {
+                if (domain.nuclei_enabled) {
+                    if (!settings.autoHttpx) {
                         nucleiSkipped = true;
-                        nucleiSkipReason = `Too many new subdomains (${result.newCount} > ${nucleiSettings.maxNewThreshold}). Manual scan recommended.`;
+                        nucleiSkipReason = "Auto-Probe (HTTPX) is disabled globally. Enable it to run Nuclei.";
                         console.log(`[Scheduler] Skipping Nuclei for ${domain.target}: ${nucleiSkipReason}`);
-                    } else {
-                        console.log(`[Scheduler] Running Nuclei on ${httpxResult.liveCount} live hosts`);
-                        const liveUrls = httpxResult.liveHosts.map(h => h.host);
-                        nucleiResult = await triggerNucleiScan(liveUrls, nucleiSettings);
+                    } else if (httpxResult && httpxResult.liveCount > 0) {
+                        // Safety check: skip if too many new subdomains
+                        if (result.newCount > nucleiSettings.maxNewThreshold) {
+                            nucleiSkipped = true;
+                            nucleiSkipReason = `Too many new subdomains (${result.newCount} > ${nucleiSettings.maxNewThreshold}). Manual scan recommended.`;
+                            console.log(`[Scheduler] Skipping Nuclei for ${domain.target}: ${nucleiSkipReason}`);
+                        } else {
+                            console.log(`[Scheduler] Running Nuclei on ${httpxResult.liveCount} live hosts`);
+                            const liveUrls = httpxResult.liveHosts.map(h => h.host);
+                            nucleiResult = await triggerNucleiScan(liveUrls, nucleiSettings);
+                        }
                     }
                 }
 

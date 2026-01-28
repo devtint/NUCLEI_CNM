@@ -13,7 +13,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Clock, Play, Calendar, Bell, BellOff, Globe, Loader2, CheckCircle2, XCircle, Radar, Zap, Shield, FlaskConical } from "lucide-react";
+import { Clock, Play, Calendar, Bell, BellOff, Globe, Loader2, CheckCircle2, XCircle, Radar, Zap, Shield, FlaskConical, AlertTriangle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
 interface SchedulerSettings {
@@ -380,6 +380,17 @@ export function SchedulerPanel() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
+                    {/* Warning if HTTPX is disabled but Nuclei is enabled for some domains */}
+                    {!settings?.autoHttpx && domains.some(d => d.nuclei_enabled === 1) && (
+                        <div className="flex items-center gap-3 rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-4 text-yellow-600 dark:text-yellow-400">
+                            <AlertTriangle className="h-5 w-5 shrink-0" />
+                            <div className="text-sm">
+                                <p className="font-medium">Auto-Probe is disabled</p>
+                                <p className="text-muted-foreground">Enable "Auto-Probe New Subdomains" above for Nuclei to scan live hosts.</p>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Scan Mode Selector */}
                     <div className="space-y-2">
                         <Label>Scan Mode</Label>

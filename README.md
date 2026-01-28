@@ -246,11 +246,13 @@ docker compose up -d     # Start the application
 *Wait ~30 seconds for the database to initialize.*
 
 > [!IMPORTANT]
-> ### 🛑 First Run: "No templates provided" Error?
+> ### 🛑 First Run: Permission Errors?
 >
-> **The Quick Start Script (`python start-nuclei.py`) will ask to fix this automatically.**
+> If you see **"no templates provided"** or **cannot save custom templates**, your volume permissions are incorrect.
 >
-> If running manually and you see this error (permissions issue):
+> **The Quick Start Script (`python start-nuclei.py`) checks and fixes this automatically.**
+>
+> If running manually and you see these errors:
 > ```bash
 > docker exec -u 0 nuclei-command-center chown -R nextjs:nodejs /home/nextjs/nuclei-templates /home/nextjs/nuclei-custom-templates
 > ```

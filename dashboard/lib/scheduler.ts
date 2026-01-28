@@ -38,19 +38,60 @@ export function saveSchedulerSettings(settings: Partial<SchedulerSettings>) {
     if (settings.lastRun !== undefined && settings.lastRun !== null) setSetting("scheduler_last_run", settings.lastRun.toString());
 }
 
+// Nuclei settings interface
+interface NucleiSettings {
+    scanMode: "quick" | "standard" | "full";
+    templates: string;
+    severity: string;
+    rateLimit: number;
+    concurrency: number;
+    maxNewThreshold: number;
+}
+
+// Get nuclei settings from DB
+export function getNucleiSettings(): NucleiSettings {
+    return {
+        scanMode: (getSetting("nuclei_scan_mode") as NucleiSettings["scanMode"]) || "standard",
+        templates: getSetting("nuclei_templates") || "cves/,exposures/,technologies/",
+        severity: getSetting("nuclei_severity") || "critical,high,medium",
+        rateLimit: parseInt(getSetting("nuclei_rate_limit") || "100", 10),
+        concurrency: parseInt(getSetting("nuclei_concurrency") || "25", 10),
+        maxNewThreshold: parseInt(getSetting("nuclei_max_threshold") || "5", 10)
+    };
+}
+
+// Save nuclei settings to DB
+export function saveNucleiSettings(settings: Partial<NucleiSettings>) {
+    if (settings.scanMode !== undefined) setSetting("nuclei_scan_mode", settings.scanMode);
+    if (settings.templates !== undefined) setSetting("nuclei_templates", settings.templates);
+    if (settings.severity !== undefined) setSetting("nuclei_severity", settings.severity);
+    if (settings.rateLimit !== undefined) setSetting("nuclei_rate_limit", settings.rateLimit.toString());
+    if (settings.concurrency !== undefined) setSetting("nuclei_concurrency", settings.concurrency.toString());
+    if (settings.maxNewThreshold !== undefined) setSetting("nuclei_max_threshold", settings.maxNewThreshold.toString());
+}
+
+// Toggle nuclei_enabled for a specific domain
+export function toggleDomainNuclei(targetId: number, enabled: boolean) {
+    const db = getDatabase();
+    if (!db) return;
+
+    db.prepare("UPDATE monitored_targets SET nuclei_enabled = ? WHERE id = ?")
+        .run(enabled ? 1 : 0, targetId);
+}
+
 // Get enabled domains for scheduled scanning
-export function getEnabledDomainsForScheduler(): { id: number; target: string; last_scan_date: number | null }[] {
+export function getEnabledDomainsForScheduler(): { id: number; target: string; last_scan_date: number | null; nuclei_enabled: number }[] {
     const db = getDatabase();
     if (!db) return [];
 
     const stmt = db.prepare(`
-        SELECT id, target, last_scan_date 
+        SELECT id, target, last_scan_date, nuclei_enabled 
         FROM monitored_targets 
         WHERE scheduler_enabled = 1 
         ORDER BY COALESCE(last_scan_date, 0) ASC
     `);
 
-    return stmt.all() as { id: number; target: string; last_scan_date: number | null }[];
+    return stmt.all() as { id: number; target: string; last_scan_date: number | null; nuclei_enabled: number }[];
 }
 
 // Toggle scheduler_enabled for a specific domain
@@ -113,6 +154,7 @@ export async function runScheduledScans() {
 
     isProcessing = true;
     const settings = getSchedulerSettings();
+    const nucleiSettings = getNucleiSettings();
     const domains = getEnabledDomainsForScheduler();
 
     console.log(`[Scheduler] Running scans for ${domains.length} domains`);
@@ -137,6 +179,24 @@ export async function runScheduledScans() {
                 if (settings.autoHttpx && result.newCount > 0) {
                     console.log(`[Scheduler] Running HTTPX on ${result.newCount} new subdomains`);
                     httpxResult = await triggerHttpxScan(result.newSubdomains);
+                }
+
+                // Run Nuclei if enabled for this domain and we have live hosts
+                let nucleiResult: { findingsCount: number; criticalCount: number; highCount: number } | null = null;
+                let nucleiSkipped = false;
+                let nucleiSkipReason = "";
+
+                if (domain.nuclei_enabled && httpxResult && httpxResult.liveCount > 0) {
+                    // Safety check: skip if too many new subdomains
+                    if (result.newCount > nucleiSettings.maxNewThreshold) {
+                        nucleiSkipped = true;
+                        nucleiSkipReason = `Too many new subdomains (${result.newCount} > ${nucleiSettings.maxNewThreshold}). Manual scan recommended.`;
+                        console.log(`[Scheduler] Skipping Nuclei for ${domain.target}: ${nucleiSkipReason}`);
+                    } else {
+                        console.log(`[Scheduler] Running Nuclei on ${httpxResult.liveCount} live hosts`);
+                        const liveUrls = httpxResult.liveHosts.map(h => h.host);
+                        nucleiResult = await triggerNucleiScan(liveUrls, nucleiSettings);
+                    }
                 }
 
                 // Check if we should send notification
@@ -188,6 +248,21 @@ export async function runScheduledScans() {
                         }
                     } else if (settings.autoHttpx && result.newCount > 0 && !httpxResult) {
                         msg += `\n⚠️ HTTPX probe failed\n`;
+                    }
+
+                    // Nuclei results section
+                    if (nucleiResult && nucleiResult.findingsCount > 0) {
+                        msg += `\n━━━━━━━━━━━━━━━━━━━━━━\n`;
+                        msg += `🔬 *Nuclei Scan Results*\n`;
+                        msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+                        msg += `🎯 Findings: ${nucleiResult.findingsCount}\n`;
+                        if (nucleiResult.criticalCount > 0) msg += `   🔴 Critical: ${nucleiResult.criticalCount}\n`;
+                        if (nucleiResult.highCount > 0) msg += `   🟠 High: ${nucleiResult.highCount}\n`;
+                    } else if (nucleiResult && nucleiResult.findingsCount === 0) {
+                        msg += `\n✓ Nuclei: No vulnerabilities found\n`;
+                    } else if (nucleiSkipped) {
+                        msg += `\n⚠️ *Nuclei Skipped*\n`;
+                        msg += `   ${nucleiSkipReason}\n`;
                     }
 
                     await sendTelegramNotification(msg);
@@ -416,6 +491,149 @@ async function triggerHttpxScan(subdomains: string[]): Promise<{ total: number; 
 
     } catch (e) {
         console.error(`[Scheduler/HTTPX] Error:`, e);
+        return null;
+    }
+}
+
+// Nuclei settings type for function parameter
+interface NucleiScanSettings {
+    scanMode: "quick" | "standard" | "full";
+    templates: string;
+    severity: string;
+    rateLimit: number;
+    concurrency: number;
+}
+
+// Trigger Nuclei scan on a list of live hosts
+async function triggerNucleiScan(liveUrls: string[], settings: NucleiScanSettings): Promise<{ findingsCount: number; criticalCount: number; highCount: number } | null> {
+    const { spawn } = await import("child_process");
+    const fs = await import("fs");
+    const path = await import("path");
+    const os = await import("os");
+    const crypto = await import("crypto");
+    const { NUCLEI_BINARY } = await import("./nuclei/config");
+    const { getDatabase } = await import("./db");
+
+    try {
+        console.log(`[Scheduler/Nuclei] Scanning ${liveUrls.length} live hosts`);
+
+        // Create temp file with targets
+        const tempFile = path.join(os.tmpdir(), `nuclei_scheduler_${Date.now()}.txt`);
+        fs.writeFileSync(tempFile, liveUrls.join("\n"));
+
+        // Build nuclei args based on scan mode
+        const args = ["-l", tempFile, "-json", "-silent"];
+
+        if (settings.scanMode !== "full") {
+            // Add template filter for quick/standard modes
+            if (settings.templates) {
+                args.push("-t", settings.templates);
+            }
+            // Add severity filter
+            if (settings.severity) {
+                args.push("-severity", settings.severity);
+            }
+        }
+
+        args.push("-rl", String(settings.rateLimit));
+        args.push("-c", String(settings.concurrency));
+
+        console.log(`[Scheduler/Nuclei] Running: nuclei ${args.join(" ")}`);
+
+        return new Promise((resolve) => {
+            const child = spawn(NUCLEI_BINARY, args);
+            let jsonOutput = "";
+            const scanId = crypto.randomUUID();
+
+            child.stdout.on("data", (data: Buffer) => {
+                jsonOutput += data.toString();
+            });
+
+            child.stderr.on("data", (data: Buffer) => {
+                console.log(`[Scheduler/Nuclei] ${data.toString().trim()}`);
+            });
+
+            child.on("close", (code: number | null) => {
+                // Cleanup temp file
+                try {
+                    fs.unlinkSync(tempFile);
+                } catch (e) { /* ignore */ }
+
+                try {
+                    const findings: any[] = [];
+                    let criticalCount = 0;
+                    let highCount = 0;
+
+                    const lines = jsonOutput.split("\n");
+                    for (const line of lines) {
+                        if (!line.trim()) continue;
+                        try {
+                            const parsed = JSON.parse(line);
+                            if (parsed.info) {
+                                findings.push(parsed);
+                                const sev = (parsed.info.severity || "").toLowerCase();
+                                if (sev === "critical") criticalCount++;
+                                if (sev === "high") highCount++;
+                            }
+                        } catch (e) {
+                            // Ignore invalid json lines
+                        }
+                    }
+
+                    console.log(`[Scheduler/Nuclei] Found ${findings.length} vulnerabilities`);
+
+                    // Save findings to DB
+                    if (findings.length > 0) {
+                        const db = getDatabase();
+                        const insertStmt = db.prepare(`
+                            INSERT INTO findings (id, target, template_id, template_name, severity, matched_at, extracted_results, timestamp, is_new)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+                        `);
+
+                        for (const finding of findings) {
+                            const findingId = crypto.randomUUID();
+                            try {
+                                insertStmt.run(
+                                    findingId,
+                                    finding.host || finding.url || "",
+                                    finding.info?.["template-id"] || finding["template-id"] || "",
+                                    finding.info?.name || "",
+                                    finding.info?.severity || "",
+                                    finding["matched-at"] || finding.host || "",
+                                    JSON.stringify(finding["extracted-results"] || []),
+                                    Math.floor(Date.now() / 1000)
+                                );
+                            } catch (e: any) {
+                                // Ignore duplicate or insert errors
+                                console.log(`[Scheduler/Nuclei] Insert error (may be duplicate): ${e.message}`);
+                            }
+                        }
+                    }
+
+                    resolve({
+                        findingsCount: findings.length,
+                        criticalCount,
+                        highCount
+                    });
+
+                } catch (error: any) {
+                    console.error("[Scheduler/Nuclei] Error processing results:", error);
+                    resolve(null);
+                }
+            });
+
+            child.on("error", (err: Error) => {
+                console.error(`[Scheduler/Nuclei] Process error: ${err.message}`);
+                // Cleanup temp file
+                try {
+                    fs.unlinkSync(tempFile);
+                } catch (e) { /* ignore */ }
+                resolve(null);
+            });
+        });
+
+    } catch (e) {
+        console.error(`[Scheduler/Nuclei] Error:`, e);
         return null;
     }
 }

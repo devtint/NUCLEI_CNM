@@ -13,7 +13,8 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Clock, Play, Calendar, Bell, BellOff, Globe, Loader2, CheckCircle2, XCircle, Radar } from "lucide-react";
+import { Clock, Play, Calendar, Bell, BellOff, Globe, Loader2, CheckCircle2, XCircle, Radar, Zap, Shield, FlaskConical } from "lucide-react";
+import { Input } from "@/components/ui/input";
 
 interface SchedulerSettings {
     enabled: boolean;
@@ -30,16 +31,27 @@ interface SchedulerStatus {
     nextRun: string | null;
 }
 
+interface NucleiSettings {
+    scanMode: "quick" | "standard" | "full";
+    templates: string;
+    severity: string;
+    rateLimit: number;
+    concurrency: number;
+    maxNewThreshold: number;
+}
+
 interface Domain {
     id: number;
     target: string;
     last_scan_date: number | null;
     scheduler_enabled: number;
+    nuclei_enabled: number;
     total_count: number;
 }
 
 export function SchedulerPanel() {
     const [settings, setSettings] = useState<SchedulerSettings | null>(null);
+    const [nucleiSettings, setNucleiSettings] = useState<NucleiSettings | null>(null);
     const [status, setStatus] = useState<SchedulerStatus | null>(null);
     const [domains, setDomains] = useState<Domain[]>([]);
     const [loading, setLoading] = useState(true);
@@ -58,6 +70,7 @@ export function SchedulerPanel() {
             const data = await res.json();
             if (data) {
                 setSettings(data.settings);
+                setNucleiSettings(data.nucleiSettings);
                 setStatus(data.status);
                 setDomains(data.domains || []);
             }
@@ -134,6 +147,48 @@ export function SchedulerPanel() {
             }
         } catch (e) {
             toast.error("Failed to toggle domain");
+        }
+    };
+
+    const handleNucleiToggle = async (targetId: number, enabled: boolean) => {
+        try {
+            const res = await fetch("/api/scheduler", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "toggleNuclei", targetId, enabled }),
+            });
+
+            if (res.ok) {
+                setDomains(prev => prev.map(d =>
+                    d.id === targetId ? { ...d, nuclei_enabled: enabled ? 1 : 0 } : d
+                ));
+                toast.success(enabled ? "Nuclei enabled" : "Nuclei disabled");
+            }
+        } catch (e) {
+            toast.error("Failed to toggle Nuclei");
+        }
+    };
+
+    const handleNucleiSettingsSave = async (updates: Partial<NucleiSettings>) => {
+        setSaving(true);
+        try {
+            const res = await fetch("/api/scheduler", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ nucleiUpdate: updates }),
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                setNucleiSettings(data.nucleiSettings);
+                toast.success("Nuclei settings saved");
+            } else {
+                toast.error("Failed to save Nuclei settings");
+            }
+        } catch (e) {
+            toast.error("Error saving Nuclei settings");
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -313,6 +368,117 @@ export function SchedulerPanel() {
                 </CardFooter>
             </Card>
 
+            {/* Nuclei Configuration */}
+            <Card className="border-border bg-card">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <FlaskConical className="h-5 w-5 text-green-400" />
+                        Nuclei Scan Configuration
+                    </CardTitle>
+                    <CardDescription>
+                        Configure automatic vulnerability scanning for newly discovered live hosts.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    {/* Scan Mode Selector */}
+                    <div className="space-y-2">
+                        <Label>Scan Mode</Label>
+                        <Select
+                            value={nucleiSettings?.scanMode || "standard"}
+                            onValueChange={(value: "quick" | "standard" | "full") => handleNucleiSettingsSave({ scanMode: value })}
+                            disabled={!settings?.enabled || saving}
+                        >
+                            <SelectTrigger>
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="quick">
+                                    <div className="flex items-center gap-2">
+                                        <Zap className="h-4 w-4 text-yellow-500" />
+                                        Quick (CVEs + Default Logins)
+                                    </div>
+                                </SelectItem>
+                                <SelectItem value="standard">
+                                    <div className="flex items-center gap-2">
+                                        <Shield className="h-4 w-4 text-blue-500" />
+                                        Standard (CVEs + Exposures + Tech)
+                                    </div>
+                                </SelectItem>
+                                <SelectItem value="full">
+                                    <div className="flex items-center gap-2">
+                                        <FlaskConical className="h-4 w-4 text-purple-500" />
+                                        Full Scan (All Templates) ⚠️
+                                    </div>
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    {/* Templates (for non-full modes) */}
+                    {nucleiSettings?.scanMode !== "full" && (
+                        <div className="space-y-2">
+                            <Label>Templates (comma-separated)</Label>
+                            <Input
+                                value={nucleiSettings?.templates || ""}
+                                onChange={(e) => setNucleiSettings(prev => prev ? { ...prev, templates: e.target.value } : prev)}
+                                onBlur={(e) => handleNucleiSettingsSave({ templates: e.target.value })}
+                                placeholder="cves/,exposures/,technologies/"
+                                disabled={!settings?.enabled || saving}
+                            />
+                        </div>
+                    )}
+
+                    {/* Severity (for non-full modes) */}
+                    {nucleiSettings?.scanMode !== "full" && (
+                        <div className="space-y-2">
+                            <Label>Severity (comma-separated)</Label>
+                            <Input
+                                value={nucleiSettings?.severity || ""}
+                                onChange={(e) => setNucleiSettings(prev => prev ? { ...prev, severity: e.target.value } : prev)}
+                                onBlur={(e) => handleNucleiSettingsSave({ severity: e.target.value })}
+                                placeholder="critical,high,medium"
+                                disabled={!settings?.enabled || saving}
+                            />
+                        </div>
+                    )}
+
+                    {/* Performance Settings */}
+                    <div className="grid gap-4 md:grid-cols-3">
+                        <div className="space-y-2">
+                            <Label>Rate Limit (req/s)</Label>
+                            <Input
+                                type="number"
+                                value={nucleiSettings?.rateLimit || 100}
+                                onChange={(e) => setNucleiSettings(prev => prev ? { ...prev, rateLimit: parseInt(e.target.value) || 100 } : prev)}
+                                onBlur={(e) => handleNucleiSettingsSave({ rateLimit: parseInt(e.target.value) || 100 })}
+                                disabled={!settings?.enabled || saving}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Concurrency</Label>
+                            <Input
+                                type="number"
+                                value={nucleiSettings?.concurrency || 25}
+                                onChange={(e) => setNucleiSettings(prev => prev ? { ...prev, concurrency: parseInt(e.target.value) || 25 } : prev)}
+                                onBlur={(e) => handleNucleiSettingsSave({ concurrency: parseInt(e.target.value) || 25 })}
+                                disabled={!settings?.enabled || saving}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Max New Threshold</Label>
+                            <Input
+                                type="number"
+                                value={nucleiSettings?.maxNewThreshold || 5}
+                                onChange={(e) => setNucleiSettings(prev => prev ? { ...prev, maxNewThreshold: parseInt(e.target.value) || 5 } : prev)}
+                                onBlur={(e) => handleNucleiSettingsSave({ maxNewThreshold: parseInt(e.target.value) || 5 })}
+                                disabled={!settings?.enabled || saving}
+                            />
+                            <p className="text-xs text-muted-foreground">Skip auto-Nuclei if more than this many new subdomains</p>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
             {/* Domain List */}
             <Card className="border-border bg-card">
                 <CardHeader>
@@ -321,7 +487,7 @@ export function SchedulerPanel() {
                         Monitored Domains
                     </CardTitle>
                     <CardDescription>
-                        Toggle which domains are included in scheduled scans.
+                        Toggle scheduler and Nuclei scanning for each domain.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -332,6 +498,13 @@ export function SchedulerPanel() {
                         </div>
                     ) : (
                         <div className="space-y-2">
+                            <div className="flex items-center justify-between px-3 py-2 text-xs text-muted-foreground border-b">
+                                <span>Domain</span>
+                                <div className="flex items-center gap-6">
+                                    <span>Scheduler</span>
+                                    <span>Nuclei</span>
+                                </div>
+                            </div>
                             {domains.map((domain) => (
                                 <div
                                     key={domain.id}
@@ -350,10 +523,17 @@ export function SchedulerPanel() {
                                             </p>
                                         </div>
                                     </div>
-                                    <Switch
-                                        checked={domain.scheduler_enabled === 1}
-                                        onCheckedChange={(checked) => handleDomainToggle(domain.id, checked)}
-                                    />
+                                    <div className="flex items-center gap-4">
+                                        <Switch
+                                            checked={domain.scheduler_enabled === 1}
+                                            onCheckedChange={(checked) => handleDomainToggle(domain.id, checked)}
+                                        />
+                                        <Switch
+                                            checked={domain.nuclei_enabled === 1}
+                                            onCheckedChange={(checked) => handleNucleiToggle(domain.id, checked)}
+                                            disabled={domain.scheduler_enabled !== 1}
+                                        />
+                                    </div>
                                 </div>
                             ))}
                         </div>

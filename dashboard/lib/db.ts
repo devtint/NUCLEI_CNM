@@ -216,6 +216,13 @@ function initializeSchema() {
     } catch (e: any) {
         if (!e.message.includes("duplicate column")) { /* ignore */ }
     }
+
+    // Migration: Add nuclei_enabled column to monitored_targets
+    try {
+        db.exec("ALTER TABLE monitored_targets ADD COLUMN nuclei_enabled INTEGER DEFAULT 0");
+    } catch (e: any) {
+        if (!e.message.includes("duplicate column")) { /* ignore */ }
+    }
 }
 
 

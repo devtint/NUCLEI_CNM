@@ -7,7 +7,10 @@ import {
     initScheduler,
     triggerManualRun,
     getEnabledDomainsForScheduler,
-    toggleDomainScheduler
+    toggleDomainScheduler,
+    getNucleiSettings,
+    saveNucleiSettings,
+    toggleDomainNuclei
 } from "@/lib/scheduler";
 
 // GET: Return scheduler settings and status
@@ -19,6 +22,7 @@ export async function GET(req: NextRequest) {
 
     try {
         const settings = getSchedulerSettings();
+        const nucleiSettings = getNucleiSettings();
         const status = getSchedulerStatus();
         const domains = getEnabledDomainsForScheduler();
 
@@ -26,13 +30,14 @@ export async function GET(req: NextRequest) {
         const { getDatabase } = await import("@/lib/db");
         const db = getDatabase();
         const allDomains = db.prepare(`
-            SELECT id, target, last_scan_date, scheduler_enabled, total_count 
+            SELECT id, target, last_scan_date, scheduler_enabled, nuclei_enabled, total_count 
             FROM monitored_targets 
             ORDER BY target ASC
         `).all();
 
         return NextResponse.json({
             settings,
+            nucleiSettings,
             status,
             domains: allDomains,
             enabledCount: domains.length
@@ -70,7 +75,35 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ success: true });
         }
 
-        // Update settings
+        // Toggle domain nuclei
+        if (body.action === "toggleNuclei") {
+            const { targetId, enabled } = body;
+            if (targetId === undefined) {
+                return NextResponse.json({ error: "targetId required" }, { status: 400 });
+            }
+            toggleDomainNuclei(targetId, enabled);
+            return NextResponse.json({ success: true });
+        }
+
+        // Update nuclei settings
+        if (body.nucleiUpdate) {
+            const { scanMode, templates, severity, rateLimit, concurrency, maxNewThreshold } = body.nucleiUpdate;
+            const nucleiUpdates: any = {};
+            if (scanMode !== undefined) nucleiUpdates.scanMode = scanMode;
+            if (templates !== undefined) nucleiUpdates.templates = templates;
+            if (severity !== undefined) nucleiUpdates.severity = severity;
+            if (rateLimit !== undefined) nucleiUpdates.rateLimit = rateLimit;
+            if (concurrency !== undefined) nucleiUpdates.concurrency = concurrency;
+            if (maxNewThreshold !== undefined) nucleiUpdates.maxNewThreshold = maxNewThreshold;
+
+            saveNucleiSettings(nucleiUpdates);
+            return NextResponse.json({
+                success: true,
+                nucleiSettings: getNucleiSettings()
+            });
+        }
+
+        // Update scheduler settings
         const { enabled, frequency, hour, notifyMode, autoHttpx } = body;
 
         const updates: any = {};

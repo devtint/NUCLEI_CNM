@@ -71,13 +71,14 @@ export async function POST(req: NextRequest) {
         }
 
         // Update settings
-        const { enabled, frequency, hour, notifyMode } = body;
+        const { enabled, frequency, hour, notifyMode, autoHttpx } = body;
 
         const updates: any = {};
         if (enabled !== undefined) updates.enabled = enabled;
         if (frequency !== undefined) updates.frequency = frequency;
         if (hour !== undefined) updates.hour = hour;
         if (notifyMode !== undefined) updates.notifyMode = notifyMode;
+        if (autoHttpx !== undefined) updates.autoHttpx = autoHttpx;
 
         saveSchedulerSettings(updates);
 

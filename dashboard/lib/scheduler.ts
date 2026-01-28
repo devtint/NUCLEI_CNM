@@ -12,6 +12,7 @@ interface SchedulerSettings {
     frequency: "6h" | "12h" | "24h" | "168h";
     hour: number;
     notifyMode: "always" | "new_only";
+    autoHttpx: boolean;
     lastRun: number | null;
 }
 
@@ -22,6 +23,7 @@ export function getSchedulerSettings(): SchedulerSettings {
         frequency: (getSetting("scheduler_frequency") as SchedulerSettings["frequency"]) || "24h",
         hour: parseInt(getSetting("scheduler_hour") || "2", 10),
         notifyMode: (getSetting("scheduler_notify_mode") as SchedulerSettings["notifyMode"]) || "new_only",
+        autoHttpx: getSetting("scheduler_auto_httpx") === "true",
         lastRun: getSetting("scheduler_last_run") ? parseInt(getSetting("scheduler_last_run")!, 10) : null
     };
 }
@@ -32,6 +34,7 @@ export function saveSchedulerSettings(settings: Partial<SchedulerSettings>) {
     if (settings.frequency !== undefined) setSetting("scheduler_frequency", settings.frequency);
     if (settings.hour !== undefined) setSetting("scheduler_hour", settings.hour.toString());
     if (settings.notifyMode !== undefined) setSetting("scheduler_notify_mode", settings.notifyMode);
+    if (settings.autoHttpx !== undefined) setSetting("scheduler_auto_httpx", settings.autoHttpx.toString());
     if (settings.lastRun !== undefined && settings.lastRun !== null) setSetting("scheduler_last_run", settings.lastRun.toString());
 }
 
@@ -128,19 +131,33 @@ export async function runScheduledScans() {
             const result = await triggerSubfinderScan(domain.target);
 
             if (result) {
+                // Run HTTPX on new subdomains if enabled
+                let httpxResult: { total: number; liveCount: number; liveHosts: { host: string; statusCode: number; title?: string }[] } | null = null;
+
+                if (settings.autoHttpx && result.newCount > 0) {
+                    console.log(`[Scheduler] Running HTTPX on ${result.newCount} new subdomains`);
+                    httpxResult = await triggerHttpxScan(result.newSubdomains);
+                }
+
                 // Check if we should send notification
                 const shouldNotify = settings.notifyMode === "always" || result.newCount > 0;
 
                 if (shouldNotify) {
-                    const newList = result.newSubdomains.slice(0, 10); // Cap at 10
-                    const hasMore = result.newSubdomains.length > 10;
-
-                    let msg = `🔍 *Scheduled Subfinder Scan*\n\n`;
+                    let msg = `🔍 *Scheduled Recon Scan*\n\n`;
                     msg += `🎯 *Target:* \`${domain.target}\`\n`;
-                    msg += `📊 *Total Subdomains:* ${result.total}\n`;
+                    msg += `⏰ *Completed:* ${new Date().toISOString().replace('T', ' ').substring(0, 19)} UTC\n\n`;
+
+                    // Subfinder results section
+                    msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+                    msg += `📡 *Subfinder Results*\n`;
+                    msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+                    msg += `📊 Total: ${result.total} subdomains\n`;
 
                     if (result.newCount > 0) {
-                        msg += `🆕 *New Discoveries:* ${result.newCount}\n`;
+                        const newList = result.newSubdomains.slice(0, 10);
+                        const hasMore = result.newSubdomains.length > 10;
+
+                        msg += `🆕 New: ${result.newCount} subdomains\n`;
                         newList.forEach(sub => {
                             msg += `   • ${sub}\n`;
                         });
@@ -148,10 +165,30 @@ export async function runScheduledScans() {
                             msg += `   _...and ${result.newSubdomains.length - 10} more_\n`;
                         }
                     } else {
-                        msg += `✓ *No new subdomains detected*\n`;
+                        msg += `✓ No new subdomains detected\n`;
                     }
 
-                    msg += `\n✅ *Status:* Completed`;
+                    // HTTPX results section (if enabled and ran)
+                    if (httpxResult && httpxResult.total > 0) {
+                        msg += `\n━━━━━━━━━━━━━━━━━━━━━━\n`;
+                        msg += `🌐 *HTTPX Probe Results*\n`;
+                        msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+                        msg += `✅ Live: ${httpxResult.liveCount}/${httpxResult.total}\n`;
+
+                        const liveList = httpxResult.liveHosts.slice(0, 10);
+                        const hasMoreLive = httpxResult.liveHosts.length > 10;
+
+                        liveList.forEach(host => {
+                            const title = host.title ? ` - ${host.title.substring(0, 30)}` : '';
+                            msg += `   • ${host.host} [${host.statusCode}]${title}\n`;
+                        });
+
+                        if (hasMoreLive) {
+                            msg += `   _...and ${httpxResult.liveHosts.length - 10} more_\n`;
+                        }
+                    } else if (settings.autoHttpx && result.newCount > 0 && !httpxResult) {
+                        msg += `\n⚠️ HTTPX probe failed\n`;
+                    }
 
                     await sendTelegramNotification(msg);
                 } else {
@@ -288,6 +325,97 @@ async function triggerSubfinderScan(domain: string): Promise<{ total: number; ne
 
     } catch (e) {
         console.error(`[Scheduler] Error during scan for ${domain}:`, e);
+        return null;
+    }
+}
+
+// Trigger HTTPX scan on a list of subdomains
+async function triggerHttpxScan(subdomains: string[]): Promise<{ total: number; liveCount: number; liveHosts: { host: string; statusCode: number; title?: string }[] } | null> {
+    const { spawn } = await import("child_process");
+    const fs = await import("fs");
+    const path = await import("path");
+    const os = await import("os");
+    const { HTTPX_BINARY } = await import("./nuclei/config");
+
+    try {
+        console.log(`[Scheduler/HTTPX] Probing ${subdomains.length} subdomains`);
+
+        // Create temp file with subdomains
+        const tempFile = path.join(os.tmpdir(), `httpx_scheduler_${Date.now()}.txt`);
+        fs.writeFileSync(tempFile, subdomains.join("\n"));
+
+        // Run httpx with JSON output
+        const args = ["-l", tempFile, "-json", "-silent", "-sc", "-title", "-timeout", "10"];
+
+        return new Promise((resolve) => {
+            const child = spawn(HTTPX_BINARY, args);
+            let jsonOutput = "";
+
+            child.stdout.on("data", (data: Buffer) => {
+                jsonOutput += data.toString();
+            });
+
+            child.stderr.on("data", (data: Buffer) => {
+                console.log(`[Scheduler/HTTPX] ${data.toString().trim()}`);
+            });
+
+            child.on("close", (code: number | null) => {
+                // Cleanup temp file
+                try {
+                    fs.unlinkSync(tempFile);
+                } catch (e) { /* ignore */ }
+
+                if (code !== 0 && code !== null) {
+                    console.error(`[Scheduler/HTTPX] Process exited with code ${code}`);
+                    // Still try to parse partial results
+                }
+
+                try {
+                    const liveHosts: { host: string; statusCode: number; title?: string }[] = [];
+                    const lines = jsonOutput.split("\n");
+
+                    for (const line of lines) {
+                        if (!line.trim()) continue;
+                        try {
+                            const parsed = JSON.parse(line);
+                            if (parsed.url || parsed.host) {
+                                liveHosts.push({
+                                    host: parsed.url || parsed.host,
+                                    statusCode: parsed.status_code || parsed["status-code"] || 0,
+                                    title: parsed.title || undefined
+                                });
+                            }
+                        } catch (e) {
+                            // Ignore invalid json lines
+                        }
+                    }
+
+                    console.log(`[Scheduler/HTTPX] Found ${liveHosts.length} live hosts`);
+
+                    resolve({
+                        total: subdomains.length,
+                        liveCount: liveHosts.length,
+                        liveHosts
+                    });
+
+                } catch (error: any) {
+                    console.error("[Scheduler/HTTPX] Error processing results:", error);
+                    resolve(null);
+                }
+            });
+
+            child.on("error", (err: Error) => {
+                console.error(`[Scheduler/HTTPX] Process error: ${err.message}`);
+                // Cleanup temp file
+                try {
+                    fs.unlinkSync(tempFile);
+                } catch (e) { /* ignore */ }
+                resolve(null);
+            });
+        });
+
+    } catch (e) {
+        console.error(`[Scheduler/HTTPX] Error:`, e);
         return null;
     }
 }

@@ -13,13 +13,14 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Clock, Play, Calendar, Bell, BellOff, Globe, ToggleLeft, ToggleRight, Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { Clock, Play, Calendar, Bell, BellOff, Globe, Loader2, CheckCircle2, XCircle, Radar } from "lucide-react";
 
 interface SchedulerSettings {
     enabled: boolean;
     frequency: "6h" | "12h" | "24h" | "168h";
     hour: number;
     notifyMode: "always" | "new_only";
+    autoHttpx: boolean;
     lastRun: number | null;
 }
 
@@ -250,6 +251,24 @@ export function SchedulerPanel() {
                                 </SelectItem>
                             </SelectContent>
                         </Select>
+                    </div>
+
+                    {/* Auto-HTTPX Toggle */}
+                    <div className="flex items-center justify-between rounded-lg border p-4 bg-blue-500/5 border-blue-500/20">
+                        <div className="space-y-0.5">
+                            <div className="flex items-center gap-2">
+                                <Radar className="h-4 w-4 text-blue-400" />
+                                <Label className="text-base">Auto-Probe New Subdomains</Label>
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                                Automatically run HTTPX on newly discovered subdomains to detect live web services
+                            </p>
+                        </div>
+                        <Switch
+                            checked={settings?.autoHttpx || false}
+                            onCheckedChange={(checked) => handleSave({ autoHttpx: checked })}
+                            disabled={!settings?.enabled || saving}
+                        />
                     </div>
 
                     {/* Status Display */}

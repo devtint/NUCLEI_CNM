@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Download, RefreshCw, Filter, Trash2, Copy, ExternalLink, Zap, Terminal } from "lucide-react";
@@ -110,28 +111,30 @@ const HostFilter = ({ hosts, selectedHosts, onToggle, onClear }: HostFilterProps
     );
 };
 
+// Fetch function for React Query
+const fetchFindings = async (): Promise<Finding[]> => {
+    const res = await fetch("/api/findings");
+    if (!res.ok) throw new Error("Failed to fetch findings");
+    return res.json();
+};
+
 export function FindingsTable() {
-    const [findings, setFindings] = useState<Finding[]>([]);
-    const [loading, setLoading] = useState(true);
+    const queryClient = useQueryClient();
+
+    // Use React Query for cached data fetching
+    const { data: findings = [], isLoading: loading, refetch } = useQuery({
+        queryKey: ["findings"],
+        queryFn: fetchFindings,
+        staleTime: 60 * 1000, // 60 seconds
+        gcTime: 5 * 60 * 1000, // 5 minutes cache
+    });
+
     const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null);
     const [severityFilters, setSeverityFilters] = useState<string[]>(["critical", "high", "medium", "low", "unknown"]);
     const [statusFilters, setStatusFilters] = useState<string[]>([]);
     const [hostFilters, setHostFilters] = useState<string[]>([]);
     const [findingToDelete, setFindingToDelete] = useState<Finding | null>(null);
-
-    const fetchFindings = async () => {
-        setLoading(true);
-        try {
-            const res = await fetch("/api/findings");
-            const data = await res.json();
-            setFindings(data);
-        } catch (e) { console.error(e) }
-        finally { setLoading(false); }
-    };
-
-    useEffect(() => {
-        fetchFindings();
-    }, []);
+    const [exporting, setExporting] = useState(false);
 
     const getSeverityColor = (severity: string) => {
         switch (severity.toLowerCase()) {
@@ -154,7 +157,7 @@ export function FindingsTable() {
     };
 
     const exportData = async () => {
-        setLoading(true);
+        setExporting(true);
         try {
             const ExcelJS = (await import('exceljs')).default;
             const workbook = new ExcelJS.Workbook();
@@ -227,7 +230,7 @@ export function FindingsTable() {
             console.error('Export failed:', error);
             alert('Failed to export Excel file');
         } finally {
-            setLoading(false);
+            setExporting(false);
         }
     };
 
@@ -284,7 +287,7 @@ export function FindingsTable() {
                 }),
             });
             toast.success("Finding deleted successfully");
-            fetchFindings();
+            refetch();
         } catch (e) {
             toast.error("Failed to delete finding");
             console.error(e);
@@ -305,7 +308,7 @@ export function FindingsTable() {
             });
 
             if (response.ok) {
-                fetchFindings();
+                refetch();
             } else {
                 alert("Failed to update status");
             }
@@ -362,7 +365,7 @@ export function FindingsTable() {
     });
 
     const exportToPDF = async () => {
-        setLoading(true);
+        setExporting(true);
         try {
             const jsPDF = (await import('jspdf')).default;
             const autoTable = (await import('jspdf-autotable')).default;
@@ -418,7 +421,7 @@ export function FindingsTable() {
             console.error(error);
             alert("Failed to export PDF");
         } finally {
-            setLoading(false);
+            setExporting(false);
         }
     };
 
@@ -498,7 +501,7 @@ export function FindingsTable() {
 
                     <div className="h-6 w-px bg-border mx-1" />
 
-                    <Button variant="outline" size="sm" onClick={fetchFindings} disabled={loading}>
+                    <Button variant="outline" size="sm" onClick={() => refetch()} disabled={loading || exporting}>
                         <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                     </Button>
 

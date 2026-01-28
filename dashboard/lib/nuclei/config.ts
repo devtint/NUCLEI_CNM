@@ -88,9 +88,18 @@ export function constructCommand(config: ScanConfig, outputFile: string): string
     }
 
     if (config.customArgs) {
-        // Simple splitting by space, handles basic flags
-        // For more complex quoting, we might need a parser, but this is sufficient for now
-        const custom = config.customArgs.split(" ").filter(Boolean);
+        // Regex to match non-space sequences OR quoted strings
+        // This allows arguments like: -H "Authorization: Bearer token"
+        const regex = /[^\s"]+|"([^"]*)"/gi;
+        const custom: string[] = [];
+        let match;
+
+        while ((match = regex.exec(config.customArgs)) !== null) {
+            // If match[1] exists, it's the quoted content (without quotes).
+            // Otherwise use the full match (unquoted token).
+            custom.push(match[1] !== undefined ? match[1] : match[0]);
+        }
+
         args.push(...custom);
     }
 

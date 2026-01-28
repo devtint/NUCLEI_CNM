@@ -201,6 +201,14 @@ function initializeSchema() {
             event_type TEXT DEFAULT 'LOGIN'
         )
     `);
+
+    // Create settings table for Global Config
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )
+    `);
 }
 
 
@@ -807,10 +815,23 @@ export function getHttpxResults(scanId?: string) {
 
 export function deleteHttpxScan(id: string) {
     const db = getDatabase();
-    db.transaction(() => {
-        db.prepare("DELETE FROM httpx_results WHERE scan_id = ?").run(id);
-        db.prepare("DELETE FROM httpx_scans WHERE id = ?").run(id);
-    })();
+    if (!db) return;
+
+    db.prepare("DELETE FROM httpx_results WHERE scan_id = ?").run(id);
+    db.prepare("DELETE FROM httpx_scans WHERE id = ?").run(id);
+}
+
+// Settings Operations
+export function getSetting(key: string): string | undefined {
+    const db = getDatabase();
+    const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | undefined;
+    return row?.value;
+}
+
+export function setSetting(key: string, value: string) {
+    const db = getDatabase();
+    const stmt = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
+    stmt.run(key, value);
 }
 
 export function getHttpxDomainSummary() {

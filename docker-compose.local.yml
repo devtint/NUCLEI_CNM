@@ -3,9 +3,8 @@
 services:
   nuclei-cnm:
     image: mrtintnaingwin/nucleicnm:latest
-    # build:
-    #   context: ./dashboard
-    #   dockerfile: Dockerfile
+    # Uncomment below if you want to build from source instead of pulling image
+    # build: ./dashboard
     container_name: nuclei-command-center
     ports:
       - "3000:3000"

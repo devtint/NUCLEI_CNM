@@ -181,6 +181,16 @@
 - **Transaction-Safe Restore**: Atomic restore with rollback on failure
 - **External Import**: Ingest Nuclei JSON from CI/CD pipelines or other sources
 
+### 🔔 Notifications & Integrations
+
+- **Telegram Notifications**: Get instant alerts when scans complete
+  - Configure via **System > General** settings
+  - Supports all scan types: Nuclei, Subfinder, HTTPX
+  - Auto-attaches JSON report files for Nuclei scans
+- **Copy as cURL**: One-click export of HTTP requests from findings
+  - Available in the Finding Details > Request tab
+  - Generates ready-to-paste cURL commands with headers and body
+
 ---
 
 ## Architecture

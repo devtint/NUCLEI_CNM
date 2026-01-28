@@ -3,7 +3,8 @@ import { spawn } from "child_process";
 import path from "path";
 import fs from "fs";
 import { constructCommand, NUCLEI_BINARY } from "@/lib/nuclei/config";
-import { insertScan, updateScan, insertFindings, FindingRecord } from "@/lib/db";
+import { insertScan, updateScan, getScan, insertFindings, getDatabase, FindingRecord } from "@/lib/db";
+import { sendTelegramNotification } from "@/lib/notifications";
 import { cache } from "@/lib/cache";
 import { auth } from "@/auth";
 
@@ -65,7 +66,7 @@ export async function POST(req: NextRequest) {
         });
 
         // Spawn the process
-        console.log(`Starting scan: ${NUCLEI_BINARY} ${args.join(" ")}`);
+        console.log(`Starting scan: ${NUCLEI_BINARY} ${args.join(" ")} `);
         const child = spawn(NUCLEI_BINARY, args);
 
         // Prevent process from waiting for input
@@ -97,8 +98,8 @@ export async function POST(req: NextRequest) {
         });
 
         child.on("error", (err) => {
-            console.error(`Scan ${scanId} failed to start:`, err);
-            logStream.write(`\nFailed to start process: ${err.message}\n`);
+            console.error(`Scan ${scanId} failed to start: `, err);
+            logStream.write(`\nFailed to start process: ${err.message} \n`);
             logStream.end();
             const scan = activeScans.get(scanId);
             if (scan) {
@@ -115,7 +116,7 @@ export async function POST(req: NextRequest) {
         });
 
         child.on("close", async (code) => {
-            console.log(`Scan ${scanId} exited with code ${code}`);
+            console.log(`Scan ${scanId} exited with code ${code} `);
             logStream.end();
 
 
@@ -163,7 +164,7 @@ export async function POST(req: NextRequest) {
                         console.log(`Stored ${findingRecords.length} findings for scan ${scanId}`);
                     }
                 } catch (e) {
-                    console.error(`Failed to parse findings for scan ${scanId}:`, e);
+                    console.error(`Failed to parse findings for scan ${scanId}: `, e);
                 }
             } else {
                 // Create empty file if no results
@@ -182,31 +183,40 @@ export async function POST(req: NextRequest) {
 
                 // Cleanup memory (Fix Memory Leak)
                 // We delay slightly to allow any final polls to see the status
+                // Update database with file metadata in single operation
+                updateScan(scanId, {
+                    status: activeScans.get(scanId)?.status === 'stopped' ? 'stopped' : 'completed',
+                    end_time: Date.now(),
+                    exit_code: code || 0,
+                    json_file_path: filename,
+                    json_file_size: jsonFileSize,
+                    log_file_path: `${scanId}.log`
+                });
+
+                // Send Telegram Notification
+                const count = (await getDatabase().prepare('SELECT COUNT(*) as count FROM findings WHERE scan_id = ?').get(scanId) as any).count;
+                const message = `🚨 *Nuclei Scan Finished*\n\n` +
+                    `🎯 *Target:* \`${target}\`\n` +
+                    `📊 *Findings:* ${count}\n` +
+                    `✅ *Status:* ${code === 0 ? 'Completed' : 'Failed'}`;
+
+                // Send asynchronously
+                sendTelegramNotification(message, outputPath).catch(console.error);
+
+                // Cleanup memory (Fix Memory Leak)
                 setTimeout(() => {
                     activeScans.delete(scanId);
+                    cache.invalidate("scan-history");
+                    cache.invalidatePattern("findings");
                 }, 5000);
             }
-
-            // Update database with file metadata in single operation
-            updateScan(scanId, {
-                status: scan?.status === 'stopped' ? 'stopped' : 'completed',
-                end_time: Date.now(),
-                exit_code: code || 0,
-                json_file_path: filename,
-                json_file_size: jsonFileSize,
-                log_file_path: `${scanId}.log`
-            });
-
-            // Invalidate cache to ensure fresh data
-            cache.invalidate("scan-history");
-            cache.invalidatePattern("findings");
         });
 
         return NextResponse.json({
             success: true,
             scanId,
             message: "Scan started",
-            command: `${NUCLEI_BINARY} ${args.join(" ")}`
+            command: `${NUCLEI_BINARY} ${args.join(" ")} `
         });
 
     } catch (error: any) {
@@ -227,14 +237,14 @@ export async function GET(req: NextRequest) {
         const db = getDatabase();
 
         const scans = db.prepare(`
-            SELECT 
-                id,
-                target,
-                config,
-                start_time,
-                end_time,
-                status,
-                exit_code
+SELECT
+id,
+    target,
+    config,
+    start_time,
+    end_time,
+    status,
+    exit_code
             FROM scans 
             ORDER BY start_time DESC 
             LIMIT 20
@@ -289,7 +299,7 @@ export async function DELETE(req: NextRequest) {
                 end_time: Date.now()
             });
         } catch (e) {
-            console.error(`Failed to kill process ${id}`, e);
+            console.error(`Failed to kill process ${id} `, e);
         }
     }
 

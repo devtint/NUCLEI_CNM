@@ -13,6 +13,7 @@ import {
 } from "@/lib/db";
 import { SUBFINDER_BINARY } from "@/lib/nuclei/config";
 import { auth } from "@/auth";
+import { sendTelegramNotification } from "@/lib/notifications";
 
 export async function POST(req: NextRequest) {
     // Check authentication
@@ -134,6 +135,13 @@ export async function POST(req: NextRequest) {
                         end_time: Date.now(),
                         count: subdomains.length
                     });
+
+                    // Notification
+                    const msg = `🔍 *Subfinder Finished*\n\n` +
+                        `🎯 *Target:* \`${domain}\`\n` +
+                        `📊 *Subdomains Found:* ${subdomains.length}\n` +
+                        `✅ *Status:* Completed`;
+                    sendTelegramNotification(msg).catch(console.error);
                 } catch (error: any) {
                     console.error("Error processing scan results:", error);
                     updateSubfinderScan(scanId, {

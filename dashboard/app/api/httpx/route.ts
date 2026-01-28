@@ -15,6 +15,7 @@ import {
 } from "@/lib/db";
 import { HTTPX_BINARY } from "@/lib/nuclei/config";
 import { auth } from "@/auth";
+import { sendTelegramNotification } from "@/lib/notifications";
 
 
 export async function DELETE(req: NextRequest) {
@@ -296,6 +297,13 @@ export async function POST(req: NextRequest) {
                         end_time: Date.now(),
                         count: results.length
                     });
+
+                    // Notification
+                    const msg = `🌐 *HTTPX Finished*\n\n` +
+                        `🎯 *Target:* \`${targetName}\`\n` +
+                        `📊 *Live Hosts:* ${results.length}\n` +
+                        `✅ *Status:* Completed`;
+                    sendTelegramNotification(msg).catch(console.error);
 
                 } catch (e: any) {
                     console.error("Error processing httpx results:", e);

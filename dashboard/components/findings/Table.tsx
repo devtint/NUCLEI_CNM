@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Download, RefreshCw, Filter, Trash2, Copy, ExternalLink, Zap } from "lucide-react";
+import { Download, RefreshCw, Filter, Trash2, Copy, ExternalLink, Zap, Terminal } from "lucide-react";
 import { toast } from "sonner";
 import {
     DropdownMenu,
@@ -714,7 +714,52 @@ export function FindingsTable() {
                         </TabsContent>
 
                         <TabsContent value="request" className="mt-4">
-                            <ScrollArea className="h-[400px] w-full rounded-md border border-border bg-black/50 p-4">
+                            <div className="flex justify-end mb-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 text-xs border-emerald-500/20 hover:bg-emerald-500/10 hover:text-emerald-500"
+                                    onClick={() => {
+                                        if (!selectedFinding?.request) return;
+                                        try {
+                                            const lines = selectedFinding.request.trim().split('\n');
+                                            const [method] = lines[0].split(' ');
+                                            const url = selectedFinding["matched-at"] || selectedFinding.host;
+
+                                            let cmd = `curl -X ${method} "${url}"`;
+
+                                            let inBody = false;
+                                            let body = "";
+
+                                            for (let i = 1; i < lines.length; i++) {
+                                                const line = lines[i].trim();
+                                                if (!inBody && line === "") {
+                                                    inBody = true;
+                                                    continue;
+                                                }
+                                                if (inBody) {
+                                                    body += line;
+                                                } else if (line.includes(':')) {
+                                                    cmd += ` -H "${line.replace(/"/g, '\\"')}"`;
+                                                }
+                                            }
+
+                                            if (body) {
+                                                cmd += ` -d '${body.replace(/'/g, "'\\''")}'`;
+                                            }
+
+                                            navigator.clipboard.writeText(cmd);
+                                            toast.success("Copied cURL command to clipboard");
+                                        } catch (e) {
+                                            console.error("cURL generation failed", e);
+                                            toast.error("Failed to generate cURL");
+                                        }
+                                    }}
+                                >
+                                    <Terminal className="mr-2 h-3 w-3" /> Copy as cURL
+                                </Button>
+                            </div>
+                            <ScrollArea className="h-[360px] w-full rounded-md border border-border bg-black/50 p-4">
                                 <pre className="text-xs font-mono text-blue-300 whitespace-pre-wrap break-all">
                                     {selectedFinding?.request || "No request data available."}
                                 </pre>

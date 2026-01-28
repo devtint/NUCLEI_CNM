@@ -7,7 +7,7 @@
 > 2. **Fix Permissions**: Run `docker exec -u 0 nuclei-command-center chown -R nextjs:nodejs /home/nextjs/nuclei-custom-templates`
 > 3. **Restart**: Run `docker compose up -d`
 >
-> *See the [Reference Guide below](#-installation--deployment) for full details.*
+> *See the [Installation Guide below](#-installation--deployment) for full details.*
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/projectdiscovery/nuclei/master/static/nuclei-logo.png" alt="Nuclei Command Center" width="200"/>
@@ -47,149 +47,58 @@
 |-----------|----------|
 | CLI-only workflow slows down operations | **One-click preset scans** with configurable parameters |
 | Findings scattered across JSON files | **Centralized SQLite database** with full-text search |
-| No vulnerability lifecycle tracking | **Status management**: New → Confirmed → Fixed → Closed |
-| Team collaboration is difficult | **Import/Export** capabilities with backup & restore |
+| No vulnerability lifecycle tracking | **Status workflow**: New → Confirmed → Fixed → Closed |
+| Manual subdomain monitoring is tedious | **Scheduled scans** with auto-probe and Telegram alerts |
 | No access control for scan operations | **NextAuth v5 integration** with bcrypt password hashing |
-
----
-
-## Screenshots
-
-### 🔐 Authentication
-
-<p align="center">
-  <img src="./screenshots/login_page.png" alt="Login Page" width="800"/>
-  <br/>
-  <em>Secure login with bcrypt-hashed credentials</em>
-</p>
-
----
-
-### 📊 Dashboard & Monitoring
-
-<p align="center">
-  <img src="./screenshots/dashboard.png" alt="Dashboard Overview" width="800"/>
-  <br/>
-  <em>Real-time overview with vulnerability statistics and recent findings</em>
-</p>
-
-<p align="center">
-  <img src="./screenshots/activity_monitor.png" alt="Activity Monitor" width="800"/>
-  <br/>
-  <em>Live scan activity tracking with process management</em>
-</p>
-
----
-
-### 🎯 Vulnerability Scanning
-
-| Nuclei Scanner | Scan History |
-|:--------------:|:------------:|
-| ![Nuclei Scan](./screenshots/nuclei_scan.png) | ![Scan History](./screenshots/scan_history.png) |
-| *Configure and launch Nuclei scans* | *View all past scan results* |
-
-<p align="center">
-  <img src="./screenshots/vuln.png" alt="Vulnerability Findings" width="800"/>
-  <br/>
-  <em>Detailed vulnerability findings with severity classification</em>
-</p>
-
----
-
-### 🌐 Subdomain Discovery (Subfinder)
-
-| Subdomain Scan | Inventory View |
-|:--------------:|:--------------:|
-| ![Subfinder Scan](./screenshots/subfinder_scan.png) | ![Subfinder Inventory](./screenshots/subfinder_inventory.png) |
-| *Launch subdomain enumeration* | *Browse discovered subdomains* |
-
-<p align="center">
-  <img src="./screenshots/subfinder_monitor.png" alt="Subfinder Monitor" width="800"/>
-  <br/>
-  <em>Monitor subdomain discovery progress</em>
-</p>
-
----
-
-### 🔍 HTTP Probing (HTTPX)
-
-| HTTPX Scan | HTTPX Results |
-|:----------:|:-------------:|
-| ![HTTPX Scan](./screenshots/httpx_scan.png) | ![HTTPX Results](./screenshots/httpx_result.png) |
-| *Configure HTTP probing parameters* | *View live host analysis results* |
-
----
-
-### ⚙️ System Administration
-
-| System Settings | Scanner Management |
-|:---------------:|:------------------:|
-| ![System Settings](./screenshots/system_setting.png) | ![System Scanner](./screenshots/system_scanner.png) |
-| *Configure rate limits and performance* | *Manage scanner binaries* |
-
-| Login Records | Backup & Restore |
-|:-------------:|:----------------:|
-| ![Login Records](./screenshots/system_login_record.png) | ![Backup Restore](./screenshots/backup_restore.png) |
-| *Audit authentication events* | *Export and restore all data* |
-
-<p align="center">
-  <img src="./screenshots/custom_templates.png" alt="Custom Templates" width="800"/>
-  <br/>
-  <em>Create and manage custom Nuclei templates</em>
-</p>
 
 ---
 
 ## Features
 
-### 🎯 Vulnerability Management
+### 🎯 Core Scanning
 
-- **Unified Finding Feed**: Aggregate all scan results in a single, filterable interface
-- **Severity Classification**: Color-coded Critical/High/Medium/Low/Info badges
-- **Status Workflow**: Track findings through New → Confirmed → False Positive → Fixed → Closed
-- **Surgical Rescan**: Re-verify individual vulnerabilities with one click
-- **Bulk Export**: CSV exports filtered by severity level
+| Tool | Capabilities |
+|------|--------------|
+| **Nuclei** | 7 preset modes (Full, Critical, CVEs, Tech Detection, etc.) + custom CLI builder |
+| **Subfinder** | Subdomain enumeration with persistent inventory |
+| **HTTPX** | HTTP probing for live host detection with technology fingerprinting |
 
-### ⚡ Scan Operations
+### 📊 Vulnerability Management
 
-- **7 Pre-Configured Presets**:
-  | Preset | Nuclei Flags | Use Case |
-  |--------|--------------|----------|
-  | Full Scan | None | Comprehensive assessment |
-  | Critical Only | `-s critical` | High-priority triage |
-  | High & Critical | `-s critical,high` | Risk-focused scan |
-  | Technology Detection | `-tags tech` | Asset fingerprinting |
-  | Recent CVEs | `-tags cve2023,cve2024` | Patch verification |
-  | Misconfigurations | `-tags misconfig` | Security hardening |
-  | Admin Panels | `-tags panel,login` | Exposed interface detection |
+- **Unified Finding Feed** - All scan results in one filterable, searchable interface
+- **Status Workflow** - Track findings: New → Confirmed → False Positive → Fixed → Closed
+- **Regression Detection** - Auto-detect when fixed vulnerabilities reappear (with Telegram alerts)
+- **Surgical Rescan** - Re-verify individual findings with one click
+- **Bulk Export** - CSV exports filtered by severity level
 
-- **Custom Command Builder**: Full CLI flag support for advanced operators
-- **Real-time Activity Monitor**: Live scan status with duration tracking
-- **Background Processing**: Non-blocking scan execution with process management
+### ⏰ Scheduled Automation
 
-### 🔧 System Management
+- **Automated Monitoring** - Schedule subdomain discovery (6h / 12h / 24h / weekly)
+- **Auto-Probe** - HTTPX automatically scans newly discovered subdomains
+- **Auto-Nuclei** - Vulnerability scanning on new live hosts (with safety threshold)
+- **Per-Domain Control** - Enable/disable scheduler and Nuclei per target
 
-- **Engine Updates**: One-click updates for Nuclei, Subfinder, and HTTPX binaries
-- **Template Management**: Create, edit, and execute custom YAML templates
-- **Performance Tuning**: Configurable rate limits, concurrency, and bulk sizes
-- **Access Logging**: Audit trail for authentication events
+### 🔔 Notifications & Alerts
 
-### 💾 Data Management
+- **Telegram Integration** - Instant alerts for scan completion and regressions
+- **Notification Detail Level** - Choose between:
+  - **Summary Only** (recommended) - Counts only, no sensitive data in chat
+  - **Detailed** - Includes subdomain/host names (with security warning)
 
-- **SQLite Persistence**: Indexed database with foreign key relationships
-- **Full Backup**: Export all scanners' data (Nuclei, Subfinder, HTTPX) to JSON
-- **Transaction-Safe Restore**: Atomic restore with rollback on failure
-- **External Import**: Ingest Nuclei JSON from CI/CD pipelines or other sources
+### �️ Data Management
 
-### 🔔 Notifications & Integrations
+- **Full Backup/Restore** - Export all data (Nuclei, Subfinder, HTTPX) to JSON
+- **Scheduled Backups** - Daily automatic backups with destination choice:
+  - **Local Storage** - Save to `/data/backups/` (default)
+  - **Telegram** - Off-site backup for disaster recovery (with security warning)
+- **External Import** - Ingest Nuclei JSON from CI/CD pipelines or other tools
 
-- **Telegram Notifications**: Get instant alerts when scans complete
-  - Configure via **System > General** settings
-  - Supports all scan types: Nuclei, Subfinder, HTTPX
-  - Auto-attaches JSON report files for Nuclei scans
-- **Copy as cURL**: One-click export of HTTP requests from findings
-  - Available in the Finding Details > Request tab
-  - Generates ready-to-paste cURL commands with headers and body
+### ⚙️ System Administration
+
+- **Scanner Updates** - One-click binary updates for Nuclei, Subfinder, HTTPX
+- **Custom Templates** - Create, edit, and persist custom YAML templates
+- **Performance Tuning** - Configurable rate limits, concurrency, and bulk sizes
+- **Access Logging** - Audit trail for all authentication events
 
 ---
 
@@ -243,8 +152,7 @@
 | **Password Security** | bcrypt (10 rounds) | Secure credential hashing |
 | **Database** | SQLite + better-sqlite3 | Embedded, zero-config persistence |
 | **API** | Next.js Route Handlers | RESTful endpoints with type safety |
-| **Process Mgmt** | Node.js child_process | Nuclei binary execution |
-| **Caching** | In-memory TTL cache | Reduced database load |
+| **Process Mgmt** | Node.js child_process | Binary execution |
 
 ---
 
@@ -256,7 +164,7 @@
 1.  **Docker Desktop** (running).
 2.  That's it.
 
-### Method 1: Docker Compose / docker-compose (Recommended)
+### Method 1: Docker Compose (Recommended)
 
 **Step 1:** Create a project folder:
 ```bash
@@ -309,33 +217,19 @@ volumes:
 ```
 
 **Step 3:** Start the application:
-Run these commands in order to ensure a clean start:
-
 ```bash
-# 1. Stop any existing containers (prevents conflicts)
-docker compose down
-# OR (for older versions)
-docker-compose down
-
-# 2. Pull the latest image
-docker compose pull
-# OR
-docker-compose pull
-
-# 3. Start the application
-docker compose up -d
-# OR
-docker-compose up -d
+docker compose down      # Stop any existing containers
+docker compose pull      # Pull the latest image
+docker compose up -d     # Start the application
 ```
 *Wait ~30 seconds for the database to initialize.*
 
 > [!IMPORTANT]
 > ### 🛑 First Run: "No templates provided" Error?
 >
-> If your first scan fails with **"no templates provided"**, it is because the templates folder is empty.
+> If your first scan fails with **"no templates provided"**, the templates folder is empty.
 >
 > **1. Fix Permissions (One-time):**
-> Docker creates the folder as `root`, but the app needs to write to it. Run this:
 > ```bash
 > docker exec -u 0 nuclei-command-center chown -R nextjs:nodejs /home/nextjs/nuclei-templates /home/nextjs/nuclei-custom-templates
 > ```
@@ -347,12 +241,8 @@ docker-compose up -d
 > *Or click "Update" in the System > Scanners dashboard.*
 
 **Step 4:** Get your HTTPS URL (Cloudflare Tunnel)
-This setup includes a free, secure Cloudflare Tunnel so you can access the dashboard from anywhere without opening ports.
-
 ```bash
 docker compose logs -f cloudflared
-# OR
-docker-compose logs -f cloudflared
 ```
 You will see a URL like: `https://silent-snowflake-9d2a.trycloudflare.com`
 
@@ -365,41 +255,10 @@ You will see a URL like: `https://silent-snowflake-9d2a.trycloudflare.com`
 ---
 
 ### 🏠 Localhost Only (No Tunnel)
-If you do **NOT** want public access and only want to use the dashboard on your local network:
 
-> **Option A:** [Download `docker-compose.local.yml`](https://github.com/devtint/NUCLEI_CNM/blob/main/docker-compose.local.yml), rename it to `docker-compose.yml`, and run `docker compose up -d` (or `docker-compose up -d`).
+If you do **NOT** want public access:
 
-> **Option B:** Copy the code below into a new `docker-compose.yml` file:
-
-```yaml
-services:
-  nuclei-cnm:
-    image: mrtintnaingwin/nucleicnm:latest
-    container_name: nuclei-command-center
-    ports:
-      - "3000:3000"
-    volumes:
-      - nuclei_data:/app/data
-      - nuclei_scans:/app/scans
-      - nuclei_templates:/home/nextjs/nuclei-templates
-      - nuclei_custom_templates:/home/nextjs/nuclei-custom-templates
-    environment:
-      - NODE_ENV=production
-      - DATABASE_PATH=/app/data/nuclei.db
-    restart: unless-stopped
-    healthcheck:
-      test: [ "CMD", "wget", "-q", "--spider", "http://localhost:3000/login" ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
-volumes:
-  nuclei_data:
-  nuclei_scans:
-  nuclei_templates:
-  nuclei_custom_templates:
-```
+> [Download `docker-compose.local.yml`](https://github.com/devtint/NUCLEI_CNM/blob/main/docker-compose.local.yml), rename it to `docker-compose.yml`, and run `docker compose up -d`.
 
 ---
 
@@ -417,57 +276,25 @@ docker run -d \
 ---
 
 ### Alternative: Build from Source
-If you are a developer contributor and want to run from source code (requires installing Go, Node.js manually), please follow the **[Manual Installation Guide](MANUAL_INSTALL.md)**.
 
----
+For developer contributors, see the **[Manual Installation Guide](MANUAL_INSTALL.md)**.
 
 ---
 
 ## 🛠 Maintenance
 
 ### How to Update
-To update to the latest version without losing data:
-
-#### Using Docker Compose / docker-compose (Safe Method)
 ```bash
-# 1. Stop the current version
 docker compose down
-# OR
-docker-compose down
-
-# 2. Pull the latest updates
 docker compose pull
-# OR
-docker-compose pull
-
-# 3. Start the application
 docker compose up -d
-# OR
-docker-compose up -d
-```
-
-#### Using Docker Run
-You must manually stop, remove, and restart:
-```bash
-docker stop nuclei-cnm
-docker rm nuclei-cnm
-# Run the start command again (ensure -v flags point to the SAME folders)
-docker run ... -v ${PWD}/data:/app/data ...
 ```
 
 ### Data Persistence
-We use **Docker Named Volumes** by default (`nuclei_data`, `nuclei_scans`, `nuclei_custom_templates`). This ensures your data survives container updates and is independent of your host directory.
+We use **Docker Named Volumes** (`nuclei_data`, `nuclei_scans`, `nuclei_custom_templates`). Your data survives container updates.
 
-- **Backup Data**:
-  ```bash
-  # Copy database to host
-  docker cp nuclei-command-center:/app/data/nuclei.db ./nuclei.db
-  ```
-- **Access Logs/Scans**:
-  ```bash
-  # List scan results
-  docker exec nuclei-command-center ls -l /app/scans
-  ```
+- **Backup Data**: `docker cp nuclei-command-center:/app/data/nuclei.db ./nuclei.db`
+- **List Scans**: `docker exec nuclei-command-center ls -l /app/scans`
 
 ---
 
@@ -479,28 +306,22 @@ We use **Docker Named Volumes** by default (`nuclei_data`, `nuclei_scans`, `nucl
 ┌──────────────────────────────────────────────────────────────┐
 │                    Security Layers                           │
 ├──────────────────────────────────────────────────────────────┤
-│                                                              │
 │  Layer 1: Edge Middleware (proxy.ts)                        │
 │  ├─ Intercepts ALL requests before routing                  │
 │  ├─ Validates session existence                             │
-│  ├─ Redirects unauthenticated users to /login               │
-│  └─ Enforces HTTPS in production                            │
+│  └─ Redirects unauthenticated users to /login               │
 │                                                              │
 │  Layer 2: API Route Guards                                   │
 │  ├─ Every API handler calls await auth()                    │
-│  ├─ Returns 401 Unauthorized if no session                  │
-│  └─ Prevents direct API access bypass                       │
+│  └─ Returns 401 Unauthorized if no session                  │
 │                                                              │
 │  Layer 3: Password Security                                  │
 │  ├─ Bcrypt hashing with 10 salt rounds                      │
-│  ├─ Timing-safe comparison                                  │
 │  └─ No plaintext password storage                           │
 │                                                              │
 │  Layer 4: Session Management                                 │
 │  ├─ Secure HTTP-only cookies                                │
-│  ├─ CSRF protection (built-in)                              │
-│  └─ Configurable session lifetime                           │
-│                                                              │
+│  └─ CSRF protection (built-in)                              │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -509,23 +330,10 @@ We use **Docker Named Volumes** by default (`nuclei_data`, `nuclei_scans`, `nucl
 | Practice | Implementation |
 |----------|----------------|
 | **Secrets Management** | All secrets in `.env.local` (gitignored) |
-| **Password Policy** | Minimum 12 characters recommended |
 | **SQL Injection** | Prepared statements via better-sqlite3 |
 | **XSS Prevention** | React's built-in escaping + CSP headers |
 | **CSRF Protection** | NextAuth automatic token validation |
 | **Access Logging** | Authentication events logged to database |
-| **Sensitive Data** | Database and scan results excluded from Git |
-
-### Protected Resources
-
-| Resource | Protection Method |
-|----------|-------------------|
-| `/` (Dashboard) | Middleware redirect |
-| `/vulnerabilities` | Middleware redirect |
-| `/api/scan` | 401 if no session |
-| `/api/findings` | 401 if no session |
-| `/api/backup/*` | 401 if no session |
-| `/api/system/*` | 401 if no session |
 
 ---
 
@@ -533,28 +341,13 @@ We use **Docker Named Volumes** by default (`nuclei_data`, `nuclei_scans`, `nucl
 
 ### Environment Variables
 
-#### Local Development
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `ADMIN_PASSWORD_HASH` | ✅ | Bcrypt hash of admin password |
-| `AUTH_SECRET` | ✅ | Session signing secret (32+ chars) |
-| `NODE_ENV` | ❌ | `development` or `production` |
-| `ALLOWED_ORIGINS` | ❌ | Comma-separated allowed origins (default: `localhost:3000`) |
-| `NUCLEI_BINARY` | ❌ | Custom path to Nuclei binary (auto-detected via PATH) |
-| `SUBFINDER_BINARY` | ❌ | Custom path to Subfinder binary (auto-detected via PATH) |
-| `HTTPX_BINARY` | ❌ | Custom path to HTTPX binary (auto-detected via PATH) |
-
-#### Docker Deployment
-
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `ADMIN_PASSWORD_HASH` | ❌ | **Auto-configured via setup wizard** |
 | `AUTH_SECRET` | ❌ | **Auto-generated via setup wizard** |
-| `ALLOWED_ORIGINS` | ❌ | Override for remote access |
 | `DATABASE_PATH` | ❌ | Custom database location (default: `/app/data/nuclei.db`) |
 
-> **Docker Note**: Password and auth secret are configured via the first-run setup wizard. No manual bcrypt hash generation required!
+> **Docker Note**: Password and auth secret are configured via the first-run setup wizard. No manual config required!
 
 ### Performance Tuning
 
@@ -568,8 +361,6 @@ Located in **Settings** within the dashboard:
 
 ---
 
----
-
 ## Project Structure
 
 ```
@@ -580,6 +371,7 @@ NUCLEI_CNM/
 │   │   │   ├── auth/                   # NextAuth endpoints
 │   │   │   ├── scan/                   # Scan CRUD operations
 │   │   │   ├── findings/               # Finding management
+│   │   │   ├── scheduler/              # Scheduled scan settings
 │   │   │   ├── backup/                 # Export/restore
 │   │   │   └── system/                 # Engine updates, health
 │   │   ├── login/                      # Authentication page
@@ -591,21 +383,11 @@ NUCLEI_CNM/
 │   │   └── ui/                         # shadcn/ui primitives
 │   ├── lib/                            # Core Logic
 │   │   ├── db.ts                       # Database operations
-│   │   ├── cache.ts                    # TTL caching
-│   │   ├── env.ts                      # Environment handling
+│   │   ├── scheduler.ts                # Scheduled scan logic
+│   │   ├── notifications.ts            # Telegram integration
 │   │   └── nuclei/                     # Config, presets
-│   ├── proxy.ts                        # Authentication middleware
-│   ├── auth.ts                         # Credentials provider
-│   ├── auth.config.ts                  # NextAuth config
-│   └── scans/                          # Scan output (gitignored)
-├── Refrencce and Usage And Guide/      # Technical Documentation
-│   ├── GETTING_STARTED.md
-│   ├── AUTHENTICATION.md
-│   ├── ARCHITECTURE.md
-│   ├── API_REFERENCE.md
-│   ├── FEATURES.md
-│   └── COMPONENTS.md
-├── .gitignore                          # Security-conscious ignores
+│   └── proxy.ts                        # Authentication middleware
+├── Reference and Usage And Guide/      # Technical Documentation
 └── README.md                           # This file
 ```
 
@@ -619,8 +401,6 @@ NUCLEI_CNM/
 | [AUTHENTICATION.md](./Refrencce%20and%20Usage%20And%20Guide/AUTHENTICATION.md) | Security implementation details |
 | [ARCHITECTURE.md](./Refrencce%20and%20Usage%20And%20Guide/ARCHITECTURE.md) | System design and data flow |
 | [API_REFERENCE.md](./Refrencce%20and%20Usage%20And%20Guide/API_REFERENCE.md) | Endpoint specifications |
-| [FEATURES.md](./Refrencce%20and%20Usage%20And%20Guide/FEATURES.md) | Feature catalog |
-| [COMPONENTS.md](./Refrencce%20and%20Usage%20And%20Guide/COMPONENTS.md) | React component documentation |
 
 ---
 
@@ -635,11 +415,9 @@ NUCLEI_CNM/
 ### Commit Convention
 
 This project follows [Conventional Commits](https://www.conventionalcommits.org/):
-
 - `feat:` New feature
 - `fix:` Bug fix
 - `docs:` Documentation
-- `refactor:` Code refactoring
 - `security:` Security improvements
 
 ---

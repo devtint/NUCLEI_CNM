@@ -322,6 +322,7 @@ export function FindingsTable() {
             case "False Positive": return "bg-gray-500/20 text-gray-500 border-gray-500/50";
             case "Fixed": return "bg-green-500/20 text-green-500 border-green-500/50";
             case "Closed": return "bg-purple-500/20 text-purple-500 border-purple-500/50";
+            case "Regression": return "bg-orange-500/20 text-orange-500 border-orange-500/50";
             default: return "bg-zinc-500/20 text-zinc-500 border-zinc-500/50";
         }
     };

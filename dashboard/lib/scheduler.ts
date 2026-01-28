@@ -559,7 +559,7 @@ async function triggerNucleiScan(liveUrls: string[], settings: NucleiScanSetting
                 console.log(`[Scheduler/Nuclei] ${data.toString().trim()}`);
             });
 
-            child.on("close", (code: number | null) => {
+            child.on("close", async (code: number | null) => {
                 // Cleanup temp file
                 try {
                     fs.unlinkSync(tempFile);
@@ -588,30 +588,59 @@ async function triggerNucleiScan(liveUrls: string[], settings: NucleiScanSetting
 
                     console.log(`[Scheduler/Nuclei] Found ${findings.length} vulnerabilities`);
 
-                    // Save findings to DB
+                    // Save findings to DB using upsertFinding for proper deduplication and regression detection
+                    const regressions: { templateName: string; host: string; severity: string }[] = [];
+
                     if (findings.length > 0) {
-                        const db = getDatabase();
-                        const insertStmt = db.prepare(`
-                            INSERT INTO findings (id, target, template_id, template_name, severity, matched_at, extracted_results, timestamp, is_new)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
-                        `);
+                        const { upsertFinding } = await import("./db");
 
                         for (const finding of findings) {
-                            const findingId = crypto.randomUUID();
                             try {
-                                insertStmt.run(
-                                    findingId,
-                                    finding.host || finding.url || "",
-                                    finding.info?.["template-id"] || finding["template-id"] || "",
-                                    finding.info?.name || "",
-                                    finding.info?.severity || "",
-                                    finding["matched-at"] || finding.host || "",
-                                    JSON.stringify(finding["extracted-results"] || []),
-                                    Math.floor(Date.now() / 1000)
-                                );
+                                const result = upsertFinding({
+                                    scan_id: `scheduled-${Date.now()}`,
+                                    template_id: finding.info?.["template-id"] || finding["template-id"] || "",
+                                    template_path: finding["template-path"] || "",
+                                    name: finding.info?.name || "",
+                                    severity: finding.info?.severity || "",
+                                    type: finding.type || "http",
+                                    host: finding.host || "",
+                                    matched_at: finding["matched-at"] || finding.host || "",
+                                    request: finding.request || "",
+                                    response: finding.response || "",
+                                    timestamp: new Date().toISOString(),
+                                    raw_json: JSON.stringify(finding),
+                                    status: "New",
+                                    matcher_name: finding["matcher-name"] || ""
+                                });
+
+                                // Track regressions for notification
+                                if (result.isRegression && result.templateName && result.host) {
+                                    regressions.push({
+                                        templateName: result.templateName,
+                                        host: result.host,
+                                        severity: result.severity || "unknown"
+                                    });
+                                }
                             } catch (e: any) {
-                                // Ignore duplicate or insert errors
-                                console.log(`[Scheduler/Nuclei] Insert error (may be duplicate): ${e.message}`);
+                                console.log(`[Scheduler/Nuclei] Upsert error: ${e.message}`);
+                            }
+                        }
+
+                        // Send Telegram notification for regressions
+                        if (regressions.length > 0) {
+                            try {
+                                let notifMsg = `⚠️ *Vulnerability Regression Detected*\n\n`;
+                                notifMsg += `${regressions.length} previously fixed finding(s) have reappeared:\n\n`;
+                                regressions.slice(0, 5).forEach(r => {
+                                    notifMsg += `• *${r.templateName}* [${r.severity}]\n`;
+                                    notifMsg += `  on \`${r.host}\`\n`;
+                                });
+                                if (regressions.length > 5) {
+                                    notifMsg += `\n_...and ${regressions.length - 5} more_`;
+                                }
+                                await sendTelegramNotification(notifMsg);
+                            } catch (e) {
+                                console.error("[Scheduler/Nuclei] Failed to send regression notification:", e);
                             }
                         }
                     }

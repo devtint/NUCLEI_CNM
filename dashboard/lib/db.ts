@@ -353,7 +353,8 @@ export function generateFindingHash(
 }
 
 // Upsert finding (insert new or update existing based on hash)
-export function upsertFinding(finding: FindingRecord) {
+// Returns info about the operation (isNew, isRegression, finding details)
+export function upsertFinding(finding: FindingRecord): { isNew: boolean; isRegression: boolean; templateName?: string; host?: string; severity?: string } {
     const db = getDatabase();
     const hash = generateFindingHash(finding.template_id, finding.host, finding.matched_at, finding.name, finding.matcher_name);
     const now = Math.floor(Date.now() / 1000);
@@ -364,10 +365,12 @@ export function upsertFinding(finding: FindingRecord) {
     if (existing) {
         // Finding already exists - update it
         let newStatus = existing.status || 'New';
+        let isRegression = false;
 
         // Regression detection: if previously Fixed/Closed, mark as Regression
         if (newStatus === 'Fixed' || newStatus === 'Closed') {
             newStatus = 'Regression';
+            isRegression = true;
         }
 
         const updateStmt = db.prepare(`
@@ -380,6 +383,14 @@ export function upsertFinding(finding: FindingRecord) {
             WHERE finding_hash = ?
         `);
         updateStmt.run(now, newStatus, finding.scan_id, finding.raw_json, finding.timestamp, hash);
+
+        return {
+            isNew: false,
+            isRegression,
+            templateName: finding.name,
+            host: finding.host,
+            severity: finding.severity
+        };
     } else {
         // New finding - insert it
         const insertStmt = db.prepare(`
@@ -407,6 +418,8 @@ export function upsertFinding(finding: FindingRecord) {
             now,
             now
         );
+
+        return { isNew: true, isRegression: false };
     }
 }
 

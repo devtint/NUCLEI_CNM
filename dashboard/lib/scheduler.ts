@@ -172,62 +172,119 @@ export async function runScheduledScans() {
     console.log("[Scheduler] All scheduled scans completed");
 }
 
-// Trigger a subfinder scan and wait for completion
+// Trigger a subfinder scan and wait for completion (direct process spawn)
 async function triggerSubfinderScan(domain: string): Promise<{ total: number; newCount: number; newSubdomains: string[] } | null> {
+    const { spawn } = await import("child_process");
+    const fs = await import("fs");
+    const path = await import("path");
+    const crypto = await import("crypto");
+    const { SUBFINDER_BINARY } = await import("./nuclei/config");
+    const { insertSubfinderScan, updateSubfinderScan, saveSubfinderResults, getDatabase } = await import("./db");
+
     try {
-        // Call the internal API to start a scan
-        const startResponse = await fetch(`http://localhost:3000/api/subfinder`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ domain, isScheduled: true })
+        const scanId = crypto.randomUUID();
+
+        // Insert scan record
+        insertSubfinderScan({
+            id: scanId,
+            target: domain,
+            start_time: Date.now(),
+            status: 'running',
+            count: 0
         });
 
-        if (!startResponse.ok) {
-            console.error(`[Scheduler] Failed to start scan for ${domain}`);
-            return null;
+        const cmdArgs = ["-d", domain, "-json"];
+        console.log(`[Scheduler] Starting subfinder: ${SUBFINDER_BINARY} ${cmdArgs.join(" ")}`);
+
+        const scansDir = path.join(process.cwd(), "scans");
+        if (!fs.existsSync(scansDir)) {
+            fs.mkdirSync(scansDir, { recursive: true });
         }
 
-        const { scanId } = await startResponse.json();
+        return new Promise((resolve) => {
+            const child = spawn(SUBFINDER_BINARY, cmdArgs);
+            let jsonOutput = "";
 
-        // Poll for completion (max 10 minutes)
-        const maxWait = 10 * 60 * 1000;
-        const pollInterval = 5000;
-        const startTime = Date.now();
+            child.stdout.on("data", (data: Buffer) => {
+                jsonOutput += data.toString();
+            });
 
-        while (Date.now() - startTime < maxWait) {
-            await new Promise(resolve => setTimeout(resolve, pollInterval));
+            child.stderr.on("data", (data: Buffer) => {
+                // Log stderr for debugging
+                console.log(`[Scheduler/Subfinder] ${data.toString().trim()}`);
+            });
 
-            const statusResponse = await fetch(`http://localhost:3000/api/subfinder?scanId=${scanId}`);
-            if (!statusResponse.ok) continue;
+            child.on("close", (code: number | null) => {
+                if (code !== 0) {
+                    updateSubfinderScan(scanId, {
+                        status: 'failed',
+                        end_time: Date.now()
+                    });
+                    resolve(null);
+                    return;
+                }
 
-            const data = await statusResponse.json();
-            const scan = data.scans?.find((s: any) => s.id === scanId);
+                try {
+                    // Parse JSONL results
+                    const subdomains: string[] = [];
+                    const lines = jsonOutput.split("\n");
+                    for (const line of lines) {
+                        if (!line.trim()) continue;
+                        try {
+                            const parsed = JSON.parse(line);
+                            if (parsed.host) {
+                                subdomains.push(parsed.host);
+                            }
+                        } catch (e) {
+                            // ignore invalid json lines
+                        }
+                    }
 
-            if (scan && scan.status === "completed") {
-                // Get the results with new subdomain info
-                const resultsResponse = await fetch(`http://localhost:3000/api/subfinder?scanId=${scanId}&results=true`);
-                if (resultsResponse.ok) {
-                    const resultsData = await resultsResponse.json();
-                    const results = resultsData.results || [];
-                    const newSubdomains = results.filter((r: any) => r.is_new).map((r: any) => r.subdomain);
+                    console.log(`[Scheduler] Parsed ${subdomains.length} subdomains for ${domain}`);
 
-                    return {
-                        total: results.length,
+                    // Save results - this function marks new subdomains with is_new flag
+                    saveSubfinderResults(scanId, domain, subdomains);
+
+                    // Update scan status
+                    updateSubfinderScan(scanId, {
+                        status: 'completed',
+                        end_time: Date.now(),
+                        count: subdomains.length
+                    });
+
+                    // Query for new subdomains from this scan
+                    const db = getDatabase();
+                    const newResults = db.prepare(
+                        "SELECT subdomain FROM subfinder_results WHERE scan_id = ? AND is_new = 1"
+                    ).all(scanId) as { subdomain: string }[];
+
+                    const newSubdomains = newResults.map(r => r.subdomain);
+
+                    resolve({
+                        total: subdomains.length,
                         newCount: newSubdomains.length,
                         newSubdomains
-                    };
+                    });
+
+                } catch (error: any) {
+                    console.error("[Scheduler] Error processing scan results:", error);
+                    updateSubfinderScan(scanId, {
+                        status: 'failed',
+                        end_time: Date.now()
+                    });
+                    resolve(null);
                 }
-                return { total: scan.count || 0, newCount: 0, newSubdomains: [] };
-            }
+            });
 
-            if (scan && scan.status === "failed") {
-                console.error(`[Scheduler] Scan failed for ${domain}`);
-                return null;
-            }
-        }
-
-        console.error(`[Scheduler] Scan timed out for ${domain}`);
-        return null;
+            child.on("error", (err: Error) => {
+                console.error(`[Scheduler] Process error: ${err.message}`);
+                updateSubfinderScan(scanId, {
+                    status: 'failed',
+                    end_time: Date.now()
+                });
+                resolve(null);
+            });
+        });
 
     } catch (e) {
         console.error(`[Scheduler] Error during scan for ${domain}:`, e);

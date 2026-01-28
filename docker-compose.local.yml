@@ -15,6 +15,7 @@ services:
       - nuclei_scans:/app/scans
       # Nuclei templates (speeds up container restarts)
       - nuclei_templates:/home/nextjs/nuclei-templates
+      - nuclei_custom_templates:/home/nextjs/nuclei-custom-templates
     # env_file:
     #   - .env.docker
     environment:
@@ -32,3 +33,4 @@ volumes:
   nuclei_data:
   nuclei_scans:
   nuclei_templates:
+  nuclei_custom_templates:

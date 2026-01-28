@@ -8,6 +8,7 @@ services:
       - nuclei_data:/app/data
       - nuclei_scans:/app/scans
       - nuclei_templates:/home/nextjs/nuclei-templates
+      - nuclei_custom_templates:/home/nextjs/nuclei-custom-templates
     environment:
       - NODE_ENV=production
       - DATABASE_PATH=/app/data/nuclei.db
@@ -31,3 +32,4 @@ volumes:
   nuclei_data:
   nuclei_scans:
   nuclei_templates:
+  nuclei_custom_templates:

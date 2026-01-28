@@ -260,6 +260,7 @@ services:
       - nuclei_data:/app/data
       - nuclei_scans:/app/scans
       - nuclei_templates:/home/nextjs/nuclei-templates
+      - nuclei_custom_templates:/home/nextjs/nuclei-custom-templates
     environment:
       - NODE_ENV=production
       - DATABASE_PATH=/app/data/nuclei.db
@@ -283,6 +284,7 @@ volumes:
   nuclei_data:
   nuclei_scans:
   nuclei_templates:
+  nuclei_custom_templates:
 ```
 
 **Step 3:** Start the application:
@@ -314,7 +316,7 @@ docker-compose up -d
 > **1. Fix Permissions (One-time):**
 > Docker creates the folder as `root`, but the app needs to write to it. Run this:
 > ```bash
-> docker exec -u 0 nuclei-command-center chown -R nextjs:nodejs /home/nextjs/nuclei-templates
+> docker exec -u 0 nuclei-command-center chown -R nextjs:nodejs /home/nextjs/nuclei-templates /home/nextjs/nuclei-custom-templates
 > ```
 >
 > **2. Download Templates:**
@@ -359,6 +361,7 @@ services:
       - nuclei_data:/app/data
       - nuclei_scans:/app/scans
       - nuclei_templates:/home/nextjs/nuclei-templates
+      - nuclei_custom_templates:/home/nextjs/nuclei-custom-templates
     environment:
       - NODE_ENV=production
       - DATABASE_PATH=/app/data/nuclei.db
@@ -374,6 +377,7 @@ volumes:
   nuclei_data:
   nuclei_scans:
   nuclei_templates:
+  nuclei_custom_templates:
 ```
 
 ---
@@ -431,7 +435,7 @@ docker run ... -v ${PWD}/data:/app/data ...
 ```
 
 ### Data Persistence
-We use **Docker Named Volumes** by default (`nuclei_data`, `nuclei_scans`). This ensures your data survives container updates and is independent of your host directory.
+We use **Docker Named Volumes** by default (`nuclei_data`, `nuclei_scans`, `nuclei_custom_templates`). This ensures your data survives container updates and is independent of your host directory.
 
 - **Backup Data**:
   ```bash

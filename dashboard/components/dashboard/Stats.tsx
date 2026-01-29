@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, AlertTriangle, Shield, FileText, Loader2 } from "lucide-react";
+import { Activity, AlertTriangle, Shield, FileText, Loader2, Globe, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 interface SeverityCounts {
@@ -43,7 +43,27 @@ export function DashboardStats({ refreshTrigger = 0 }) {
         gcTime: 5 * 60 * 1000,
     });
 
-    const loading = loadingFindings || loadingHistory;
+    const { data: domains = [], isLoading: loadingDomains } = useQuery({
+        queryKey: ["domains"],
+        queryFn: async () => {
+            const res = await fetch("/api/subfinder/inventory");
+            if (!res.ok) throw new Error("Failed to fetch domains");
+            return res.json();
+        },
+        staleTime: 60 * 1000,
+    });
+
+    const { data: scheduler = {}, isLoading: loadingScheduler } = useQuery({
+        queryKey: ["scheduler-status"],
+        queryFn: async () => {
+            const res = await fetch("/api/scheduler/status");
+            if (!res.ok) throw new Error("Failed to fetch scheduler status");
+            return res.json();
+        },
+        staleTime: 60 * 1000,
+    });
+
+    const loading = loadingFindings || loadingHistory || loadingDomains || loadingScheduler;
 
     // Calculate severity counts from cached findings
     const counts: SeverityCounts = { critical: 0, high: 0, medium: 0, low: 0, info: 0, total: findings.length };
@@ -61,11 +81,31 @@ export function DashboardStats({ refreshTrigger = 0 }) {
         lastScanTime = new Date(last.date).toLocaleString();
     }
 
+    // Calculate next run time
+    let nextRunTime = "Disabled";
+    if (scheduler.enabled) {
+        if (scheduler.nextRun) {
+            const nextRun = new Date(scheduler.nextRun);
+            const now = new Date();
+            const diff = nextRun.getTime() - now.getTime();
+
+            if (diff > 0) {
+                const hours = Math.floor(diff / (1000 * 60 * 60));
+                const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                nextRunTime = `In ${hours}h ${minutes}m`;
+            } else {
+                nextRunTime = "Due Now";
+            }
+        } else {
+            nextRunTime = "Scheduled";
+        }
+    }
+
     if (loading) {
         return (
             <div className="space-y-6">
-                <div className="grid gap-4 md:grid-cols-3">
-                    {[1, 2, 3].map(i => (
+                <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
+                    {[1, 2, 3, 4, 5].map(i => (
                         <Card key={i} className="bg-card border-border shadow-sm h-[100px] flex items-center justify-center">
                             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                         </Card>
@@ -78,7 +118,7 @@ export function DashboardStats({ refreshTrigger = 0 }) {
     return (
         <div className="space-y-6">
             {/* Top Stats */}
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
                 <Card className="bg-card border-border shadow-sm">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium text-foreground">Total Scans</CardTitle>
@@ -92,12 +132,36 @@ export function DashboardStats({ refreshTrigger = 0 }) {
 
                 <Card className="bg-card border-border shadow-sm">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium text-foreground">Monitored Domains</CardTitle>
+                        <Globe className="h-4 w-4 text-blue-400" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold text-foreground">{domains.length || 0}</div>
+                        <p className="text-xs text-muted-foreground">In persistent inventory</p>
+                    </CardContent>
+                </Card>
+
+                <Card className="bg-card border-border shadow-sm">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium text-foreground">Total Findings</CardTitle>
                         <AlertTriangle className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-foreground">{counts.total}</div>
                         <p className="text-xs text-muted-foreground">Across all scans</p>
+                    </CardContent>
+                </Card>
+
+                <Card className="bg-card border-border shadow-sm">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium text-foreground">Automation</CardTitle>
+                        <Zap className="h-4 w-4 text-yellow-400" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold text-foreground">{nextRunTime}</div>
+                        <p className="text-xs text-muted-foreground">
+                            {scheduler.enabled ? `${scheduler.enabledDomains || 0} domains active` : "Scheduler paused"}
+                        </p>
                     </CardContent>
                 </Card>
 

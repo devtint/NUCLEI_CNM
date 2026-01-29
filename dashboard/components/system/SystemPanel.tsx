@@ -5,8 +5,7 @@ import { ScannerConfig } from "./ScannerConfig";
 import { AccessLogTable } from "./AccessLogTable";
 import { ScannersManager } from "./ScannersManager";
 import { SettingsPanel } from "./SettingsPanel";
-import { SchedulerPanel } from "./SchedulerPanel";
-import { Settings, ShieldAlert, Cpu, Clock } from "lucide-react";
+import { Settings, ShieldAlert, Cpu } from "lucide-react";
 
 export function SystemPanel() {
     return (
@@ -30,10 +29,6 @@ export function SystemPanel() {
                         <ShieldAlert className="mr-2 h-4 w-4" />
                         Security Audit
                     </TabsTrigger>
-                    <TabsTrigger value="scheduler" className="data-[state=active]:bg-background">
-                        <Clock className="mr-2 h-4 w-4" />
-                        Scheduler
-                    </TabsTrigger>
                     <TabsTrigger value="general" className="data-[state=active]:bg-background">
                         <Settings className="mr-2 h-4 w-4" />
                         General
@@ -50,10 +45,6 @@ export function SystemPanel() {
 
                 <TabsContent value="audit" className="mt-6">
                     <AccessLogTable />
-                </TabsContent>
-
-                <TabsContent value="scheduler" className="mt-6">
-                    <SchedulerPanel />
                 </TabsContent>
 
                 <TabsContent value="general" className="mt-6">

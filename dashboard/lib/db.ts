@@ -210,6 +210,24 @@ function initializeSchema() {
         )
     `);
 
+    // Create scheduler_logs table for Automation History
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS scheduler_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            domain TEXT NOT NULL,
+            started_at INTEGER NOT NULL,
+            completed_at INTEGER,
+            status TEXT DEFAULT 'running',
+            subdomains_total INTEGER DEFAULT 0,
+            subdomains_new INTEGER DEFAULT 0,
+            live_hosts INTEGER DEFAULT 0,
+            findings_count INTEGER DEFAULT 0,
+            error_message TEXT,
+            created_at INTEGER DEFAULT (strftime('%s', 'now'))
+        )
+    `);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_scheduler_logs_started ON scheduler_logs(started_at DESC);`);
+
     // Migration: Add scheduler_enabled column to monitored_targets
     try {
         db.exec("ALTER TABLE monitored_targets ADD COLUMN scheduler_enabled INTEGER DEFAULT 1");
@@ -911,4 +929,81 @@ export function getAccessLogs(limit: number = 50) {
     return db.prepare(`
         SELECT * FROM access_logs ORDER BY timestamp DESC LIMIT ?
     `).all(limit);
+}
+
+// Scheduler Log Helpers
+export interface SchedulerLog {
+    id?: number;
+    domain: string;
+    started_at: number;
+    completed_at?: number;
+    status: 'running' | 'completed' | 'error';
+    subdomains_total: number;
+    subdomains_new: number;
+    live_hosts: number;
+    findings_count: number;
+    error_message?: string;
+}
+
+export function insertSchedulerLog(domain: string): number {
+    const db = getDatabase();
+    const stmt = db.prepare(`
+        INSERT INTO scheduler_logs (domain, started_at, status)
+        VALUES (?, ?, 'running')
+    `);
+    const result = stmt.run(domain, Date.now());
+    return result.lastInsertRowid as number;
+}
+
+export function updateSchedulerLog(id: number, updates: Partial<SchedulerLog>) {
+    const db = getDatabase();
+    const fields: string[] = [];
+    const values: any[] = [];
+
+    if (updates.completed_at !== undefined) {
+        fields.push('completed_at = ?');
+        values.push(updates.completed_at);
+    }
+    if (updates.status !== undefined) {
+        fields.push('status = ?');
+        values.push(updates.status);
+    }
+    if (updates.subdomains_total !== undefined) {
+        fields.push('subdomains_total = ?');
+        values.push(updates.subdomains_total);
+    }
+    if (updates.subdomains_new !== undefined) {
+        fields.push('subdomains_new = ?');
+        values.push(updates.subdomains_new);
+    }
+    if (updates.live_hosts !== undefined) {
+        fields.push('live_hosts = ?');
+        values.push(updates.live_hosts);
+    }
+    if (updates.findings_count !== undefined) {
+        fields.push('findings_count = ?');
+        values.push(updates.findings_count);
+    }
+    if (updates.error_message !== undefined) {
+        fields.push('error_message = ?');
+        values.push(updates.error_message);
+    }
+
+    if (fields.length === 0) return;
+
+    values.push(id);
+    const sql = `UPDATE scheduler_logs SET ${fields.join(', ')} WHERE id = ?`;
+    db.prepare(sql).run(...values);
+}
+
+export function getSchedulerLogs(limit: number = 50): SchedulerLog[] {
+    const db = getDatabase();
+    return db.prepare(`
+        SELECT * FROM scheduler_logs ORDER BY started_at DESC LIMIT ?
+    `).all(limit) as SchedulerLog[];
+}
+
+export function clearSchedulerLogs() {
+    const db = getDatabase();
+    db.exec('DELETE FROM scheduler_logs');
 }

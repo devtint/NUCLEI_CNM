@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Loader2, Play, Activity, List, StopCircle, Terminal, Globe, RefreshCw, Trash2, ChevronRight, Download, Copy, Folder, ArrowLeft, Upload, Plus, Target } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -37,23 +37,24 @@ import { toast } from "sonner";
 import { TargetListManager } from "../scan/TargetListManager";
 import { Zap, FileText } from "lucide-react";
 
+
 interface HttpxResult {
     id: string;
     url: string;
     status_code: number;
-    title?: string;
-    technologies?: string; // JSON string
-    web_server?: string;
+    title?: string | string[];
+    technologies?: string | string[]; // JSON string or array
+    web_server?: string | string[];
     response_time?: string;
     change_status?: 'new' | 'old' | 'changed';
     screenshot_path?: string;
-    host?: string;
-    port?: string;
-    ip?: string;
-    cname?: string; // JSON or string
-    cdn_name?: string;
+    host?: string | string[];
+    port?: string | string[];
+    ip?: string | string[];
+    cname?: string | string[]; // JSON or string
+    cdn_name?: string | string[];
     content_length?: number;
-    content_type?: string;
+    content_type?: string | string[];
 }
 
 interface HttpxScan {
@@ -77,6 +78,148 @@ import {
 } from "@/components/ui/alert-dialog";
 
 // ... imports
+
+// Helper to format tech stack
+const renderTech = (techString?: string | string[], webServer?: string | string[]) => {
+    let techs: string[] = [];
+    try {
+        if (Array.isArray(techString)) {
+            techs = techString;
+        } else {
+            techs = techString ? JSON.parse(techString) : [];
+        }
+    } catch { techs = []; }
+
+    // Normalize webServer to string for comparison
+    const webServerStr = Array.isArray(webServer) ? webServer[0] : webServer;
+
+    if (webServerStr && !techs.includes(webServerStr)) {
+        techs.unshift(webServerStr);
+    }
+
+    if (techs.length === 0) return <span className="text-xs text-muted-foreground/50 italic">No Tech Detected</span>;
+
+    return techs.map((t, i) => (
+        <Badge key={i} variant="secondary" className="text-[10px] px-1.5 h-5 bg-secondary/50 text-secondary-foreground hover:bg-secondary">
+            {t}
+        </Badge>
+    ));
+};
+
+// Safe rendering helper to prevent React #300 errors (Objects as children)
+const renderSafeString = (value: any): string => {
+    if (!value) return "";
+    if (typeof value === 'string') {
+        // Check if it's a JSON array string like '["a","b"]'
+        if (value.startsWith('[') && value.endsWith(']')) {
+            try {
+                const parsed = JSON.parse(value);
+                if (Array.isArray(parsed)) return parsed.join(', ');
+            } catch { /* ignore parse error, return raw string */ }
+        }
+        return value;
+    }
+    if (Array.isArray(value)) return value.join(', ');
+    if (typeof value === 'object') return JSON.stringify(value);
+    return String(value);
+};
+
+// Helper: Get raw string for processing (handles string vs array)
+const getString = (val?: string | string[]): string => {
+    if (!val) return "";
+    if (Array.isArray(val)) return val.join(", ");
+    return val;
+};
+
+interface HttpxAssetCardProps {
+    data: HttpxResult;
+    onClick: () => void;
+    onScanTarget?: (target: string) => void;
+    style?: React.CSSProperties;
+}
+
+const HttpxAssetCard = ({ data: r, onClick, onScanTarget, style }: HttpxAssetCardProps) => {
+    return (
+        <div style={style} className="px-4 pb-3">
+            <div onClick={onClick} className="cursor-pointer h-full">
+                <Card className={cn(
+                    "bg-card text-card-foreground shadow-sm h-full flex flex-col border transition-all hover:bg-muted/10 active:scale-[0.99] duration-200",
+                    r.change_status === 'new' ? "border-emerald-500/50 shadow-emerald-500/5" :
+                        r.change_status === 'changed' ? "border-amber-500/50 shadow-amber-500/5" :
+                            "border-white/10"
+                )}>
+                    <CardContent className="p-4 flex flex-col gap-3">
+                        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                            {/* LEFT COLUMN: URL and Title */}
+                            <div className="flex-1 min-w-0 space-y-1.5">
+                                <div className="flex items-center gap-2">
+                                    <a href={r.url} target="_blank" onClick={(e) => e.stopPropagation()} className="text-base font-bold text-blue-400 hover:text-blue-300 hover:underline truncate" title={r.url}>
+                                        {r.url}
+                                    </a>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground shrink-0" onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigator.clipboard.writeText(r.url);
+                                        toast.success("Copied to clipboard");
+                                    }}>
+                                        <Copy className="h-3 w-3" />
+                                    </Button>
+                                    {onScanTarget && (
+                                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-emerald-500 shrink-0" onClick={(e) => {
+                                            e.stopPropagation();
+                                            onScanTarget(r.url);
+                                        }} title="Start Nuclei Scan">
+                                            <Target className="h-3 w-3" />
+                                        </Button>
+                                    )}
+                                    <div className="flex md:hidden items-center gap-2">
+                                        <Badge variant="outline" className={cn(
+                                            "text-[10px] px-1.5 h-5 font-mono",
+                                            r.status_code >= 200 && r.status_code < 300 ? "text-emerald-500 border-emerald-500/30 bg-emerald-500/5" :
+                                                r.status_code >= 300 && r.status_code < 400 ? "text-amber-500 border-amber-500/30 bg-amber-500/5" :
+                                                    "text-red-500 border-red-500/30 bg-red-500/5"
+                                        )}>{r.status_code}</Badge>
+                                    </div>
+                                </div>
+
+                                <div className="text-sm text-foreground/80 font-medium truncate" title={getString(r.title) || "No Title"}>
+                                    {renderSafeString(r.title) || <span className="text-muted-foreground italic">No Title</span>}
+                                </div>
+
+
+                            </div>
+
+                            {/* RIGHT COLUMN: Meta, Tech, Timings */}
+                            <div className="flex flex-col items-start md:items-end gap-3 min-w-[200px]">
+                                <div className="flex items-center gap-3">
+                                    <span className="text-xs font-mono text-muted-foreground tabular-nums">
+                                        {r.response_time || "0ms"}
+                                    </span>
+
+                                    <div className="hidden md:flex items-center gap-2">
+                                        <Badge variant="outline" className={cn(
+                                            "text-xs px-2 h-6 font-mono font-bold",
+                                            r.status_code >= 200 && r.status_code < 300 ? "text-emerald-500 border-emerald-500/30 bg-emerald-500/10" :
+                                                r.status_code >= 300 && r.status_code < 400 ? "text-amber-500 border-amber-500/30 bg-amber-500/10" :
+                                                    "text-red-500 border-red-500/30 bg-red-500/10"
+                                        )}>{r.status_code}</Badge>
+
+                                        {r.change_status === 'new' && <Badge className="text-[10px] px-1.5 h-6 bg-emerald-500/20 text-emerald-500 border border-emerald-500/30">NEW</Badge>}
+                                        {r.change_status === 'changed' && <Badge className="text-[10px] px-1.5 h-6 bg-amber-500/20 text-amber-500 border border-amber-500/30">CHANGED</Badge>}
+                                        {r.change_status === 'old' && <Badge variant="outline" className="text-[10px] px-1.5 h-6 text-muted-foreground border-zinc-500/20">OLD</Badge>}
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-wrap justify-end gap-1.5 max-w-full md:max-w-xs">
+                                    {renderTech(r.technologies, r.web_server)}
+                                </div>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+        </div>
+    );
+};
 
 export function HttpxPanel({ onScanTarget }: { onScanTarget?: (target: string) => void }) {
     const [scans, setScans] = useState<HttpxScan[]>([]);
@@ -104,6 +247,9 @@ export function HttpxPanel({ onScanTarget }: { onScanTarget?: (target: string) =
     const [filterDomain, setFilterDomain] = useState("");
     const [filterCode, setFilterCode] = useState<string[]>([]); // Multi-select for codes
     const [filterChangeStatus, setFilterChangeStatus] = useState<string[]>([]); // Empty = All
+    const [filterTech, setFilterTech] = useState<string[]>([]); // Tech stack filter
+
+
 
     // Delete Dialog State
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -160,6 +306,25 @@ export function HttpxPanel({ onScanTarget }: { onScanTarget?: (target: string) =
         }
     }, [activeTab, selectedScanId, selectedDomain]);
 
+    // Extract unique technologies for filter dropdown (must be before early return)
+    const uniqueTechs = useMemo(() => {
+        const techSet = new Set<string>();
+        results.forEach(r => {
+            try {
+                const techs = JSON.parse(getString(r.technologies) || "[]");
+                if (Array.isArray(techs)) {
+                    techs.forEach((t: string) => techSet.add(t));
+                }
+            } catch { }
+            // Also add web_server if present
+            if (r.web_server) {
+                const ws = getString(r.web_server);
+                techSet.add(ws);
+            }
+        });
+        return Array.from(techSet).sort();
+    }, [results]);
+
     // Full Screen Detail View
     if (selectedAsset) {
         return (
@@ -202,13 +367,13 @@ export function HttpxPanel({ onScanTarget }: { onScanTarget?: (target: string) =
                             <Card>
                                 <CardHeader className="pb-2">
                                     <CardDescription>Content Type</CardDescription>
-                                    <CardTitle className="text-xl truncate" title={selectedAsset.content_type}>{selectedAsset.content_type || "-"}</CardTitle>
+                                    <CardTitle className="text-xl truncate" title={renderSafeString(selectedAsset.content_type)}>{renderSafeString(selectedAsset.content_type) || "-"}</CardTitle>
                                 </CardHeader>
                             </Card>
                             <Card>
                                 <CardHeader className="pb-2">
                                     <CardDescription>Web Server</CardDescription>
-                                    <CardTitle className="text-xl truncate" title={selectedAsset.web_server}>{selectedAsset.web_server || "-"}</CardTitle>
+                                    <CardTitle className="text-xl truncate" title={renderSafeString(selectedAsset.web_server)}>{renderSafeString(selectedAsset.web_server) || "-"}</CardTitle>
                                 </CardHeader>
                             </Card>
                         </div>
@@ -219,29 +384,11 @@ export function HttpxPanel({ onScanTarget }: { onScanTarget?: (target: string) =
                                 <Card>
                                     <CardHeader>
                                         <CardTitle>Page Title</CardTitle>
-                                        <CardDescription className="text-base text-foreground">{selectedAsset.title || "No Title Detected"}</CardDescription>
+                                        <CardDescription className="text-base text-foreground">{renderSafeString(selectedAsset.title) || "No Title Detected"}</CardDescription>
                                     </CardHeader>
                                 </Card>
 
-                                {selectedAsset.screenshot_path ? (
-                                    <Card className="overflow-hidden">
-                                        <div className="aspect-video relative bg-muted/50 flex items-center justify-center">
-                                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                                            <img
-                                                src={selectedAsset.screenshot_path}
-                                                alt="Full Page Screenshot"
-                                                className="w-full h-full object-contain"
-                                            />
-                                        </div>
-                                    </Card>
-                                ) : (
-                                    <Card className="h-64 flex items-center justify-center bg-muted/20 border-dashed">
-                                        <div className="text-center text-muted-foreground">
-                                            <Activity className="h-10 w-10 mx-auto mb-2 opacity-50" />
-                                            <p>No Screenshot Available</p>
-                                        </div>
-                                    </Card>
-                                )}
+
                             </div>
 
                             <div className="space-y-6">
@@ -257,7 +404,19 @@ export function HttpxPanel({ onScanTarget }: { onScanTarget?: (target: string) =
                                         <div className="flex flex-wrap gap-2">
                                             {(() => {
                                                 try {
-                                                    const t = JSON.parse(selectedAsset.technologies || "[]");
+                                                    let t = [];
+                                                    if (Array.isArray(selectedAsset.technologies)) {
+                                                        t = selectedAsset.technologies;
+                                                    } else {
+                                                        const techStr = selectedAsset.technologies || "[]";
+                                                        // Handle case where string is just "Nginx" not "['Nginx']"
+                                                        if (techStr.startsWith('[')) {
+                                                            t = JSON.parse(techStr);
+                                                        } else {
+                                                            t = [techStr];
+                                                        }
+                                                    }
+
                                                     if (t.length === 0) return <span className="text-muted-foreground italic">None detected</span>;
                                                     return t.map((tech: string, i: number) => (
                                                         <Badge key={i} variant="secondary" className="px-2 py-1">{tech}</Badge>
@@ -280,21 +439,21 @@ export function HttpxPanel({ onScanTarget }: { onScanTarget?: (target: string) =
                                         <div>
                                             <p className="text-xs font-medium text-muted-foreground uppercase mb-1">IP Address</p>
                                             <div className="font-mono text-sm bg-muted p-2 rounded break-all select-all">
-                                                {selectedAsset.ip || selectedAsset.host || "-"}
+                                                {renderSafeString(selectedAsset.ip || selectedAsset.host || "-")}
                                             </div>
                                         </div>
                                         {selectedAsset.cname && (
                                             <div>
                                                 <p className="text-xs font-medium text-muted-foreground uppercase mb-1">CNAME</p>
                                                 <div className="font-mono text-sm bg-muted p-2 rounded break-all select-all">
-                                                    {selectedAsset.cname}
+                                                    {renderSafeString(selectedAsset.cname)}
                                                 </div>
                                             </div>
                                         )}
                                         {selectedAsset.cdn_name && (
                                             <div>
                                                 <p className="text-xs font-medium text-muted-foreground uppercase mb-1">CDN Detected</p>
-                                                <Badge variant="outline" className="border-blue-500/50 text-blue-500">{selectedAsset.cdn_name}</Badge>
+                                                <Badge variant="outline" className="border-blue-500/50 text-blue-500">{renderSafeString(selectedAsset.cdn_name)}</Badge>
                                             </div>
                                         )}
                                     </CardContent>
@@ -416,24 +575,7 @@ export function HttpxPanel({ onScanTarget }: { onScanTarget?: (target: string) =
         }
     };
 
-    // Helper to format tech stack
-    const renderTech = (techString?: string) => {
-        if (!techString) return null;
-        try {
-            const techs = JSON.parse(techString);
-            if (!Array.isArray(techs)) return null;
-            return (
-                <div className="flex flex-wrap gap-1">
-                    {techs.slice(0, 3).map((t, i) => (
-                        <Badge key={i} variant="outline" className="text-[10px] px-1 py-0 h-4 bg-muted/50">
-                            {t}
-                        </Badge>
-                    ))}
-                    {techs.length > 3 && <span className="text-[10px] text-muted-foreground">+{techs.length - 3}</span>}
-                </div>
-            );
-        } catch (e) { return null; }
-    };
+
 
     const filteredResults = results.filter(r => {
         if (selectedDomain && selectedDomain !== 'ALL' && !r.url.includes(selectedDomain)) return false;
@@ -452,6 +594,28 @@ export function HttpxPanel({ onScanTarget }: { onScanTarget?: (target: string) =
 
         // Status Filter
         if (filterChangeStatus.length > 0 && r.change_status && !filterChangeStatus.includes(r.change_status)) return false;
+
+        // Tech Filter (Multi-select)
+        if (filterTech.length > 0) {
+            try {
+                // Handle technologies which might be string or array
+                let techs: string[] = [];
+                if (Array.isArray(r.technologies)) {
+                    techs = r.technologies;
+                } else {
+                    techs = JSON.parse(r.technologies || "[]");
+                }
+
+                const allTechs = Array.isArray(techs) ? [...techs] : [];
+                if (r.web_server) allTechs.push(getString(r.web_server));
+
+                const hasMatch = filterTech.some(ft => allTechs.includes(ft));
+                if (!hasMatch) return false;
+            } catch {
+                return false;
+            }
+        }
+
         return true;
     });
 
@@ -475,8 +639,8 @@ export function HttpxPanel({ onScanTarget }: { onScanTarget?: (target: string) =
     const exportCsv = () => {
         const headers = "URL,Status,Title,Tech,Latency";
         const rows = filteredResults.map(r => {
-            const title = (r.title || "").replace(/"/g, '""'); // Escape quotes
-            const tech = (r.technologies || "").replace(/"/g, "'");
+            const title = getString(r.title).replace(/"/g, '""'); // Escape quotes
+            const tech = getString(r.technologies).replace(/"/g, "'");
             return `${r.url},${r.status_code},"${title}","${tech}",${r.response_time || ""}`;
         }).join("\n");
         const blob = new Blob([headers + "\n" + rows], { type: 'text/csv' });
@@ -555,8 +719,8 @@ export function HttpxPanel({ onScanTarget }: { onScanTarget?: (target: string) =
     const exportFullCsv = () => {
         const headers = "URL,Status,Title,Tech,Latency";
         const rows = filteredResults.map(r => {
-            const title = (r.title || "").replace(/"/g, '""'); // Escape quotes
-            const tech = (r.technologies || "").replace(/"/g, "'");
+            const title = getString(r.title).replace(/"/g, '""'); // Escape quotes
+            const tech = getString(r.technologies).replace(/"/g, "'");
             return `${r.url},${r.status_code},"${title}","${tech}",${r.response_time || ""}`;
         }).join("\n");
         const blob = new Blob([headers + "\n" + rows], { type: 'text/csv' });
@@ -697,6 +861,8 @@ export function HttpxPanel({ onScanTarget }: { onScanTarget?: (target: string) =
                                         </Button>
                                     </TabsContent>
                                 </Tabs>
+
+
                             </CardContent>
                         </Card>
                     </div>
@@ -935,6 +1101,47 @@ export function HttpxPanel({ onScanTarget }: { onScanTarget?: (target: string) =
                                                         )}
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>
+                                                {/* Tech Stack Filter */}
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="outline" size="sm" className="h-8 border-dashed">
+                                                            <Zap className="h-3 w-3 mr-1" />
+                                                            Tech {filterTech.length > 0 ? `(${filterTech.length})` : ""}
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end" className="w-[200px] max-h-[300px] overflow-y-auto">
+                                                        <DropdownMenuLabel>Technologies</DropdownMenuLabel>
+                                                        <DropdownMenuSeparator />
+                                                        {uniqueTechs.slice(0, 30).map((tech) => (
+                                                            <DropdownMenuCheckboxItem
+                                                                key={tech}
+                                                                checked={filterTech.includes(tech)}
+                                                                onCheckedChange={(checked) => {
+                                                                    if (checked) setFilterTech([...filterTech, tech]);
+                                                                    else setFilterTech(filterTech.filter(t => t !== tech));
+                                                                }}
+                                                                onSelect={(e) => e.preventDefault()}
+                                                            >
+                                                                {tech}
+                                                            </DropdownMenuCheckboxItem>
+                                                        ))}
+                                                        {uniqueTechs.length === 0 && <div className="p-2 text-xs text-muted-foreground text-center">No technologies found</div>}
+                                                        {uniqueTechs.length > 30 && <div className="p-2 text-xs text-muted-foreground text-center">+{uniqueTechs.length - 30} more</div>}
+                                                        {filterTech.length > 0 && (
+                                                            <>
+                                                                <DropdownMenuSeparator />
+                                                                <DropdownMenuCheckboxItem
+                                                                    checked={false}
+                                                                    onCheckedChange={() => setFilterTech([])}
+                                                                    onSelect={(e) => e.preventDefault()}
+                                                                    className="justify-center text-center text-xs font-medium"
+                                                                >
+                                                                    Clear
+                                                                </DropdownMenuCheckboxItem>
+                                                            </>
+                                                        )}
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
                                                 {selectedScanId && (
                                                     <Button variant="ghost" size="sm" onClick={() => setSelectedScanId(null)} className="h-8 ml-2">
                                                         View All Assets
@@ -956,117 +1163,15 @@ export function HttpxPanel({ onScanTarget }: { onScanTarget?: (target: string) =
                                                 </div>
                                             </div>
 
-                                            <div className="grid grid-cols-1 gap-3 p-4">
+                                            {/* Asset Cards */}
+                                            <div className="flex-1 min-h-[400px] max-h-[600px] overflow-y-auto p-4 space-y-3">
                                                 {filteredResults.map((r) => (
-                                                    <div key={r.id} onClick={() => setSelectedAsset(r)} className="cursor-pointer h-full">
-                                                        <Card className={cn(
-                                                            "bg-card text-card-foreground shadow-sm h-full flex flex-col border transition-all hover:bg-muted/10 active:scale-[0.99] duration-200",
-                                                            r.change_status === 'new' ? "border-emerald-500/50 shadow-emerald-500/5" :
-                                                                r.change_status === 'changed' ? "border-amber-500/50 shadow-amber-500/5" :
-                                                                    "border-white/10"
-                                                        )}>
-                                                            <CardContent className="p-4 flex flex-col gap-3">
-                                                                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-
-                                                                    {/* LEFT COLUMN: URL and Title */}
-                                                                    <div className="flex-1 min-w-0 space-y-1.5">
-                                                                        <div className="flex items-center gap-2">
-                                                                            <a href={r.url} target="_blank" className="text-base font-bold text-blue-400 hover:text-blue-300 hover:underline truncate" title={r.url}>
-                                                                                {r.url}
-                                                                            </a>
-                                                                            <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground shrink-0" onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                navigator.clipboard.writeText(r.url);
-                                                                                toast.success("Copied to clipboard");
-                                                                            }}>
-                                                                                <Copy className="h-3 w-3" />
-                                                                            </Button>
-                                                                            {onScanTarget && (
-                                                                                <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-emerald-500 shrink-0" onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    onScanTarget(r.url);
-                                                                                }} title="Start Nuclei Scan">
-                                                                                    <Target className="h-3 w-3" />
-                                                                                </Button>
-                                                                            )}
-                                                                            {/* Status Badges Mobile/Inline */}
-                                                                            <div className="flex md:hidden items-center gap-2">
-                                                                                <Badge variant="outline" className={cn(
-                                                                                    "text-[10px] px-1.5 h-5 font-mono",
-                                                                                    r.status_code >= 200 && r.status_code < 300 ? "text-emerald-500 border-emerald-500/30 bg-emerald-500/5" :
-                                                                                        r.status_code >= 300 && r.status_code < 400 ? "text-amber-500 border-amber-500/30 bg-amber-500/5" :
-                                                                                            "text-red-500 border-red-500/30 bg-red-500/5"
-                                                                                )}>{r.status_code}</Badge>
-                                                                            </div>
-                                                                        </div>
-
-                                                                        <div className="text-sm text-foreground/80 font-medium truncate" title={r.title || "No Title"}>
-                                                                            {r.title || <span className="text-muted-foreground italic">No Title</span>}
-                                                                        </div>
-
-                                                                        {/* Screenshot Thumbnail (if available) - Rendered nicely here */}
-                                                                        {r.screenshot_path && (
-                                                                            <div className="mt-2 border rounded-md overflow-hidden bg-muted/50 w-fit max-w-[300px] group relative">
-                                                                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                                                <img
-                                                                                    src={r.screenshot_path}
-                                                                                    alt="Screenshot"
-                                                                                    className="w-full h-auto object-cover max-h-[150px] transition-transform duration-300 group-hover:scale-105 cursor-pointer"
-                                                                                    onClick={() => window.open(r.screenshot_path, '_blank')}
-                                                                                />
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-
-                                                                    {/* RIGHT COLUMN: Meta, Tech, Timings */}
-                                                                    <div className="flex flex-col items-start md:items-end gap-3 min-w-[200px]">
-                                                                        {/* Top Row Right: Badges & Response Time */}
-                                                                        <div className="flex items-center gap-3">
-                                                                            <span className="text-xs font-mono text-muted-foreground tabular-nums">
-                                                                                {r.response_time || "0ms"}
-                                                                            </span>
-
-                                                                            <div className="hidden md:flex items-center gap-2">
-                                                                                <Badge variant="outline" className={cn(
-                                                                                    "text-xs px-2 h-6 font-mono font-bold",
-                                                                                    r.status_code >= 200 && r.status_code < 300 ? "text-emerald-500 border-emerald-500/30 bg-emerald-500/10" :
-                                                                                        r.status_code >= 300 && r.status_code < 400 ? "text-amber-500 border-amber-500/30 bg-amber-500/10" :
-                                                                                            "text-red-500 border-red-500/30 bg-red-500/10"
-                                                                                )}>{r.status_code}</Badge>
-
-                                                                                {r.change_status === 'new' && <Badge className="text-[10px] px-1.5 h-6 bg-emerald-500/20 text-emerald-500 border border-emerald-500/30">NEW</Badge>}
-                                                                                {r.change_status === 'changed' && <Badge className="text-[10px] px-1.5 h-6 bg-amber-500/20 text-amber-500 border border-amber-500/30">CHANGED</Badge>}
-                                                                                {r.change_status === 'old' && <Badge variant="outline" className="text-[10px] px-1.5 h-6 text-muted-foreground border-zinc-500/20">OLD</Badge>}
-                                                                            </div>
-                                                                        </div>
-
-                                                                        {/* Tech Stack - Right Aligned or Wrapped */}
-                                                                        <div className="flex flex-wrap justify-end gap-1.5 max-w-full md:max-w-xs">
-                                                                            {(() => {
-                                                                                let techs: string[] = [];
-                                                                                try {
-                                                                                    techs = r.technologies ? JSON.parse(r.technologies) : [];
-                                                                                } catch { techs = []; }
-
-                                                                                // Also show server if distinct
-                                                                                if (r.web_server && !techs.includes(r.web_server)) {
-                                                                                    techs.unshift(r.web_server);
-                                                                                }
-
-                                                                                if (techs.length === 0) return <span className="text-xs text-muted-foreground/50 italic">No Tech Detected</span>;
-
-                                                                                return techs.map((t, i) => (
-                                                                                    <Badge key={i} variant="secondary" className="text-[10px] px-1.5 h-5 bg-secondary/50 text-secondary-foreground hover:bg-secondary">
-                                                                                        {t}
-                                                                                    </Badge>
-                                                                                ));
-                                                                            })()}
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </CardContent>
-                                                        </Card>
-                                                    </div>
+                                                    <HttpxAssetCard
+                                                        key={r.id}
+                                                        data={r}
+                                                        onClick={() => setSelectedAsset(r)}
+                                                        onScanTarget={onScanTarget}
+                                                    />
                                                 ))}
                                             </div>
                                         </ScrollArea>

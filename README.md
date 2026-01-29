@@ -77,6 +77,7 @@
 - **Auto-Probe** - HTTPX automatically scans newly discovered subdomains
 - **Auto-Nuclei** - Vulnerability scanning on new live hosts (with safety threshold)
 - **Per-Domain Control** - Enable/disable scheduler and Nuclei per target
+- **Automation History** - Full log of all scheduled runs with timestamps, domains, new subdomains, live hosts, and findings count
 
 ### 🔔 Notifications & Alerts
 

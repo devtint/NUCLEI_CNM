@@ -12,8 +12,9 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Clock, Play, Calendar, Bell, BellOff, Globe, Loader2, CheckCircle2, XCircle, Radar, Zap, Shield, FlaskConical, AlertTriangle, HardDrive, Send, FileText, Eye } from "lucide-react";
+import { Clock, Play, Calendar, Bell, BellOff, Globe, Loader2, CheckCircle2, XCircle, Radar, Zap, Shield, FlaskConical, AlertTriangle, HardDrive, Send, FileText, Eye, History, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
 interface SchedulerSettings {
@@ -56,12 +57,26 @@ interface BackupSettings {
     notifyDetail: "summary" | "detailed";
 }
 
+interface SchedulerLog {
+    id: number;
+    domain: string;
+    started_at: number;
+    completed_at: number | null;
+    status: 'running' | 'completed' | 'error';
+    subdomains_total: number;
+    subdomains_new: number;
+    live_hosts: number;
+    findings_count: number;
+    error_message: string | null;
+}
+
 export function SchedulerPanel() {
     const [settings, setSettings] = useState<SchedulerSettings | null>(null);
     const [nucleiSettings, setNucleiSettings] = useState<NucleiSettings | null>(null);
     const [backupSettings, setBackupSettings] = useState<BackupSettings | null>(null);
     const [status, setStatus] = useState<SchedulerStatus | null>(null);
     const [domains, setDomains] = useState<Domain[]>([]);
+    const [logs, setLogs] = useState<SchedulerLog[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [triggering, setTriggering] = useState(false);
@@ -84,9 +99,35 @@ export function SchedulerPanel() {
                 setDomains(data.domains || []);
             }
         } catch (e) {
-            console.error("Failed to load scheduler data", e);
+            console.error("Failed to fetch scheduler data", e);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchLogs = async () => {
+        try {
+            const res = await fetch("/api/scheduler/logs");
+            const data = await res.json();
+            if (data.success) {
+                setLogs(data.logs || []);
+            }
+        } catch (e) {
+            console.error("Failed to fetch scheduler logs", e);
+        }
+    };
+
+    const clearLogs = async () => {
+        if (!confirm("Are you sure you want to clear all automation history?")) return;
+        try {
+            const res = await fetch("/api/scheduler/logs", { method: "DELETE" });
+            const data = await res.json();
+            if (data.success) {
+                setLogs([]);
+                toast.success("History cleared");
+            }
+        } catch (e) {
+            toast.error("Failed to clear history");
         }
     };
 
@@ -241,464 +282,523 @@ export function SchedulerPanel() {
 
     if (loading) return <div className="text-center py-8">Loading scheduler...</div>;
 
+    const formatLogDate = (timestamp: number) => {
+        const date = new Date(timestamp);
+        const now = new Date();
+        const diffMs = now.getTime() - date.getTime();
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+
+        if (diffMins < 1) return "Just now";
+        if (diffMins < 60) return `${diffMins}m ago`;
+        if (diffHours < 24) return `${diffHours}h ago`;
+        if (diffDays < 7) return `${diffDays}d ago`;
+        return date.toLocaleDateString();
+    };
+
+    const StatusBadge = ({ status }: { status: string }) => {
+        const styles: Record<string, string> = {
+            running: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+            completed: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+            error: "bg-red-500/20 text-red-400 border-red-500/30",
+        };
+        const icons: Record<string, React.ReactNode> = {
+            running: <Loader2 className="h-3 w-3 animate-spin" />,
+            completed: <CheckCircle2 className="h-3 w-3" />,
+            error: <XCircle className="h-3 w-3" />,
+        };
+        return (
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border ${styles[status] || styles.error}`}>
+                {icons[status]}
+                {status}
+            </span>
+        );
+    };
+
     return (
-        <div className="space-y-6">
-            {/* Main Scheduler Settings */}
-            <Card className="border-border bg-card">
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <Clock className="h-5 w-5 text-purple-400" />
-                        Scheduled Subdomain Monitoring
-                    </CardTitle>
-                    <CardDescription>
-                        Automatically scan your monitored domains for new subdomains on a schedule.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                    {/* Enable/Disable Toggle */}
-                    <div className="flex items-center justify-between rounded-lg border p-4">
-                        <div className="space-y-0.5">
-                            <Label className="text-base">Enable Scheduler</Label>
-                            <p className="text-sm text-muted-foreground">
-                                Automatically run Subfinder scans for all enabled domains
-                            </p>
-                        </div>
-                        <Switch
-                            checked={settings?.enabled || false}
-                            onCheckedChange={handleToggle}
-                            disabled={saving}
-                        />
-                    </div>
+        <Tabs defaultValue="schedule" className="w-full" onValueChange={(v) => v === "history" && fetchLogs()}>
+            <TabsList className="bg-muted mb-6">
+                <TabsTrigger value="schedule" className="data-[state=active]:bg-background">
+                    <Clock className="mr-2 h-4 w-4" />
+                    Schedule
+                </TabsTrigger>
+                <TabsTrigger value="history" className="data-[state=active]:bg-background">
+                    <History className="mr-2 h-4 w-4" />
+                    History
+                </TabsTrigger>
+            </TabsList>
 
-                    {/* Frequency Selection */}
-                    <div className="grid gap-4 md:grid-cols-2">
-                        <div className="space-y-2">
-                            <Label>Scan Frequency</Label>
-                            <Select
-                                value={settings?.frequency || "24h"}
-                                onValueChange={(value) => handleSave({ frequency: value as any })}
-                                disabled={!settings?.enabled || saving}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="6h">Every 6 hours</SelectItem>
-                                    <SelectItem value="12h">Every 12 hours</SelectItem>
-                                    <SelectItem value="24h">Daily</SelectItem>
-                                    <SelectItem value="168h">Weekly</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label>Run at Hour (for Daily/Weekly)</Label>
-                            <Select
-                                value={String(settings?.hour || 2)}
-                                onValueChange={(value) => handleSave({ hour: parseInt(value) })}
-                                disabled={!settings?.enabled || saving || !["24h", "168h"].includes(settings?.frequency || "")}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {Array.from({ length: 24 }, (_, i) => (
-                                        <SelectItem key={i} value={String(i)}>
-                                            {String(i).padStart(2, "0")}:00
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
-
-                    {/* Notification Mode */}
-                    <div className="space-y-2">
-                        <Label>Notification Mode</Label>
-                        <Select
-                            value={settings?.notifyMode || "new_only"}
-                            onValueChange={(value) => handleSave({ notifyMode: value as any })}
-                            disabled={!settings?.enabled || saving}
-                        >
-                            <SelectTrigger>
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="new_only">
-                                    <div className="flex items-center gap-2">
-                                        <BellOff className="h-4 w-4" />
-                                        Only when new subdomains found
-                                    </div>
-                                </SelectItem>
-                                <SelectItem value="always">
-                                    <div className="flex items-center gap-2">
-                                        <Bell className="h-4 w-4" />
-                                        Always notify on completion
-                                    </div>
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    {/* Auto-HTTPX Toggle */}
-                    <div className="flex items-center justify-between rounded-lg border p-4 bg-blue-500/5 border-blue-500/20">
-                        <div className="space-y-0.5">
-                            <div className="flex items-center gap-2">
-                                <Radar className="h-4 w-4 text-blue-400" />
-                                <Label className="text-base">Auto-Probe New Subdomains</Label>
-                            </div>
-                            <p className="text-sm text-muted-foreground">
-                                Automatically run HTTPX on newly discovered subdomains to detect live web services
-                            </p>
-                        </div>
-                        <Switch
-                            checked={settings?.autoHttpx || false}
-                            onCheckedChange={(checked) => handleSave({ autoHttpx: checked })}
-                            disabled={!settings?.enabled || saving}
-                        />
-                    </div>
-
-                    {/* Status Display */}
-                    <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
-                        <div className="flex items-center gap-2 text-sm">
-                            <Calendar className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-muted-foreground">Last Run:</span>
-                            <span>{formatDate(settings?.lastRun ?? null)}</span>
-                        </div>
-                        {status?.nextRun && (
-                            <div className="flex items-center gap-2 text-sm">
-                                <Clock className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-muted-foreground">Next Run:</span>
-                                <span>{new Date(status.nextRun).toLocaleString()}</span>
-                            </div>
-                        )}
-                        {status?.isProcessing && (
-                            <div className="flex items-center gap-2 text-sm text-yellow-500">
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                <span>Currently scanning: {status.currentDomain}</span>
-                            </div>
-                        )}
-                    </div>
-                </CardContent>
-                <CardFooter className="bg-muted/50 border-t border-border flex justify-between py-3">
-                    <p className="text-xs text-muted-foreground">
-                        {domains.filter(d => d.scheduler_enabled).length} of {domains.length} domains enabled
-                    </p>
-                    <Button
-                        onClick={handleTrigger}
-                        disabled={triggering || status?.isProcessing || domains.filter(d => d.scheduler_enabled).length === 0}
-                        variant="outline"
-                        className="gap-2"
-                    >
-                        {triggering ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                            <Play className="h-4 w-4" />
-                        )}
-                        Run Now
-                    </Button>
-                </CardFooter>
-            </Card>
-
-            {/* Nuclei Configuration */}
-            <Card className="border-border bg-card">
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <FlaskConical className="h-5 w-5 text-green-400" />
-                        Nuclei Scan Configuration
-                    </CardTitle>
-                    <CardDescription>
-                        Configure automatic vulnerability scanning for newly discovered live hosts.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                    {/* Warning if HTTPX is disabled but Nuclei is enabled for some domains */}
-                    {!settings?.autoHttpx && domains.some(d => d.nuclei_enabled === 1) && (
-                        <div className="flex items-center gap-3 rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-4 text-yellow-600 dark:text-yellow-400">
-                            <AlertTriangle className="h-5 w-5 shrink-0" />
-                            <div className="text-sm">
-                                <p className="font-medium">Auto-Probe is disabled</p>
-                                <p className="text-muted-foreground">Enable "Auto-Probe New Subdomains" above for Nuclei to scan live hosts.</p>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Scan Mode Selector */}
-                    <div className="space-y-2">
-                        <Label>Scan Mode</Label>
-                        <Select
-                            value={nucleiSettings?.scanMode || "standard"}
-                            onValueChange={(value: "quick" | "standard" | "full") => handleNucleiSettingsSave({ scanMode: value })}
-                            disabled={!settings?.enabled || saving}
-                        >
-                            <SelectTrigger>
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="quick">
-                                    <div className="flex items-center gap-2">
-                                        <Zap className="h-4 w-4 text-yellow-500" />
-                                        Quick (CVEs + Default Logins)
-                                    </div>
-                                </SelectItem>
-                                <SelectItem value="standard">
-                                    <div className="flex items-center gap-2">
-                                        <Shield className="h-4 w-4 text-blue-500" />
-                                        Standard (CVEs + Exposures + Tech)
-                                    </div>
-                                </SelectItem>
-                                <SelectItem value="full">
-                                    <div className="flex items-center gap-2">
-                                        <FlaskConical className="h-4 w-4 text-purple-500" />
-                                        Full Scan (All Templates) ⚠️
-                                    </div>
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    {/* Templates (for non-full modes) */}
-                    {nucleiSettings?.scanMode !== "full" && (
-                        <div className="space-y-2">
-                            <Label>Templates (comma-separated)</Label>
-                            <Input
-                                value={nucleiSettings?.templates || ""}
-                                onChange={(e) => setNucleiSettings(prev => prev ? { ...prev, templates: e.target.value } : prev)}
-                                onBlur={(e) => handleNucleiSettingsSave({ templates: e.target.value })}
-                                placeholder="cves/,exposures/,technologies/"
-                                disabled={!settings?.enabled || saving}
-                            />
-                        </div>
-                    )}
-
-                    {/* Severity (for non-full modes) */}
-                    {nucleiSettings?.scanMode !== "full" && (
-                        <div className="space-y-2">
-                            <Label>Severity (comma-separated)</Label>
-                            <Input
-                                value={nucleiSettings?.severity || ""}
-                                onChange={(e) => setNucleiSettings(prev => prev ? { ...prev, severity: e.target.value } : prev)}
-                                onBlur={(e) => handleNucleiSettingsSave({ severity: e.target.value })}
-                                placeholder="critical,high,medium"
-                                disabled={!settings?.enabled || saving}
-                            />
-                        </div>
-                    )}
-
-                    {/* Performance Settings */}
-                    <div className="grid gap-4 md:grid-cols-3">
-                        <div className="space-y-2">
-                            <Label>Rate Limit (req/s)</Label>
-                            <Input
-                                type="number"
-                                value={nucleiSettings?.rateLimit || 100}
-                                onChange={(e) => setNucleiSettings(prev => prev ? { ...prev, rateLimit: parseInt(e.target.value) || 100 } : prev)}
-                                onBlur={(e) => handleNucleiSettingsSave({ rateLimit: parseInt(e.target.value) || 100 })}
-                                disabled={!settings?.enabled || saving}
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Concurrency</Label>
-                            <Input
-                                type="number"
-                                value={nucleiSettings?.concurrency || 25}
-                                onChange={(e) => setNucleiSettings(prev => prev ? { ...prev, concurrency: parseInt(e.target.value) || 25 } : prev)}
-                                onBlur={(e) => handleNucleiSettingsSave({ concurrency: parseInt(e.target.value) || 25 })}
-                                disabled={!settings?.enabled || saving}
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Max New Threshold</Label>
-                            <Input
-                                type="number"
-                                value={nucleiSettings?.maxNewThreshold || 5}
-                                onChange={(e) => setNucleiSettings(prev => prev ? { ...prev, maxNewThreshold: parseInt(e.target.value) || 5 } : prev)}
-                                onBlur={(e) => handleNucleiSettingsSave({ maxNewThreshold: parseInt(e.target.value) || 5 })}
-                                disabled={!settings?.enabled || saving}
-                            />
-                            <p className="text-xs text-muted-foreground">Skip auto-Nuclei if more than this many new subdomains</p>
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
-
-            {/* Notification & Backup Settings */}
-            <Card className="border-border bg-card">
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <Bell className="h-5 w-5 text-amber-400" />
-                        Notification & Backup Settings
-                    </CardTitle>
-                    <CardDescription>
-                        Configure notification detail level and automatic backups.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                    {/* Notification Detail Level */}
-                    <div className="space-y-2">
-                        <Label>Notification Detail Level</Label>
-                        <Select
-                            value={backupSettings?.notifyDetail || "summary"}
-                            onValueChange={(value: "summary" | "detailed") => handleBackupSettingsSave({ notifyDetail: value })}
-                            disabled={saving}
-                        >
-                            <SelectTrigger>
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="summary">
-                                    <div className="flex items-center gap-2">
-                                        <FileText className="h-4 w-4 text-green-500" />
-                                        Summary Only (recommended)
-                                    </div>
-                                </SelectItem>
-                                <SelectItem value="detailed">
-                                    <div className="flex items-center gap-2">
-                                        <Eye className="h-4 w-4 text-amber-500" />
-                                        Detailed (includes names)
-                                    </div>
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
-
-                        {/* Warning for Detailed mode */}
-                        {backupSettings?.notifyDetail === "detailed" && (
-                            <div className="flex items-start gap-3 rounded-lg border border-amber-500/50 bg-amber-500/10 p-3 text-amber-600 dark:text-amber-400 mt-2">
-                                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-                                <div className="text-xs">
-                                    <p className="font-medium">Security Notice</p>
-                                    <p className="text-muted-foreground">Detailed notifications include subdomain names and live host URLs in your Telegram chat.</p>
+            <TabsContent value="schedule">
+                <div className="space-y-6">
+                    {/* Main Scheduler Settings */}
+                    <Card className="border-border bg-card">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Clock className="h-5 w-5 text-purple-400" />
+                                Scheduled Subdomain Monitoring
+                            </CardTitle>
+                            <CardDescription>
+                                Automatically scan your monitored domains for new subdomains on a schedule.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            {/* Enable/Disable Toggle */}
+                            <div className="flex items-center justify-between rounded-lg border p-4">
+                                <div className="space-y-0.5">
+                                    <Label className="text-base">Enable Scheduler</Label>
+                                    <p className="text-sm text-muted-foreground">
+                                        {status?.isProcessing
+                                            ? `Currently scanning: ${status.currentDomain}`
+                                            : settings?.enabled
+                                                ? `Next run: ${status?.nextRun || "Calculating..."}`
+                                                : "Scheduler is disabled"}
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                    {settings?.enabled && (
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={handleTrigger}
+                                            disabled={triggering || status?.isProcessing}
+                                        >
+                                            {triggering ? (
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            ) : (
+                                                <Play className="mr-2 h-4 w-4" />
+                                            )}
+                                            Run Now
+                                        </Button>
+                                    )}
+                                    <Switch
+                                        checked={settings?.enabled}
+                                        onCheckedChange={handleToggle}
+                                        disabled={saving}
+                                    />
                                 </div>
                             </div>
-                        )}
-                    </div>
 
-                    {/* Backup Settings */}
-                    <div className="space-y-4 pt-4 border-t border-border">
-                        <div className="flex items-center justify-between">
-                            <div className="space-y-0.5">
-                                <div className="flex items-center gap-2">
-                                    <HardDrive className="h-4 w-4 text-blue-400" />
-                                    <Label className="text-base">Enable Daily Backup</Label>
-                                </div>
-                                <p className="text-sm text-muted-foreground">
-                                    Automatically backup all data daily at 03:00 UTC
-                                </p>
-                            </div>
-                            <Switch
-                                checked={backupSettings?.backupEnabled || false}
-                                onCheckedChange={(checked) => handleBackupSettingsSave({ backupEnabled: checked })}
-                                disabled={saving}
-                            />
-                        </div>
-
-                        {backupSettings?.backupEnabled && (
-                            <>
+                            {/* Frequency */}
+                            <div className="grid gap-4 sm:grid-cols-2">
                                 <div className="space-y-2">
-                                    <Label>Backup Destination</Label>
+                                    <Label>Scan Frequency</Label>
                                     <Select
-                                        value={backupSettings?.backupMode || "local"}
-                                        onValueChange={(value: "local" | "telegram") => handleBackupSettingsSave({ backupMode: value })}
+                                        value={settings?.frequency}
+                                        onValueChange={(v) => handleSave({ frequency: v as any })}
                                         disabled={saving}
                                     >
                                         <SelectTrigger>
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="local">
-                                                <div className="flex items-center gap-2">
-                                                    <HardDrive className="h-4 w-4 text-blue-500" />
-                                                    Local Storage (/data/backups/)
-                                                </div>
-                                            </SelectItem>
-                                            <SelectItem value="telegram">
-                                                <div className="flex items-center gap-2">
-                                                    <Send className="h-4 w-4 text-blue-500" />
-                                                    Telegram (off-site)
-                                                </div>
-                                            </SelectItem>
+                                            <SelectItem value="6h">Every 6 hours</SelectItem>
+                                            <SelectItem value="12h">Every 12 hours</SelectItem>
+                                            <SelectItem value="24h">Daily</SelectItem>
+                                            <SelectItem value="168h">Weekly</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
-
-                                {/* Warning for Telegram backup */}
-                                {backupSettings?.backupMode === "telegram" && (
-                                    <div className="flex items-start gap-3 rounded-lg border border-amber-500/50 bg-amber-500/10 p-3 text-amber-600 dark:text-amber-400">
-                                        <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-                                        <div className="text-xs">
-                                            <p className="font-medium">Security Notice</p>
-                                            <p className="text-muted-foreground">Backup files contain all vulnerability findings, subdomains, and HTTPX results. This data will be stored in Telegram&apos;s cloud.</p>
-                                            <p className="text-green-500 mt-1">✓ Benefit: Off-site backup survives server failure</p>
-                                        </div>
-                                    </div>
-                                )}
-                            </>
-                        )}
-                    </div>
-                </CardContent>
-            </Card>
-
-            {/* Domain List */}
-            <Card className="border-border bg-card">
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                        <Globe className="h-5 w-5 text-blue-400" />
-                        Monitored Domains
-                    </CardTitle>
-                    <CardDescription>
-                        Toggle scheduler and Nuclei scanning for each domain.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    {domains.length === 0 ? (
-                        <div className="text-center py-8 text-muted-foreground">
-                            <p>No monitored domains yet.</p>
-                            <p className="text-sm">Run a Subfinder scan to add domains to the inventory.</p>
-                        </div>
-                    ) : (
-                        <div className="space-y-2">
-                            <div className="flex items-center justify-between px-3 py-2 text-xs text-muted-foreground border-b">
-                                <span>Domain</span>
-                                <div className="flex items-center gap-6">
-                                    <span>Scheduler</span>
-                                    <span>Nuclei</span>
+                                <div className="space-y-2">
+                                    <Label>Start Hour (UTC)</Label>
+                                    <Select
+                                        value={String(settings?.hour || 0)}
+                                        onValueChange={(v) => handleSave({ hour: parseInt(v) })}
+                                        disabled={saving}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {Array.from({ length: 24 }, (_, i) => (
+                                                <SelectItem key={i} value={String(i)}>
+                                                    {String(i).padStart(2, '0')}:00 UTC
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                 </div>
                             </div>
-                            {domains.map((domain) => (
-                                <div
-                                    key={domain.id}
-                                    className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted/50 transition-colors"
+
+                            {/* Auto HTTPX */}
+                            <div className="flex items-center justify-between rounded-lg border p-4">
+                                <div className="space-y-0.5">
+                                    <div className="flex items-center gap-2">
+                                        <Radar className="h-4 w-4 text-cyan-400" />
+                                        <Label className="text-base">Auto-Probe (HTTPX)</Label>
+                                    </div>
+                                    <p className="text-sm text-muted-foreground">
+                                        Automatically probe new subdomains for live hosts after discovery.
+                                    </p>
+                                </div>
+                                <Switch
+                                    checked={settings?.autoHttpx}
+                                    onCheckedChange={(v) => handleSave({ autoHttpx: v })}
+                                    disabled={saving}
+                                />
+                            </div>
+
+                            {/* Notification Mode */}
+                            <div className="space-y-2">
+                                <Label className="flex items-center gap-2">
+                                    <Bell className="h-4 w-4" />
+                                    Telegram Notifications
+                                </Label>
+                                <Select
+                                    value={settings?.notifyMode}
+                                    onValueChange={(v) => handleSave({ notifyMode: v as any })}
+                                    disabled={saving}
                                 >
-                                    <div className="flex items-center gap-3">
-                                        {domain.scheduler_enabled ? (
-                                            <CheckCircle2 className="h-4 w-4 text-green-500" />
-                                        ) : (
-                                            <XCircle className="h-4 w-4 text-muted-foreground" />
-                                        )}
-                                        <div>
-                                            <p className="font-mono text-sm">{domain.target}</p>
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="always">
+                                            <div className="flex items-center gap-2">
+                                                <Bell className="h-4 w-4" />
+                                                Always notify
+                                            </div>
+                                        </SelectItem>
+                                        <SelectItem value="new_only">
+                                            <div className="flex items-center gap-2">
+                                                <BellOff className="h-4 w-4" />
+                                                Only when new subdomains found
+                                            </div>
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            {/* Last Run */}
+                            {settings?.lastRun && (
+                                <div className="text-sm text-muted-foreground border-t pt-4">
+                                    <Calendar className="inline h-4 w-4 mr-1" />
+                                    Last completed: {formatDate(settings.lastRun)}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    {/* Notification Detail Settings */}
+                    <Card className="border-border bg-card">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Send className="h-5 w-5 text-blue-400" />
+                                Notification Settings
+                            </CardTitle>
+                            <CardDescription>
+                                Configure how detailed notifications are sent to Telegram.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="space-y-2">
+                                <Label className="flex items-center gap-2">
+                                    <FileText className="h-4 w-4" />
+                                    Notification Detail Level
+                                </Label>
+                                <Select
+                                    value={backupSettings?.notifyDetail || "summary"}
+                                    onValueChange={(v) => handleBackupSettingsSave({ notifyDetail: v as any })}
+                                    disabled={saving}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="summary">
+                                            <div className="flex items-center gap-2">
+                                                <Eye className="h-4 w-4" />
+                                                Summary (counts only)
+                                            </div>
+                                        </SelectItem>
+                                        <SelectItem value="detailed">
+                                            <div className="flex items-center gap-2">
+                                                <FileText className="h-4 w-4" />
+                                                Detailed (includes subdomain names)
+                                            </div>
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-xs text-muted-foreground">
+                                    Summary mode only shows counts (safer for sensitive targets). Detailed mode includes subdomain names in notifications.
+                                </p>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Nuclei Settings */}
+                    <Card className="border-border bg-card">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Shield className="h-5 w-5 text-orange-400" />
+                                Nuclei Vulnerability Scanning
+                            </CardTitle>
+                            <CardDescription>
+                                Configure automatic vulnerability scanning for live hosts discovered during scheduled scans.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            {/* Scan Mode */}
+                            <div className="space-y-2">
+                                <Label className="flex items-center gap-2">
+                                    <Zap className="h-4 w-4" />
+                                    Scan Mode
+                                </Label>
+                                <Select
+                                    value={nucleiSettings?.scanMode}
+                                    onValueChange={(v) => handleNucleiSettingsSave({ scanMode: v as any })}
+                                    disabled={saving}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="quick">
+                                            <div className="flex items-center gap-2">
+                                                <Zap className="h-4 w-4 text-yellow-400" />
+                                                Quick (CVEs only)
+                                            </div>
+                                        </SelectItem>
+                                        <SelectItem value="standard">
+                                            <div className="flex items-center gap-2">
+                                                <Shield className="h-4 w-4 text-blue-400" />
+                                                Standard (CVEs + Exposures)
+                                            </div>
+                                        </SelectItem>
+                                        <SelectItem value="full">
+                                            <div className="flex items-center gap-2">
+                                                <FlaskConical className="h-4 w-4 text-purple-400" />
+                                                Full (All templates)
+                                            </div>
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            {/* Custom Templates */}
+                            <div className="space-y-2">
+                                <Label>Custom Templates (comma-separated paths)</Label>
+                                <Input
+                                    value={nucleiSettings?.templates || ""}
+                                    onChange={(e) => handleNucleiSettingsSave({ templates: e.target.value })}
+                                    placeholder="e.g., /templates/custom/, cves/2024/"
+                                    disabled={saving}
+                                />
+                            </div>
+
+                            {/* Severity Filter */}
+                            <div className="space-y-2">
+                                <Label>Severity Filter</Label>
+                                <Select
+                                    value={nucleiSettings?.severity || "critical,high,medium"}
+                                    onValueChange={(v) => handleNucleiSettingsSave({ severity: v })}
+                                    disabled={saving}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="critical">Critical only</SelectItem>
+                                        <SelectItem value="critical,high">Critical + High</SelectItem>
+                                        <SelectItem value="critical,high,medium">Critical + High + Medium</SelectItem>
+                                        <SelectItem value="critical,high,medium,low">All severities</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            {/* Rate Limit & Concurrency */}
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <div className="space-y-2">
+                                    <Label>Rate Limit (req/s)</Label>
+                                    <Input
+                                        type="number"
+                                        value={nucleiSettings?.rateLimit || 150}
+                                        onChange={(e) => handleNucleiSettingsSave({ rateLimit: parseInt(e.target.value) || 150 })}
+                                        min={10}
+                                        max={500}
+                                        disabled={saving}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Concurrency</Label>
+                                    <Input
+                                        type="number"
+                                        value={nucleiSettings?.concurrency || 25}
+                                        onChange={(e) => handleNucleiSettingsSave({ concurrency: parseInt(e.target.value) || 25 })}
+                                        min={5}
+                                        max={100}
+                                        disabled={saving}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Safety Threshold */}
+                            <div className="flex items-center justify-between rounded-lg border p-4 bg-yellow-500/5 border-yellow-500/20">
+                                <div className="space-y-0.5">
+                                    <div className="flex items-center gap-2">
+                                        <AlertTriangle className="h-4 w-4 text-yellow-400" />
+                                        <Label className="text-base">Safety Threshold</Label>
+                                    </div>
+                                    <p className="text-sm text-muted-foreground">
+                                        Skip Nuclei if more than this many new subdomains are found (prevents accidental large scans).
+                                    </p>
+                                </div>
+                                <Input
+                                    type="number"
+                                    value={nucleiSettings?.maxNewThreshold || 50}
+                                    onChange={(e) => handleNucleiSettingsSave({ maxNewThreshold: parseInt(e.target.value) || 50 })}
+                                    min={10}
+                                    max={500}
+                                    className="w-24"
+                                    disabled={saving}
+                                />
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Domain List */}
+                    <Card className="border-border bg-card">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Globe className="h-5 w-5 text-emerald-400" />
+                                Monitored Targets
+                            </CardTitle>
+                            <CardDescription>
+                                Toggle scheduling for each domain. Add domains via Subfinder inventory.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            {domains.length === 0 ? (
+                                <div className="text-center py-8 text-muted-foreground">
+                                    <Globe className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                                    <p>No domains in inventory.</p>
+                                    <p className="text-sm">Run a Subfinder scan to add domains.</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    <div className="grid grid-cols-3 gap-4 text-xs font-medium text-muted-foreground px-4 py-2">
+                                        <div>Domain</div>
+                                        <div className="text-center">Subfinder</div>
+                                        <div className="text-center">Nuclei</div>
+                                    </div>
+                                    {domains.map((domain) => (
+                                        <div
+                                            key={domain.id}
+                                            className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted/50"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <Globe className="h-4 w-4 text-muted-foreground" />
+                                                <div>
+                                                    <p className="font-medium">{domain.target}</p>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {domain.total_count} subdomains • Last: {formatDate(domain.last_scan_date)}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-4">
+                                                <Switch
+                                                    checked={domain.scheduler_enabled === 1}
+                                                    onCheckedChange={(checked) => handleDomainToggle(domain.id, checked)}
+                                                />
+                                                <Switch
+                                                    checked={domain.nuclei_enabled === 1}
+                                                    onCheckedChange={(checked) => handleNucleiToggle(domain.id, checked)}
+                                                    disabled={domain.scheduler_enabled !== 1}
+                                                />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
+            </TabsContent>
+
+            <TabsContent value="history">
+                <Card className="border-border bg-card">
+                    <CardHeader>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <CardTitle className="flex items-center gap-2">
+                                    <History className="h-5 w-5 text-blue-400" />
+                                    Automation History
+                                </CardTitle>
+                                <CardDescription>
+                                    View logs of all scheduled scan runs.
+                                </CardDescription>
+                            </div>
+                            {logs.length > 0 && (
+                                <Button variant="outline" size="sm" onClick={clearLogs}>
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Clear History
+                                </Button>
+                            )}
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        {logs.length === 0 ? (
+                            <div className="text-center py-8 text-muted-foreground">
+                                <History className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                                <p>No automation history yet.</p>
+                                <p className="text-sm">Run a scheduled scan to see logs here.</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-2">
+                                <div className="grid grid-cols-6 gap-4 text-xs font-medium text-muted-foreground px-4 py-2 border-b">
+                                    <div>Time</div>
+                                    <div>Domain</div>
+                                    <div className="text-center">Status</div>
+                                    <div className="text-center">New Subs</div>
+                                    <div className="text-center">New Live</div>
+                                    <div className="text-center">Findings</div>
+                                </div>
+                                {logs.map((log) => (
+                                    <div
+                                        key={log.id}
+                                        className={`grid grid-cols-6 gap-4 items-center p-4 rounded-lg border hover:bg-muted/50 ${log.status === 'error' ? 'border-red-500/30 bg-red-500/5' : ''}`}
+                                    >
+                                        <div className="text-sm">
+                                            <p className="font-medium">{formatLogDate(log.started_at)}</p>
                                             <p className="text-xs text-muted-foreground">
-                                                {domain.total_count} subdomains • Last: {formatDate(domain.last_scan_date)}
+                                                {new Date(log.started_at).toLocaleTimeString()}
                                             </p>
                                         </div>
+                                        <div className="font-mono text-sm truncate" title={log.domain}>
+                                            {log.domain}
+                                        </div>
+                                        <div className="text-center">
+                                            <StatusBadge status={log.status} />
+                                        </div>
+                                        <div className="text-center">
+                                            <span className={`font-medium ${log.subdomains_new > 0 ? 'text-emerald-400' : 'text-muted-foreground'}`}>
+                                                {log.subdomains_new}
+                                            </span>
+                                        </div>
+                                        <div className="text-center font-medium">
+                                            {log.live_hosts}
+                                        </div>
+                                        <div className="text-center">
+                                            {log.findings_count > 0 ? (
+                                                <span className="text-orange-400 font-medium">{log.findings_count}</span>
+                                            ) : (
+                                                <span className="text-muted-foreground">0</span>
+                                            )}
+                                        </div>
+                                        {log.error_message && (
+                                            <div className="col-span-6 text-xs text-red-400 bg-red-500/10 p-2 rounded mt-1">
+                                                <AlertTriangle className="inline h-3 w-3 mr-1" />
+                                                {log.error_message}
+                                            </div>
+                                        )}
                                     </div>
-                                    <div className="flex items-center gap-4">
-                                        <Switch
-                                            checked={domain.scheduler_enabled === 1}
-                                            onCheckedChange={(checked) => handleDomainToggle(domain.id, checked)}
-                                        />
-                                        <Switch
-                                            checked={domain.nuclei_enabled === 1}
-                                            onCheckedChange={(checked) => handleNucleiToggle(domain.id, checked)}
-                                            disabled={domain.scheduler_enabled !== 1}
-                                        />
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-        </div>
+                                ))}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            </TabsContent>
+        </Tabs>
     );
 }
+

@@ -15,6 +15,7 @@ import { SystemStatus } from "@/components/dashboard/SystemStatus";
 import { SystemPanel } from "@/components/system/SystemPanel";
 import { BackupRestorePanel } from "@/components/import/ImportPanel";
 import { AnalysisRow } from "@/components/dashboard/AnalysisRow";
+import { SchedulerPanel } from "@/components/system/SchedulerPanel";
 
 export function DashboardClient({ initialStats }: { initialStats: any }) {
     const [activeScanId, setActiveScanId] = useState<string | null>(null);
@@ -129,6 +130,12 @@ export function DashboardClient({ initialStats }: { initialStats: any }) {
                     {activeView === "system" && (
                         <div className="animate-in fade-in duration-500">
                             <SystemPanel />
+                        </div>
+                    )}
+
+                    {activeView === "automation" && (
+                        <div className="animate-in fade-in duration-500">
+                            <SchedulerPanel />
                         </div>
                     )}
 

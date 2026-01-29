@@ -1,5 +1,5 @@
 import cron, { ScheduledTask } from "node-cron";
-import { getDatabase, getSetting, setSetting } from "./db";
+import { getDatabase, getSetting, setSetting, insertSchedulerLog, updateSchedulerLog } from "./db";
 import { sendTelegramNotification } from "./notifications";
 
 let schedulerTask: ScheduledTask | null = null;
@@ -195,6 +195,9 @@ export async function runScheduledScans() {
         currentDomain = domain.target;
         console.log(`[Scheduler] Scanning: ${domain.target}`);
 
+        // Log the scan start
+        const logId = insertSchedulerLog(domain.target);
+
         try {
             const result = await triggerSubfinderScan(domain.target);
 
@@ -329,9 +332,32 @@ export async function runScheduledScans() {
                 } else {
                     console.log(`[Scheduler] Skipping notification for ${domain.target} (no new subdomains, mode: new_only)`);
                 }
+
+                // Update scheduler log with success
+                updateSchedulerLog(logId, {
+                    completed_at: Date.now(),
+                    status: 'completed',
+                    subdomains_total: result.total,
+                    subdomains_new: result.newCount,
+                    live_hosts: httpxResult?.liveCount || 0,
+                    findings_count: nucleiResult?.findingsCount || 0
+                });
+            } else {
+                // Subfinder returned null
+                updateSchedulerLog(logId, {
+                    completed_at: Date.now(),
+                    status: 'error',
+                    error_message: 'Subfinder scan returned no results'
+                });
             }
         } catch (e) {
             console.error(`[Scheduler] Error scanning ${domain.target}:`, e);
+            // Log the error
+            updateSchedulerLog(logId, {
+                completed_at: Date.now(),
+                status: 'error',
+                error_message: e instanceof Error ? e.message : String(e)
+            });
         }
 
         currentDomain = null;

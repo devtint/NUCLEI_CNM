@@ -85,13 +85,25 @@ def run_command(cmd, capture_output=False, silent=False):
 def check_docker():
     """Verify Docker is running"""
     print_colored(f"{icon('🔍')} Checking Docker status...", Colors.CYAN)
-    result = run_command('docker info', capture_output=True)
-    if result and 'Server:' in result:
-        print_colored(f"   {icon('✓', '+')} Docker is running", Colors.GREEN)
-        return True
-    else:
-        print_colored(f"   {icon('✗', 'X')} Docker is not running!", Colors.RED)
-        print_colored("   Please start Docker Desktop and try again.", Colors.YELLOW)
+    try:
+        result = subprocess.run('docker info', shell=True, capture_output=True, text=True, timeout=5)
+        # Check if command succeeded and contains server information
+        if result.returncode == 0 and 'Server' in result.stdout:
+            print_colored(f"   {icon('✓', '+')} Docker is running", Colors.GREEN)
+            return True
+        else:
+            print_colored(f"   {icon('✗', 'X')} Docker is not running!", Colors.RED)
+            print_colored("   Please start Docker Desktop and try again.", Colors.YELLOW)
+            if platform.system() == 'Windows':
+                print_colored("   Hint: Launch Docker Desktop from Start Menu", Colors.GRAY)
+            return False
+    except subprocess.TimeoutExpired:
+        print_colored(f"   {icon('✗', 'X')} Docker command timed out!", Colors.RED)
+        print_colored("   Docker may be starting or not responding.", Colors.YELLOW)
+        return False
+    except Exception as e:
+        print_colored(f"   {icon('✗', 'X')} Error checking Docker: {e}", Colors.RED)
+        print_colored("   Please ensure Docker is installed and running.", Colors.YELLOW)
         return False
 
 def check_compose_file():

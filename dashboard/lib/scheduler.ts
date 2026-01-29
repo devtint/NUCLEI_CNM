@@ -758,7 +758,7 @@ export function getSchedulerStatus(): { isProcessing: boolean; currentDomain: st
     const settings = getSchedulerSettings();
 
     let nextRun: Date | null = null;
-    if (settings.enabled && schedulerTask) {
+    if (settings.enabled) {
         // Calculate next run based on frequency
         const now = new Date();
         switch (settings.frequency) {

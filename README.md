@@ -28,7 +28,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Next.js-15+-black?style=flat-square&logo=next.js" alt="Next.js"/>
+  <img src="https://img.shields.io/badge/Next.js-16+-black?style=flat-square&logo=next.js" alt="Next.js"/>
   <img src="https://img.shields.io/badge/TypeScript-5.0-blue?style=flat-square&logo=typescript" alt="TypeScript"/>
   <img src="https://img.shields.io/badge/Auth.js-v5-green?style=flat-square&logo=auth0" alt="Auth.js"/>
   <img src="https://img.shields.io/badge/SQLite-3-003B57?style=flat-square&logo=sqlite" alt="SQLite"/>
@@ -101,6 +101,22 @@
 - **Performance Tuning** - Configurable rate limits, concurrency, and bulk sizes
 - **Access Logging** - Audit trail for all authentication events
 
+### ⌨️ Keyboard Shortcuts
+
+- **Command Palette** (`Ctrl+K`) - Fuzzy search across views, actions, and navigation
+- **Help Overlay** (`?`) - Full keyboard shortcut reference
+- **Quick Navigation** (`g` + key) - Gmail/GitHub-style two-key combos (e.g., `g d` → Dashboard, `g v` → Vulnerabilities)
+- **Global Shortcuts** - `/` focus search, `r` refresh, `n` new scan, `Esc` close modals
+
+### 📺 Fullscreen Log Viewer
+
+- **Always Fullscreen** - Immersive terminal-style log viewing
+- **ANSI Color Rendering** - Full color support with inline CSS (XSS-safe)
+- **Severity Detection** - Color-coded borders for Critical/High/Medium/Low/Info lines
+- **Search** (`Ctrl+F`) - In-log search with match navigation (`Enter` / `Shift+Enter`)
+- **Quick Actions** - `Ctrl+C` copy, `Ctrl+Shift+S` download, `Home`/`End` jump, `m` toggle nav
+- **Integrated Navigation** - Slide-out sidebar menu to switch views without closing logs
+
 ---
 
 ## Architecture
@@ -147,7 +163,7 @@
 
 | Layer | Technology | Purpose |
 |-------|------------|---------|
-| **Frontend** | Next.js 15, React 19, Tailwind CSS | Server-side rendering, responsive UI |
+| **Frontend** | Next.js 16, React 19, Tailwind CSS v4 | Server-side rendering, responsive UI |
 | **Components** | shadcn/ui (Radix primitives) | Accessible, customizable UI library |
 | **Authentication** | Auth.js v5 (NextAuth) | Session management, middleware protection |
 | **Password Security** | bcrypt (10 rounds) | Secure credential hashing |
@@ -401,16 +417,28 @@ NUCLEI_CNM/
 │   │   ├── login/                      # Authentication page
 │   │   └── page.tsx                    # Main dashboard
 │   ├── components/                     # React Components
-│   │   ├── dashboard/                  # Overview, stats
-│   │   ├── findings/                   # Table, filters
-│   │   ├── scan/                       # Wizard, console
+│   │   ├── dashboard/                  # Overview, stats, analysis
+│   │   ├── findings/                   # Table, filters, export
+│   │   ├── layout/                     # Sidebar, CommandPalette, ShortcutHelp, KeyboardShortcuts
+│   │   ├── scan/                       # Wizard, LiveConsole, LogViewer
+│   │   ├── subfinder/                  # SubfinderPanel, SubdomainTable, ResultsFeed
+│   │   ├── httpx/                      # HttpxPanel (live asset probing)
+│   │   ├── system/                     # Settings, Scheduler, Scanners, Config
+│   │   ├── templates/                  # Template manager and list
+│   │   ├── import/                     # Backup & restore panel
 │   │   └── ui/                         # shadcn/ui primitives
 │   ├── lib/                            # Core Logic
-│   │   ├── db.ts                       # Database operations
+│   │   ├── db.ts                       # Database operations (1000+ lines)
+│   │   ├── ansi.ts                     # ANSI color → HTML converter (XSS-safe)
 │   │   ├── scheduler.ts                # Scheduled scan logic
 │   │   ├── notifications.ts            # Telegram integration
 │   │   └── nuclei/                     # Config, presets
+│   ├── scripts/                        # Utility scripts
+│   │   ├── init-config.js              # Docker first-run config generator
+│   │   └── hash-password.js            # Password hash utility
 │   └── proxy.ts                        # Authentication middleware
+├── docker-compose.yml                  # Production (with Cloudflare Tunnel)
+├── docker-compose.local.yml            # Local-only (no tunnel)
 ├── Reference and Usage And Guide/      # Technical Documentation
 └── README.md                           # This file
 ```
@@ -425,6 +453,7 @@ NUCLEI_CNM/
 | [AUTHENTICATION.md](./Refrencce%20and%20Usage%20And%20Guide/AUTHENTICATION.md) | Security implementation details |
 | [ARCHITECTURE.md](./Refrencce%20and%20Usage%20And%20Guide/ARCHITECTURE.md) | System design and data flow |
 | [API_REFERENCE.md](./Refrencce%20and%20Usage%20And%20Guide/API_REFERENCE.md) | Endpoint specifications |
+| [DATABASE_SCHEMA.md](./Refrencce%20and%20Usage%20And%20Guide/DATABASE_SCHEMA.md) | SQLite table definitions and relationships |
 
 ---
 

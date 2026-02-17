@@ -140,78 +140,72 @@ interface HttpxAssetCardProps {
 
 const HttpxAssetCard = ({ data: r, onClick, onScanTarget, style }: HttpxAssetCardProps) => {
     return (
-        <div style={style} className="px-4 pb-3">
+        <div style={style} className="px-4 pb-2">
             <div onClick={onClick} className="cursor-pointer h-full">
                 <Card className={cn(
-                    "bg-card text-card-foreground shadow-sm h-full flex flex-col border transition-all hover:bg-muted/10 active:scale-[0.99] duration-200",
+                    "bg-card text-card-foreground shadow-sm h-full border transition-all hover:bg-muted/10 active:scale-[0.99] duration-200 group",
                     r.change_status === 'new' ? "border-emerald-500/50 shadow-emerald-500/5" :
                         r.change_status === 'changed' ? "border-amber-500/50 shadow-amber-500/5" :
                             "border-white/10"
                 )}>
-                    <CardContent className="p-4 flex flex-col gap-3">
-                        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                            {/* LEFT COLUMN: URL and Title */}
-                            <div className="flex-1 min-w-0 space-y-1.5">
-                                <div className="flex items-center gap-2">
-                                    <a href={r.url} target="_blank" onClick={(e) => e.stopPropagation()} className="text-base font-bold text-blue-400 hover:text-blue-300 hover:underline truncate" title={r.url}>
-                                        {r.url}
-                                    </a>
-                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground shrink-0" onClick={(e) => {
-                                        e.stopPropagation();
-                                        navigator.clipboard.writeText(r.url);
-                                        toast.success("Copied to clipboard");
-                                    }}>
-                                        <Copy className="h-3 w-3" />
-                                    </Button>
-                                    {onScanTarget && (
-                                        <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-emerald-500 shrink-0" onClick={(e) => {
-                                            e.stopPropagation();
-                                            onScanTarget(r.url);
-                                        }} title="Start Nuclei Scan">
-                                            <Target className="h-3 w-3" />
-                                        </Button>
-                                    )}
-                                    <div className="flex md:hidden items-center gap-2">
-                                        <Badge variant="outline" className={cn(
-                                            "text-[10px] px-1.5 h-5 font-mono",
-                                            r.status_code >= 200 && r.status_code < 300 ? "text-emerald-500 border-emerald-500/30 bg-emerald-500/5" :
-                                                r.status_code >= 300 && r.status_code < 400 ? "text-amber-500 border-amber-500/30 bg-amber-500/5" :
-                                                    "text-red-500 border-red-500/30 bg-red-500/5"
-                                        )}>{r.status_code}</Badge>
+                    <CardContent className="p-3">
+                        <div className="flex flex-col gap-2">
+                            {/* Top Row: URL, Status, Actions */}
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0 flex-1 flex flex-col gap-0.5">
+                                    <div className="flex items-center gap-2">
+                                        <a href={r.url} target="_blank" onClick={(e) => e.stopPropagation()} className="font-bold text-blue-400 hover:text-blue-300 hover:underline truncate text-sm leading-tight" title={r.url}>
+                                            {r.url}
+                                        </a>
+                                        <div className="flex shrink-0 items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <Button variant="ghost" size="icon" className="h-5 w-5 text-muted-foreground hover:text-foreground" onClick={(e) => {
+                                                e.stopPropagation();
+                                                navigator.clipboard.writeText(r.url);
+                                                toast.success("Copied to clipboard");
+                                            }}>
+                                                <Copy className="h-3 w-3" />
+                                            </Button>
+                                            {onScanTarget && (
+                                                <Button variant="ghost" size="icon" className="h-5 w-5 text-muted-foreground hover:text-emerald-500" onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onScanTarget(r.url);
+                                                }} title="Start Nuclei Scan">
+                                                    <Target className="h-3 w-3" />
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="text-xs text-muted-foreground truncate" title={getString(r.title) || "No Title"}>
+                                        {renderSafeString(r.title) || <span className="italic opacity-50">No Title</span>}
                                     </div>
                                 </div>
 
-                                <div className="text-sm text-foreground/80 font-medium truncate" title={getString(r.title) || "No Title"}>
-                                    {renderSafeString(r.title) || <span className="text-muted-foreground italic">No Title</span>}
-                                </div>
-
-
-                            </div>
-
-                            {/* RIGHT COLUMN: Meta, Tech, Timings */}
-                            <div className="flex flex-col items-start md:items-end gap-3 min-w-[200px]">
-                                <div className="flex items-center gap-3">
-                                    <span className="text-xs font-mono text-muted-foreground tabular-nums">
-                                        {r.response_time || "0ms"}
-                                    </span>
-
-                                    <div className="hidden md:flex items-center gap-2">
+                                <div className="flex flex-col items-end gap-1 shrink-0">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] font-mono text-muted-foreground tabular-nums">
+                                            {r.response_time || "0ms"}
+                                        </span>
                                         <Badge variant="outline" className={cn(
-                                            "text-xs px-2 h-6 font-mono font-bold",
+                                            "text-[10px] px-1.5 h-5 font-mono font-bold",
                                             r.status_code >= 200 && r.status_code < 300 ? "text-emerald-500 border-emerald-500/30 bg-emerald-500/10" :
                                                 r.status_code >= 300 && r.status_code < 400 ? "text-amber-500 border-amber-500/30 bg-amber-500/10" :
                                                     "text-red-500 border-red-500/30 bg-red-500/10"
                                         )}>{r.status_code}</Badge>
-
-                                        {r.change_status === 'new' && <Badge className="text-[10px] px-1.5 h-6 bg-emerald-500/20 text-emerald-500 border border-emerald-500/30">NEW</Badge>}
-                                        {r.change_status === 'changed' && <Badge className="text-[10px] px-1.5 h-6 bg-amber-500/20 text-amber-500 border border-amber-500/30">CHANGED</Badge>}
-                                        {r.change_status === 'old' && <Badge variant="outline" className="text-[10px] px-1.5 h-6 text-muted-foreground border-zinc-500/20">OLD</Badge>}
                                     </div>
-                                </div>
 
-                                <div className="flex flex-wrap justify-end gap-1.5 max-w-full md:max-w-xs">
-                                    {renderTech(r.technologies, r.web_server)}
+                                    {/* Change Status Badges */}
+                                    {(r.change_status === 'new' || r.change_status === 'changed') && (
+                                        <div className="flex gap-1">
+                                            {r.change_status === 'new' && <Badge className="text-[9px] px-1 h-4 bg-emerald-500/20 text-emerald-500 border border-emerald-500/30 pointer-events-none">NEW</Badge>}
+                                            {r.change_status === 'changed' && <Badge className="text-[9px] px-1 h-4 bg-amber-500/20 text-amber-500 border border-amber-500/30 pointer-events-none">MOD</Badge>}
+                                        </div>
+                                    )}
                                 </div>
+                            </div>
+
+                            {/* Tech Stack Row */}
+                            <div className="flex flex-wrap gap-1 mt-1">
+                                {renderTech(r.technologies, r.web_server)}
                             </div>
                         </div>
                     </CardContent>

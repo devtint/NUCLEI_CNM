@@ -9,41 +9,62 @@ export function stripAnsiCodes(text: string): string {
 }
 
 /**
- * Convert ANSI color codes to HTML/CSS colors
- * This preserves the color information from terminal output
+ * ANSI color code -> inline CSS style map
+ * Uses inline styles instead of Tailwind classes for safe use with dangerouslySetInnerHTML
+ */
+const ANSI_STYLE_MAP: Record<string, string> = {
+    '30': 'color:#6b7280',      // Black
+    '31': 'color:#ef4444',      // Red
+    '32': 'color:#22c55e',      // Green
+    '33': 'color:#eab308',      // Yellow
+    '34': 'color:#3b82f6',      // Blue
+    '35': 'color:#a855f7',      // Magenta
+    '36': 'color:#06b6d4',      // Cyan
+    '37': 'color:#d1d5db',      // White
+    '90': 'color:#9ca3af',      // Bright Black (Gray)
+    '91': 'color:#f87171',      // Bright Red
+    '92': 'color:#4ade80',      // Bright Green
+    '93': 'color:#facc15',      // Bright Yellow
+    '94': 'color:#60a5fa',      // Bright Blue
+    '95': 'color:#c084fc',      // Bright Magenta
+    '96': 'color:#22d3ee',      // Bright Cyan
+    '97': 'color:#f3f4f6',      // Bright White
+    '1': 'font-weight:bold',   // Bold
+};
+
+/**
+ * Convert a semicolon-separated ANSI code string into an HTML <span> or </span>
+ */
+function codesToSpan(codes: string): string {
+    const codeList = codes.split(';');
+    // Reset code -> close span
+    if (codeList.includes('0')) {
+        return '</span>';
+    }
+    const styles = codeList
+        .map(c => ANSI_STYLE_MAP[c])
+        .filter(Boolean)
+        .join(';');
+    return styles ? `<span style="${styles}">` : '';
+}
+
+/**
+ * Convert ANSI color codes to inline-styled HTML.
+ * - HTML-escapes the content first (XSS prevention)
+ * - Converts ESC[...m and bare [...m sequences to <span style="..."> / </span>
  */
 export function ansiToHtml(text: string): string {
-    const ansiColorMap: { [key: string]: string } = {
-        '30': 'text-gray-900',      // Black
-        '31': 'text-red-500',        // Red
-        '32': 'text-green-500',      // Green
-        '33': 'text-yellow-500',     // Yellow
-        '34': 'text-blue-500',       // Blue
-        '35': 'text-purple-500',     // Magenta
-        '36': 'text-cyan-500',       // Cyan
-        '37': 'text-gray-300',       // White
-        '90': 'text-gray-600',       // Bright Black (Gray)
-        '91': 'text-red-400',        // Bright Red
-        '92': 'text-green-400',      // Bright Green
-        '93': 'text-yellow-400',     // Bright Yellow
-        '94': 'text-blue-400',       // Bright Blue
-        '95': 'text-purple-400',     // Bright Magenta
-        '96': 'text-cyan-400',       // Bright Cyan
-        '97': 'text-white',          // Bright White
-        '0': 'text-green-400',       // Reset (default terminal color)
-        '1': 'font-bold',            // Bold
-    };
+    // 1. Escape HTML entities to prevent XSS from log content
+    let result = text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
 
-    let result = text;
+    // 2. Convert proper ESC[...m sequences
+    result = result.replace(/\x1b\[([0-9;]+)m/g, (_match, codes) => codesToSpan(codes));
 
-    // Replace ANSI codes with span tags
-    Object.entries(ansiColorMap).forEach(([code, className]) => {
-        const regex = new RegExp(`\\[${code}m`, 'g');
-        result = result.replace(regex, `<span class="${className}">`);
-    });
-
-    // Close any open spans at reset codes
-    result = result.replace(/\[0m/g, '</span>');
+    // 3. Convert bare [XXm sequences (ESC byte already stripped by some transports)
+    result = result.replace(/\[([0-9;]+)m/g, (_match, codes) => codesToSpan(codes));
 
     return result;
 }

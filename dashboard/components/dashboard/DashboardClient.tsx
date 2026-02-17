@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { DashboardStats } from "@/components/dashboard/Stats";
 import { ScanWizard } from "@/components/scan/Wizard";
 import { LiveConsole } from "@/components/scan/LiveConsole";
@@ -16,6 +16,10 @@ import { SystemPanel } from "@/components/system/SystemPanel";
 import { BackupRestorePanel } from "@/components/import/ImportPanel";
 import { AnalysisRow } from "@/components/dashboard/AnalysisRow";
 import { SchedulerPanel } from "@/components/system/SchedulerPanel";
+import { useKeyboardShortcuts } from "@/components/layout/KeyboardShortcuts";
+import { CommandPalette } from "@/components/layout/CommandPalette";
+import { ShortcutHelp } from "@/components/layout/ShortcutHelp";
+import { Command } from "lucide-react";
 
 export function DashboardClient({ initialStats }: { initialStats: any }) {
     const [activeScanId, setActiveScanId] = useState<string | null>(null);
@@ -24,6 +28,22 @@ export function DashboardClient({ initialStats }: { initialStats: any }) {
     const [activeView, setActiveView] = useState("overview");
     const [templateRefresh, setTemplateRefresh] = useState(0);
     const [statsRefresh, setStatsRefresh] = useState(0);
+
+    // Keyboard shortcuts state
+    const [paletteOpen, setPaletteOpen] = useState(false);
+    const [helpOpen, setHelpOpen] = useState(false);
+
+    const handleRefresh = useCallback(() => {
+        setStatsRefresh(prev => prev + 1);
+    }, []);
+
+    useKeyboardShortcuts({
+        onNavigate: setActiveView,
+        onOpenCommandPalette: () => setPaletteOpen(true),
+        onOpenHelp: () => setHelpOpen(true),
+        onRefresh: handleRefresh,
+        activeView,
+    });
 
     const startScan = (id: string) => {
         setActiveScanId(id);
@@ -48,6 +68,14 @@ export function DashboardClient({ initialStats }: { initialStats: any }) {
                             {activeView.replace("-", " ")}
                         </h1>
                         <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setPaletteOpen(true)}
+                                className="flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground bg-muted/50 border border-border rounded-lg hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
+                            >
+                                <Command className="h-3.5 w-3.5" />
+                                <span className="hidden sm:inline">Search...</span>
+                                <kbd className="ml-1 px-1.5 py-0.5 text-[10px] bg-background border border-border rounded font-mono">Ctrl+K</kbd>
+                            </button>
                             <SystemStatus />
                         </div>
                     </header>
@@ -93,7 +121,7 @@ export function DashboardClient({ initialStats }: { initialStats: any }) {
 
                     {activeView === "activity" && (
                         <div className="animate-in fade-in duration-500 h-[calc(100vh-200px)]">
-                            <LiveConsole scanId={activeScanId} />
+                            <LiveConsole scanId={activeScanId} onNavigate={setActiveView} />
                         </div>
                     )}
 
@@ -146,6 +174,18 @@ export function DashboardClient({ initialStats }: { initialStats: any }) {
                     )}
                 </div>
             </div>
+
+            {/* Command Palette & Shortcut Help */}
+            <CommandPalette
+                open={paletteOpen}
+                onClose={() => setPaletteOpen(false)}
+                onNavigate={setActiveView}
+                onOpenHelp={() => { setPaletteOpen(false); setHelpOpen(true); }}
+            />
+            <ShortcutHelp
+                open={helpOpen}
+                onClose={() => setHelpOpen(false)}
+            />
         </div>
     );
 }

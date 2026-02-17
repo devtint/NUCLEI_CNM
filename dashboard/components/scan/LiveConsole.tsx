@@ -27,7 +27,7 @@ interface ScanInfo {
     };
 }
 
-export function LiveConsole({ scanId }: { scanId: string | null }) {
+export function LiveConsole({ scanId, onNavigate }: { scanId: string | null; onNavigate?: (view: string) => void }) {
     const [activeScans, setActiveScans] = useState<ScanInfo[]>([]);
     const [loading, setLoading] = useState(false);
     const [viewingLogs, setViewingLogs] = useState<string | null>(null);
@@ -181,6 +181,7 @@ export function LiveConsole({ scanId }: { scanId: string | null }) {
                     isRunning={activeScans.find(s => s.id === viewingLogs)?.status === 'running'}
                     open={!!viewingLogs}
                     onClose={() => setViewingLogs(null)}
+                    onNavigate={onNavigate}
                 />
             )}
         </div>

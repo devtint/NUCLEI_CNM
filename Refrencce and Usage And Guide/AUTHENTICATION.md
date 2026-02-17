@@ -1,190 +1,114 @@
-# Authentication & Security
+# Authentication & Security Documentation
 
 ## Overview
+NUCLEI_CNM implements a robust, multifaceted security model designed to protect sensitive vulnerability data. It leverages **NextAuth v5 (Beta)** for session management and **Next.js Middleware** for edge-level access control.
 
-The Nuclei Dashboard now includes comprehensive authentication and authorization to protect all pages and API routes. This document details the security implementation.
+## 1. Authentication System
 
----
+### Core Components
+- **Library**: `next-auth` (v5.0.0-beta.16)
+- **Strategy**: Credentials Provider (Username/Password)
+- **Session**: Encrypted JWT (JWE) in HTTP-only cookies
+- **Encryption**: AES-256-GCM (via `jose`)
 
-## Architecture
-
-### Technology Stack
-- **Framework**: NextAuth v5 (Auth.js)
-- **Password Hashing**: bcrypt (10 rounds)
-- **Session Management**: NextAuth sessions
-- **Middleware**: Next.js 16 `proxy.ts` (renamed from `middleware.ts`)
-
-### Security Layers
-
-```
-┌─────────────────────────────────────┐
-│   1. proxy.ts (Route Protection)    │
-│   - Redirects unauthenticated users │
-│   - HTTPS enforcement (production)  │
-└─────────────────────────────────────┘
-           ↓
-┌─────────────────────────────────────┐
-│   2. API Route Auth Checks          │
-│   - Every API validates session     │
-│   - Returns 401 if unauthorized     │
-└─────────────────────────────────────┘
-           ↓
-┌─────────────────────────────────────┐
-│   3. Database & Business Logic      │
-│   - Access logging                  │
-│   - Audit trail                     │
-└─────────────────────────────────────┘
-```
-
----
-
-## Configuration
-
-### Environment Variables
-
-Required in `dashboard/.env.local`:
-
-```env
-# Admin Password Hash (bcrypt)
-ADMIN_PASSWORD_HASH="$2b$10$..."
-
-# NextAuth Secret (generate with: openssl rand -base64 32)
-AUTH_SECRET="your-random-secret-key-here"
-```
-
-### Generating Password Hash
-
-**Method 1: Node.js (Recommended)**
-```bash
-node -e "const bcrypt = require('bcrypt'); bcrypt.hash('your-password', 10).then(hash => console.log(hash));"
-```
-
-**Method 2: bcrypt-cli**
-```bash
-npm install -g bcrypt-cli
-bcrypt-cli hash "your-password"
-```
-
-### Generating AUTH_SECRET
-
-```bash
-# Using OpenSSL
-openssl rand -base64 32
-
-# Using Node.js
-node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
-```
-
----
-
-## Implementation Details
-
-### 1. proxy.ts (Middleware)
-
-**Purpose**: Protect all routes at the edge using Next.js 16 conventions.
-
+### Configuration (`dashboard/auth.ts`)
 ```typescript
-export async function proxy(req: NextRequest) {
-    // 1. HTTPS enforcement (production only)
-    if (process.env.NODE_ENV === 'production') {
-        // Redirect HTTP → HTTPS
-    }
-
-    // 2. Get session
-    const session = await auth();
-    const isLoggedIn = !!session?.user;
-    const isOnLogin = req.nextUrl.pathname === '/login';
-
-    // 3. Redirect logic
-    if (isOnLogin && isLoggedIn) {
-        return NextResponse.redirect(new URL('/', req.url));
-    }
-    if (isOnLogin) {
-        return NextResponse.next();
-    }
-    if (!isLoggedIn) {
-        return NextResponse.redirect(new URL('/login', req.url));
-    }
-
-    return NextResponse.next();
-}
-
-export const config = {
-    matcher: ['/((?!api/auth|_next/static|_next/image|favicon.ico).*)'],
-};
+export const { auth, signIn, signOut } = NextAuth({
+  ...authConfig,
+  providers: [
+    Credentials({
+      async authorize(credentials) {
+        // 1. Validate input
+        const { password } = credentials;
+        
+        // 2. Compare against environment hash
+        const isValid = await bcrypt.compare(
+          password, 
+          process.env.ADMIN_PASSWORD_HASH
+        );
+        
+        // 3. Return user object or null
+        if (isValid) return { id: "admin", name: "Administrator" };
+        return null;
+      },
+    }),
+  ],
+});
 ```
 
-### 2. API Route Protection Pattern
+### Password Management
+Passwords are **never stored in plaintext**.
+- **Storage**: `ADMIN_PASSWORD_HASH` in `.env.local`
+- **Algorithm**: bcrypt (salt rounds: 10)
+- **Verification**: `bcrypt.compare()` on login attempt
 
-**Every API route** follows this pattern:
+---
 
+## 2. Middleware Protection (`dashboard/proxy.ts`)
+
+We use Next.js Middleware to enforce security rules **before** requests reach your application logic.
+
+### Rules Engine
+The `proxy.ts` file acts as a firewall rule engine:
+
+| Route Pattern | Access Rule | Action |
+| :--- | :--- | :--- |
+| `/login` | Public | Allow |
+| `/api/auth/*` | Public | Allow |
+| `/_next/*` | Public (Assets) | Allow |
+| `/favicon.ico` | Public | Allow |
+| `/api/*` | **Authenticated** | Return `401 Unauthorized` |
+| `/*` (All Pages) | **Authenticated** | Redirect to `/login` |
+
+### Implementation Details
 ```typescript
-export async function POST(req: NextRequest) {
-    // 1. Check authentication
-    const session = await auth();
-    if (!session) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+// dashboard/proxy.ts (Simplified)
+export default auth((req) => {
+  const isLoggedIn = !!req.auth;
+  const isApiRoute = req.nextUrl.pathname.startsWith('/api');
+  
+  if (!isLoggedIn && !isPublicRoute) {
+    if (isApiRoute) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
-
-    // 2. Business logic
-    // ...
-}
+    return Response.redirect(new URL('/login', req.nextUrl));
+  }
+});
 ```
 
----
-
-## Security Features
-
-### ✅ Implemented
-
-| Feature | Status | Description |
-|---------|--------|-------------|
-| Password Protection | ✅ | All routes require authentication |
-| Bcrypt Hashing | ✅ | Passwords hashed with 10 rounds |
-| Session Management | ✅ | NextAuth v5 sessions |
-| HTTPS Enforcement | ✅ | Auto-redirect in production |
-| Access Logging | ✅ | Login attempts logged to database |
-| Input Validation | ✅ | Zod schema validation |
+### Protection Layers
+1.  **Page Routes**: Unauthenticated users are redirected to login.
+2.  **API Routes**: Unauthenticated AJAX requests receive opaque 401 errors.
+3.  **HSTS**: In production (`NODE_ENV=production`), middleware adds `Strict-Transport-Security` headers only allowing HTTPS.
 
 ---
 
-## Access Logging
+## 3. Data Protection
 
-### Database Table
+### Database Security
+- **Isolation**: The `nuclei.db` file is stored outside the web root (`/app/data/`).
+- **Git Exclusion**: `.gitignore` explicitly blocks `*.db`, `*.db-wal`, `*.db-shm`.
+- **Injection Prevention**: All queries in `lib/db.ts` use **Prepared Statements** (`?` placeholders).
 
-```sql
-CREATE TABLE access_logs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    ip TEXT,
-    user_agent TEXT,
-    action TEXT,
-    timestamp INTEGER
-);
+### File System Security
+- **Traversal Protection**: Import/Restore endpoints validate filenames to prevent directory traversal attacks.
+- **Sanitization**: Template names are sanitized before being used as file paths.
+
+---
+
+## 4. Operational Security (OpSec)
+
+### Recommendations for Deployment
+1.  **HTTPS is Mandatory**: Do not expose the dashboard over plain HTTP publically. Cloudflare Tunnel handles this automatically.
+2.  **Strong Passwords**: Use a long, random passphrase for `ADMIN_PASSWORD_HASH`.
+3.  **Rotation**: Periodically rotate the `AUTH_SECRET` and Admin Password.
+4.  **Access Logs**: Monitor the `access_logs` table (viewable in System panel) for failed login attempts.
+
+### Environment variables
+Always keep `.env.local` secure.
+```bash
+# Critical Secrets
+ADMIN_PASSWORD_HASH=...
+AUTH_SECRET=...
+TELEGRAM_BOT_TOKEN=...
 ```
-
-### Viewing Logs
-
-Navigate to **System** → **Access Logs** in the dashboard.
-
----
-
-## Troubleshooting
-
-### Cannot Login
-
-**Symptom**: "Invalid credentials" error
-
-**Fix**:
-1. Regenerate hash using bcrypt.
-2. Update `ADMIN_PASSWORD_HASH` in `.env.local`.
-3. Restart server.
-
-### 401 on API Routes
-
-**Symptom**: API returns "Unauthorized"
-
-**Cause**: Session not sent with request or middleware not running. Ensure `proxy.ts` is in the root directory.
-
----
-
-**Last Updated**: 2026-01-12

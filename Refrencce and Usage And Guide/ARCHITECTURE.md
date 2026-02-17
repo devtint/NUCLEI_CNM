@@ -35,7 +35,7 @@ The Nuclei Dashboard is a **Next.js-based web application** with **SQLite databa
 4. **Real-time Updates**: Database polling for scan status
 5. **Client-Side State**: React hooks for UI state management
 6. **Response Caching**: In-memory caching with TTL for API optimization
-7. **Middleware-Based Security**: Route-level protection for pages and APIs
+7. **Middleware-Based Security**: Route-level protection for pages and APIs via `proxy.ts`.
 
 ---
 
@@ -52,11 +52,12 @@ The Nuclei Dashboard is a **Next.js-based web application** with **SQLite databa
 
 ### Backend
 - **Runtime**: Node.js (Next.js API Routes)
-- **Database**: SQLite with better-sqlite3
+- **Database**: SQLite with better-sqlite3 (WAL Mode)
 - **Authentication**: NextAuth.js v5 (Auth.js)
 - **Process Management**: `child_process.spawn` for Nuclei execution
+- **Scheduler**: `node-cron` for automated background jobs
 - **File System**: Node.js `fs` module for scan output storage
-- **Caching**: In-memory cache with TTL
+- **Caching**: In-memory `SimpleCache` with TTL
 
 ### Build Tools
 - **Package Manager**: npm
@@ -80,16 +81,20 @@ d:\NCNC\
 │   │   │   ├── backup/             # Backup & Restore API
 │   │   │   ├── settings/           # Settings API
 │   │   │   ├── stream/             # Real-time log streaming
+│   │   │   ├── scheduler/          # Automation scheduler endpoints
 │   │   │   └── templates/          # Custom template management
 │   │   ├── login/                  # Login page
 │   │   ├── layout.tsx              # Root layout with theme
 │   │   ├── page.tsx                # Main dashboard page
 │   │   └── globals.css             # Global styles & theme tokens
 │   ├── components/                 # React components
+│   │   ├── system/                 # System modules (Scheduler, Settings)
+│   │   ├── scan/                   # Scan modules (Wizard, LiveConsole)
+│   │   └── ...
 │   ├── lib/                        # Utility libraries
-│   │   ├── db.ts                   # Database operations
-│   │   ├── cache.ts                # Response caching
-│   │   ├── env.ts                  # Environment variable handling
+│   │   ├── db.ts                   # Database operations (Singleton)
+│   │   ├── scheduler.ts            # Cron job engine
+│   │   ├── notifications.ts        # Telegram alert system
 │   │   └── ...
 │   ├── scans/                      # Scan results storage (gitignored)
 │   ├── nuclei.db                   # SQLite database (gitignored)
@@ -116,27 +121,30 @@ d:\NCNC\
 - Intercepts all requests at the edge.
 - Enforces authentication for both Page routes and API routes.
 - Handles production HTTPS redirects.
+- **Lazy Protection**: Checks `NEXT_AUTH_SESSION` cookie before even reaching logic.
 
 ### 3. Hybrid Storage Strategy
 - **Database**: Structured data (scans, findings, metadata)
 - **Files**: Raw output (JSON results, log files)
 - **File Metadata**: Stored in database for fast access
 
-### 3. Database-Backed Process Management
+### 4. Database-Backed Process Management
 - Scans stored in `scans` table with status tracking
 - Findings stored in `findings` table with relationships
+- Scheduler Logs stored in `scheduler_logs` table
 - Activity Monitor reads from database (last 20 scans)
 
-### 4. Event-Driven Architecture
+### 5. Event-Driven Architecture
 - Scan execution via `child_process.spawn`
 - Database updates on scan events
 - Event listeners for stdout, stderr, close, error
+- **Notification Hook**: On scan completion -> Trigger `notifications.ts` -> Send Telegram msg.
 
-### 5. Response Caching
+### 6. Response Caching
 - In-memory cache with TTL
 - History API: 30-second cache
 - Findings API: 20-second cache
-- Automatic invalidation on mutations
+- Automatic invalidation on mutations (Create/Update/Delete)
 
 ---
 
@@ -152,59 +160,28 @@ d:\NCNC\
 6. Session established, user redirected back to target
 ```
 
-### Scan Execution Flow
+### Automation Scheduler Flow
 ```
-1. User configures scan in Wizard
-2. POST to `/api/scan` with config
-3. Backend:
-   a. Inserts scan record in database
-   b. Constructs Nuclei command
-   c. Spawns Nuclei process
-   d. Creates log file
-4. On scan completion:
-   a. Parses JSON output
-   b. Inserts findings into database
-   c. Updates scan status and metadata
-   d. Invalidates caches
-5. Client polls Activity Monitor
-6. Findings appear in Vulnerabilities page
+1. User enables Scheduler in System settings
+2. `scheduler.ts` initializes cron job (e.g., "0 0 * * *")
+3. Job Triggers:
+   a. Subfinder: Scans target for subdomains
+   b. DB Sync: Updates `monitored_subdomains` (tracks "New" subs)
+   c. HTTPX: Probes live hosts from sub list
+   d. Nuclei: Scans only live hosts
+   e. DB Insert: Saves findings
+   f. Alert: Sends Telegram summary
 ```
 
 ### Finding Status Update Flow
 ```
-1. User clicks status badge
-2. Selects new status from dropdown
-3. PATCH to `/api/findings` with ID and status
-4. Backend:
+1. User clicks status badge (e.g., "New" -> "Confirmed")
+2. PATCH to `/api/findings` with ID and status
+3. Backend:
    a. Updates finding in database
    b. Invalidates findings cache
-5. Client refreshes findings list
-6. Status badge updates with new color
-```
-
-### Finding Deletion Flow
-```
-1. User clicks delete button
-2. Confirmation dialog
-3. DELETE to `/api/findings` with ID
-4. Backend:
-   a. Deletes finding from database (by ID)
-   b. Invalidates findings cache
-5. Client refreshes list
-6. Finding removed from UI
-```
-
-### Scan History Deletion Flow
-```
-1. User clicks delete in history
-2. Confirmation dialog
-3. DELETE to `/api/history?id={scanId}`
-4. Backend:
-   a. Deletes scan from database (cascade to findings)
-   b. Deletes JSON and log files
-   c. Invalidates history and findings caches
-5. Client refreshes history
-6. Scan removed from UI
+4. Client refreshes findings list
+5. Status badge updates with new color
 ```
 
 ---
@@ -214,43 +191,26 @@ d:\NCNC\
 ### Frontend Components
 
 #### DashboardClient.tsx
-Main orchestrator for all views with view routing
+Main orchestrator for all views with conditional rendering for "tabs" (Dashboard, Vulnerabilities, History, etc.).
 
-#### Stats.tsx
-Dashboard statistics with:
-- Total scans count
-- Total findings count
-- Last activity timestamp
-- Severity breakdown (Critical, High, Medium, Low, Info)
+#### SchedulerPanel.tsx
+Automation control center:
+- Toggle On/Off
+- Set Frequency (6h/12h/24h)
+- Enable/Disable specific targets
+- View recent automation logs
 
-#### ScanWizard.tsx
-Scan configuration with:
-- 7 one-click presets (including Full Scan)
-- Custom command builder
-- Settings integration
+#### SettingsPanel.tsx
+Global configuration:
+- Telegram API keys
+- Scan performance (Rate Limit, Concurrency)
+- Notification toggles
 
 #### LiveConsole.tsx (Activity Monitor)
 Database-backed scan monitoring:
-- Last 20 scans from database
-- Real-time status updates
-- Scan duration and exit codes
-- Configuration details display
-- Color-coded status badges
-
-#### FindingsTable.tsx
-Vulnerability display with:
-- Multi-select severity filtering
-- Status management dropdown
-- Delete and rescan actions
-- Detailed finding view
-- CSV export
-
-#### History.tsx
-Scan history with:
-- Database-backed scan list
-- File download buttons
-- Delete functionality
-- Findings count per scan
+- Polling interval: 2s
+- Reads `scans` table for active jobs
+- Reads `tail` of log file for real-time output
 
 ---
 
@@ -261,137 +221,31 @@ Scan history with:
 - Returns `401 Unauthorized` if no session is present.
 
 ### `/api/scan`
-**GET** - List recent scans (last 20 from database)
-- Returns: `{ id, target, status, startTime, endTime, exitCode, config }`
-- Source: Database query with ORDER BY start_time DESC
+**POST** - Start new scan. Spawns process, returns `scanId`.
 
-**POST** - Start new scan
-- Inserts scan record in database
-- Spawns Nuclei process
-- Returns: `{ scanId }`
-
-**DELETE** - Stop running scan
-- Updates scan status in database
-- Kills Nuclei process
-- Returns: `{ success: true }`
+### `/api/scheduler/status`
+**GET/POST** - Get or Set scheduler state (running, frequency, target list).
 
 ### `/api/findings`
-**GET** - List all findings or by scanId
-- Query param: `?scanId={id}` (optional)
-- Returns: Array of findings with `_status` and `_dbId`
-- Cached: 20-second TTL
-- Source: Database query
+**GET** - List findings (filtered by scan or all).
+**PATCH** - Update status.
 
-**PATCH** - Update finding status
-- Body: `{ id, status }`
-- Validates status against allowed values
-- Invalidates cache
-- Returns: `{ success: true }`
-
-**DELETE** - Delete finding
-- Body: `{ id }`
-- Deletes by database ID
-- Invalidates cache
-- Returns: `{ success: true }`
-
-### `/api/history`
-**GET** - Get scan history
-- Returns: Array of scans with metadata
-- Includes: filename, size, date, findingsCount, hasLog
-- Cached: 30-second TTL
-- Fallback to filesystem for legacy scans
-
-**DELETE** - Delete scan and files
-- Query param: `?id={scanId}`
-- Deletes database record (cascade to findings)
-- Deletes JSON and log files
-- Invalidates caches
-- Returns: `{ success: true }`
-
-### `/api/templates`
-**GET** - List available templates
-- Returns: Standard + custom templates
-
-**POST** - Create custom template
-- Body: `{ name, content }`
-- Saves to `~/nuclei-custom-templates/`
-- Returns: `{ success: true }`
-
-### `/api/backup/export`
-**GET** - Export complete database backup
-- Returns: Downloadable JSON file with all data
-- Format: `nuclei-cc-backup` with version metadata
-- Includes: Nuclei, Subfinder, HTTPX data
-
-### `/api/backup/restore`
-**POST** - Restore from Nuclei CC backup
-- Body: FormData with backup file
-- Validates backup format
-- Uses SQLite transactions
-- Returns: Restore statistics
-
-### `/api/findings/import`
-**POST** - Import external Nuclei JSON
-- Body: FormData with Nuclei JSON file
-- Validates Nuclei format
-- Creates scan record
-- Returns: Import statistics
+### `/api/settings`
+**GET/POST** - Manage global `settings` key-value pairs (Telegram, etc.).
 
 ---
 
 ## Database Schema
 
-### Scans Table
-```sql
-CREATE TABLE scans (
-    id TEXT PRIMARY KEY,
-    target TEXT NOT NULL,
-    config TEXT,
-    start_time INTEGER,
-    end_time INTEGER,
-    status TEXT,
-    exit_code INTEGER,
-    json_file_path TEXT,
-    json_file_size INTEGER DEFAULT 0,
-    log_file_path TEXT
-);
+For full schema details, refer to `DATABASE_SCHEMA.md`.
 
-CREATE INDEX idx_scans_start_time ON scans(start_time);
-CREATE INDEX idx_scans_status ON scans(status);
-```
-
-### Findings Table
-```sql
-CREATE TABLE findings (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    scan_id TEXT NOT NULL,
-    template_id TEXT,
-    severity TEXT,
-    name TEXT,
-    matched_at TEXT,
-    status TEXT DEFAULT 'New',
-    raw_json TEXT,
-    timestamp INTEGER,
-    FOREIGN KEY (scan_id) REFERENCES scans(id) ON DELETE CASCADE
-);
-
-CREATE INDEX idx_findings_scan_id ON findings(scan_id);
-CREATE INDEX idx_findings_severity ON findings(severity);
-CREATE INDEX idx_findings_status ON findings(status);
-```
-
-### Database Operations (lib/db.ts)
-- `getDatabase()` - Get singleton database instance
-- `insertScan()` - Create scan record
-- `updateScan()` - Update scan metadata
-- `getScan()` - Retrieve scan by ID
-- `getAllScans()` - Get all scans
-- `deleteScan()` - Delete scan and findings
-- `insertFinding()` - Create single finding
-- `insertFindings()` - Batch insert findings
-- `updateFinding()` - Update finding fields
-- `deleteFinding()` - Delete finding by ID
-- `getFindings()` - Get findings (all or by scan)
+**Key Tables:**
+- `scans`
+- `findings`
+- `monitored_targets` (Assets)
+- `monitored_subdomains` (Recon)
+- `scheduler_logs` (Audit)
+- `settings` (Config)
 
 ---
 
@@ -400,21 +254,12 @@ CREATE INDEX idx_findings_status ON findings(status);
 ### Database Storage
 - **Scans**: Metadata, configuration, status, timestamps
 - **Findings**: Vulnerabilities with status tracking
-- **Indexes**: Optimized for common queries
+- **Indexes**: Optimized for common queries (Severity, Status, Date)
 
 ### File Storage
 - **Scan Results**: `dashboard/scans/{scanId}_{timestamp}.json`
 - **Scan Logs**: `dashboard/scans/{scanId}.log`
 - **Custom Templates**: `~/nuclei-custom-templates/*.yaml`
-
-### Client Storage
-- **Settings**: Browser `localStorage`
-
-### File Metadata in Database
-- JSON file path and size stored in `scans` table
-- Log file path stored in `scans` table
-- Reduces filesystem I/O for history display
-- Fallback to filesystem for legacy scans
 
 ---
 
@@ -435,106 +280,3 @@ class SimpleCache {
 - **History API**: 30-second TTL
 - **Findings API**: 20-second TTL
 - **Pattern-based invalidation**: `findings-*`, `history-*`
-
-### Cache Invalidation Triggers
-- Scan completion → invalidate history + findings
-- Finding deletion → invalidate findings
-- Finding status update → invalidate findings
-- Scan deletion → invalidate history + findings
-
----
-
-## Error Handling
-
-### Centralized Error Management (lib/errors.ts)
-```typescript
-enum ErrorType {
-    DATABASE_ERROR,
-    VALIDATION_ERROR,
-    FILE_SYSTEM_ERROR,
-    NETWORK_ERROR
-}
-
-class ApiError extends Error {
-    type: ErrorType
-    statusCode: number
-}
-```
-
-### Error Handling Utilities
-- `handleApiError()` - Consistent error responses
-- `tryCatch()` - Async error wrapper
-- `dbOperation()` - Database operation wrapper
-
----
-
-## Integration with Nuclei Binary
-
-### Command Construction
-Builds Nuclei args from config object:
-- Target URL
-- Tags filter
-- Severity filter
-- Template ID
-- Rate limit, concurrency, bulk size
-- Custom arguments
-
-### Nuclei Paths
-Dynamically resolved using `os.homedir()`
-
----
-
-## Performance Considerations
-
-### Database
-- Indexed queries for fast retrieval
-- Batch inserts for findings
-- Connection pooling (singleton)
-- Prepared statements
-
-### Caching
-- Reduced database load
-- Faster API responses
-- Smart invalidation
-
-### File I/O
-- Metadata in database
-- Buffered log writes
-- Async file operations
-
-### Settings
-- Rate limiting: 50-1000 req/s
-- Concurrency: 25-300 parallel templates
-- Bulk size: 25-100 hosts
-
----
-
-## Security Considerations
-
-1. Input sanitization for template names
-2. No arbitrary file access
-3. Process spawned safely (not shell exec)
-4. Database prepared statements (SQL injection prevention)
-5. Privacy: `.mhtml`, `nuclei.db` excluded from Git
-6. Status validation against allowed values
-
----
-
-## Completed Enhancements
-
-✅ Database integration (SQLite)  
-✅ Finding status management  
-✅ Response caching  
-✅ Activity Monitor from database  
-✅ Backup & Restore system  
-✅ Import external Nuclei scans  
-✅ **Integrated Authentication (NextAuth)**  
-✅ **Middleware Protection (Next.js 16 proxy.ts)**  
-✅ **System Management and Scanners Update** (added timeout handling)
-
----
-
-For detailed API documentation, see [API_REFERENCE.md](./API_REFERENCE.md)  
-For details on security, see [AUTHENTICATION.md](./AUTHENTICATION.md)  
-For component documentation, see [COMPONENTS.md](./COMPONENTS.md)  
-For features documentation, see [FEATURES.md](./FEATURES.md)

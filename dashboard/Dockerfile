@@ -67,8 +67,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --chown=nextjs:nodejs docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# Set ownership of all directories
-RUN chown -R nextjs:nodejs /app /home/nextjs
+# Set ownership of all directories + Go tool binaries (so -up self-update works)
+RUN chown -R nextjs:nodejs /app /home/nextjs && \
+    chown nextjs:nodejs /usr/local/bin/nuclei /usr/local/bin/subfinder /usr/local/bin/httpx
 
 # Environment variables
 ENV NODE_ENV=production

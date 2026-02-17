@@ -50,12 +50,12 @@ RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
 # Create data directories BEFORE switching user
-RUN mkdir -p /app/data /app/scans /app/scans/logs /app/scans/uploads /app/public/screenshots /home/nextjs
+RUN mkdir -p /app/data /app/scans /app/scans/logs /app/scans/uploads /app/public/screenshots /home/nextjs /app/bin
 
-# Copy Go tools from stage 1
-COPY --from=tools /go/bin/nuclei /usr/local/bin/
-COPY --from=tools /go/bin/subfinder /usr/local/bin/
-COPY --from=tools /go/bin/httpx /usr/local/bin/
+# Copy Go tools to user-owned directory (so self-update can write temp files + replace binaries)
+COPY --from=tools /go/bin/nuclei /app/bin/
+COPY --from=tools /go/bin/subfinder /app/bin/
+COPY --from=tools /go/bin/httpx /app/bin/
 
 # Copy built application from stage 2
 # The standalone output includes node_modules for dependencies
@@ -67,15 +67,15 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --chown=nextjs:nodejs docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# Set ownership of all directories + Go tool binaries (so -up self-update works)
-RUN chown -R nextjs:nodejs /app /home/nextjs && \
-    chown nextjs:nodejs /usr/local/bin/nuclei /usr/local/bin/subfinder /usr/local/bin/httpx
+# Set ownership of all directories (includes /app/bin with Go tools)
+RUN chown -R nextjs:nodejs /app /home/nextjs
 
 # Environment variables
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 ENV DATABASE_PATH=/app/data/nuclei.db
+ENV PATH="/app/bin:$PATH"
 
 # Switch to non-root user
 USER nextjs

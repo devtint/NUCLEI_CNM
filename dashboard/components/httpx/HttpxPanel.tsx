@@ -36,6 +36,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { TargetListManager } from "../scan/TargetListManager";
 import { Zap, FileText } from "lucide-react";
+import { ShodanEnrichment } from "./ShodanEnrichment";
 
 
 interface HttpxResult {
@@ -248,6 +249,7 @@ export function HttpxPanel({ onScanTarget }: { onScanTarget?: (target: string) =
     // Delete Dialog State
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [scanToDelete, setScanToDelete] = useState<string | null>(null);
+    const [domainToDelete, setDomainToDelete] = useState<string | null>(null);
     const [isDeletingAll, setIsDeletingAll] = useState(false);
 
     // Fetch scans list
@@ -382,6 +384,8 @@ export function HttpxPanel({ onScanTarget }: { onScanTarget?: (target: string) =
                                     </CardHeader>
                                 </Card>
 
+                                {/* SHODAN ENRICHMENT COMPONENT */}
+                                <ShodanEnrichment ip={getString(selectedAsset.ip || selectedAsset.host)} />
 
                             </div>
 
@@ -531,8 +535,19 @@ export function HttpxPanel({ onScanTarget }: { onScanTarget?: (target: string) =
     };
 
     const confirmClearAll = () => {
-        setIsDeletingAll(true);
-        setScanToDelete(null);
+        if (selectedScanId) {
+            setScanToDelete(selectedScanId);
+            setIsDeletingAll(false);
+            setDomainToDelete(null);
+        } else if (selectedDomain && selectedDomain !== 'ALL') {
+            setDomainToDelete(selectedDomain);
+            setIsDeletingAll(false);
+            setScanToDelete(null);
+        } else {
+            setIsDeletingAll(true);
+            setScanToDelete(null);
+            setDomainToDelete(null);
+        }
         setDeleteDialogOpen(true);
     }
 
@@ -550,6 +565,15 @@ export function HttpxPanel({ onScanTarget }: { onScanTarget?: (target: string) =
                 } else {
                     toast.error(data.error);
                 }
+            } else if (domainToDelete) {
+                const res = await fetch(`/api/httpx?action=delete_domain&domain=${encodeURIComponent(domainToDelete)}`, { method: "DELETE" });
+                if (res.ok) {
+                    toast.success("Domain deleted");
+                    if (selectedDomain === domainToDelete) setSelectedDomain('ALL');
+                    fetchScans();
+                } else {
+                    toast.error("Failed to delete domain");
+                }
             } else if (scanToDelete) {
                 const res = await fetch(`/api/httpx?id=${scanToDelete}`, { method: 'DELETE' });
                 if (res.ok) {
@@ -565,6 +589,7 @@ export function HttpxPanel({ onScanTarget }: { onScanTarget?: (target: string) =
         } finally {
             setDeleteDialogOpen(false);
             setScanToDelete(null);
+            setDomainToDelete(null);
             setIsDeletingAll(false);
         }
     };
@@ -1149,7 +1174,8 @@ export function HttpxPanel({ onScanTarget }: { onScanTarget?: (target: string) =
                                                         <Download className="h-3.5 w-3.5" /> Export CSV
                                                     </Button>
                                                     <Button variant="outline" size="sm" onClick={clearHttpxHistory} className="h-8 gap-1.5 text-xs text-red-500 hover:text-red-600 border-red-500/20 hover:bg-red-500/5">
-                                                        <Trash2 className="h-3.5 w-3.5" /> Delete All
+                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                        {selectedDomain && selectedDomain !== 'ALL' ? "Delete Domain" : (selectedScanId ? "Delete Scan" : "Delete All History")}
                                                     </Button>
                                                     <span className="text-[10px] text-muted-foreground ml-2 bg-muted/50 px-2 py-1 rounded border border-border/50">
                                                         {filteredResults.length} Assets
@@ -1184,13 +1210,15 @@ export function HttpxPanel({ onScanTarget }: { onScanTarget?: (target: string) =
                         <AlertDialogDescription>
                             {isDeletingAll
                                 ? "This will permanently delete ALL scan history and results. This action cannot be undone."
-                                : "This will permanently delete this scan history. This action cannot be undone."}
+                                : domainToDelete
+                                    ? `This will permanently delete all history for ${domainToDelete}. This action cannot be undone.`
+                                    : "This will permanently delete this scan history. This action cannot be undone."}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction onClick={handleExecuteDelete} className="bg-red-600 hover:bg-red-700">
-                            {isDeletingAll ? "Delete All" : "Delete Scan"}
+                            {isDeletingAll ? "Delete All" : (domainToDelete ? "Delete Domain" : "Delete Scan")}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

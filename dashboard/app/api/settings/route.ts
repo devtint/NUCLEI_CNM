@@ -12,6 +12,7 @@ export async function GET(req: NextRequest) {
     let token = getSetting("telegram_bot_token");
     let chatId = getSetting("telegram_chat_id");
     let notificationsEnabled = getSetting("notifications_enabled");
+    let shodanKey = getSetting("shodan_api_key");
 
     // If missing in DB, check Env and Sync
     if (!token && process.env.TELEGRAM_BOT_TOKEN) {
@@ -29,6 +30,11 @@ export async function GET(req: NextRequest) {
         setSetting("telegram_chat_id", chatId);
     }
 
+    if (!shodanKey && process.env.SHODAN_API_KEY) {
+        shodanKey = process.env.SHODAN_API_KEY;
+        setSetting("shodan_api_key", shodanKey);
+    }
+
     // Mask Token for security
     let maskedToken = "";
     if (token) {
@@ -39,10 +45,20 @@ export async function GET(req: NextRequest) {
         }
     }
 
+    let maskedShodan = "";
+    if (shodanKey) {
+        if (shodanKey.length > 10) {
+            maskedShodan = shodanKey.substring(0, 4) + "••••••••" + shodanKey.substring(shodanKey.length - 4);
+        } else {
+            maskedShodan = "••••";
+        }
+    }
+
     return NextResponse.json({
         telegram_bot_token: maskedToken,
         telegram_chat_id: chatId || "",
         notifications_enabled: notificationsEnabled === "true",
+        shodan_api_key: maskedShodan,
         is_configured: !!(token && chatId)
     });
 }
@@ -55,7 +71,7 @@ export async function POST(req: NextRequest) {
 
     try {
         const body = await req.json();
-        const { telegram_bot_token, telegram_chat_id, notifications_enabled } = body;
+        const { telegram_bot_token, telegram_chat_id, notifications_enabled, shodan_api_key } = body;
 
         // If user sends masked token, DO NOT update it in DB (keep existing)
         // If user sends new token (not masked), update it
@@ -69,6 +85,10 @@ export async function POST(req: NextRequest) {
 
         if (notifications_enabled !== undefined) {
             setSetting("notifications_enabled", String(notifications_enabled));
+        }
+
+        if (shodan_api_key && !shodan_api_key.includes("••••")) {
+            setSetting("shodan_api_key", shodan_api_key);
         }
 
         return NextResponse.json({ success: true });

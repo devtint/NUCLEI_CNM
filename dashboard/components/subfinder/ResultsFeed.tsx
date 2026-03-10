@@ -49,6 +49,7 @@ interface Subdomain {
     first_seen: number;
     last_seen: number;
     is_new: number; // 1 or 0
+    shodan_status?: number; // 1 = verified, -1 = checked not found, 0 = not checked
     // derived
     status?: 'active' | 'inactive' | 'new';
 }
@@ -59,6 +60,7 @@ export function ResultsFeed({ initialTarget, onScanTarget }: { initialTarget?: s
     const [selectedTarget, setSelectedTarget] = useState<Target | null>(null);
     const [subdomains, setSubdomains] = useState<Subdomain[]>([]);
     const [loading, setLoading] = useState(false);
+    const [verifyingShodan, setVerifyingShodan] = useState(false);
     const [search, setSearch] = useState("");
     const [filterStatus, setFilterStatus] = useState<string[]>([]); // Empty = All
     const [targetToDelete, setTargetToDelete] = useState<Target | null>(null);
@@ -144,6 +146,32 @@ export function ResultsFeed({ initialTarget, onScanTarget }: { initialTarget?: s
         }
     };
 
+    const handleVerifyShodan = async () => {
+        if (!selectedTarget) return;
+
+        setVerifyingShodan(true);
+        try {
+            const res = await fetch("/api/shodan/verify", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ targetId: selectedTarget.id })
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                toast.success(data.message);
+                // Refresh subdomains to show the new shodan_status values
+                fetchSubdomains(selectedTarget);
+            } else {
+                toast.error(data.error || "Failed to verify Shodan");
+            }
+        } catch (e: any) {
+            toast.error(e.message || "Something went wrong verifying with Shodan");
+        } finally {
+            setVerifyingShodan(false);
+        }
+    };
+
     useEffect(() => {
         fetchTargets();
     }, [initialTarget]);
@@ -174,6 +202,24 @@ export function ResultsFeed({ initialTarget, onScanTarget }: { initialTarget?: s
         }
     };
 
+    const ShodanBadge = ({ status }: { status?: number }) => {
+        if (status === 1) {
+            return (
+                <div title="Verified on Shodan" className="flex items-center justify-center p-1 bg-red-500/10 rounded-full border border-red-500/20 shadow-[0_0_10px_rgba(239,68,68,0.2)]">
+                    <div className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                </div>
+            );
+        }
+        if (status === -1) {
+            return (
+                <div title="Checked, not on Shodan" className="flex items-center justify-center p-1 bg-zinc-500/10 rounded-full border border-white/5 opacity-50">
+                    <div className="h-2 w-2 rounded-full bg-zinc-600" />
+                </div>
+            );
+        }
+        return null;
+    };
+
     if (selectedTarget) {
         // Detail View (Subdomains)
         return (
@@ -192,8 +238,41 @@ export function ResultsFeed({ initialTarget, onScanTarget }: { initialTarget?: s
                         </p>
                     </div>
                     <div className="flex gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-red-400 hover:text-red-300 hover:bg-red-500/10 border-red-500/20"
+                            onClick={handleVerifyShodan}
+                            disabled={verifyingShodan || loading}
+                        >
+                            <Target className={`mr-2 h-4 w-4 ${verifyingShodan ? 'animate-spin' : ''}`} />
+                            {verifyingShodan ? 'Verifying...' : 'Verify with Shodan'}
+                        </Button>
                         <Button variant="outline" size="sm" onClick={() => fetchSubdomains(selectedTarget)}>
                             <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-amber-500 hover:text-amber-600 hover:bg-amber-500/10 border-amber-500/20"
+                            onClick={async () => {
+                                const activeSubs = subdomains
+                                    .filter(s => {
+                                        if (filterStatus.length > 0 && s.status && !filterStatus.includes(s.status)) return false;
+                                        return s.subdomain.includes(search) && s.shodan_status === 1;
+                                    })
+                                    .map(s => s.subdomain);
+
+                                if (activeSubs.length === 0) {
+                                    toast.error("No Shodan verified subdomains to copy");
+                                    return;
+                                }
+                                const success = await copyToClipboard(activeSubs.join("\n"));
+                                if (success) toast.success(`Copied ${activeSubs.length} verified subdomains to clipboard`);
+                                else toast.error("Failed to copy to clipboard");
+                            }}
+                        >
+                            <Copy className="mr-1.5 h-4 w-4" /> Copy Verified
                         </Button>
                         <Button
                             variant="default"
@@ -302,7 +381,10 @@ export function ResultsFeed({ initialTarget, onScanTarget }: { initialTarget?: s
                                     .map((sub) => (
                                         <TableRow key={sub.id} className="border-white/10 hover:bg-white/5">
                                             <TableCell>
-                                                <StatusBadge status={sub.status || 'inactive'} />
+                                                <div className="flex items-center gap-2">
+                                                    <StatusBadge status={sub.status || 'inactive'} />
+                                                    <ShodanBadge status={sub.shodan_status} />
+                                                </div>
                                             </TableCell>
                                             <TableCell className="font-mono text-sm">{sub.subdomain}</TableCell>
                                             <TableCell className="text-right text-xs text-muted-foreground font-mono">

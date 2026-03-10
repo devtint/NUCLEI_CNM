@@ -118,10 +118,18 @@ function initializeSchema() {
             subdomain TEXT NOT NULL,
             first_seen INTEGER,
             last_seen INTEGER,
+            shodan_status INTEGER DEFAULT 0,
             FOREIGN KEY (target_id) REFERENCES monitored_targets(id) ON DELETE CASCADE,
             UNIQUE(target_id, subdomain)
         )
     `);
+
+    // Migration for existing tables: Add shodan_status column if not exists
+    try {
+        db.exec("ALTER TABLE monitored_subdomains ADD COLUMN shodan_status INTEGER DEFAULT 0");
+    } catch (e: any) {
+        if (!e.message.includes("duplicate column")) { /* ignore */ }
+    }
 
     // Create indexes for better query performance
     db.exec(`
@@ -199,6 +207,15 @@ function initializeSchema() {
             ip_address TEXT,
             user_agent TEXT,
             event_type TEXT DEFAULT 'LOGIN'
+        )
+    `);
+
+    // Create shodan_ips table for caching enriched IP intel
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS shodan_ips (
+            ip TEXT PRIMARY KEY,
+            raw_data TEXT,
+            last_updated INTEGER
         )
     `);
 
@@ -330,6 +347,18 @@ export function clearHttpxResults() {
         // Also clean up screenshots? For now let's just clear DB.
     } catch (e) {
         console.error("Failed to clear httpx data", e);
+        throw e;
+    }
+}
+
+export function deleteHttpxDomain(domain: string) {
+    const db = getDatabase();
+    // Delete any results matching that hostname directly
+    try {
+        const stmt = db.prepare("DELETE FROM httpx_results WHERE host LIKE ? OR url LIKE ?");
+        stmt.run(`%${domain}%`, `%${domain}%`);
+    } catch (e) {
+        console.error(`Failed to delete domain ${domain}`, e);
         throw e;
     }
 }
@@ -681,6 +710,52 @@ export function deleteMonitoredTarget(id: number) {
     db.prepare("DELETE FROM monitored_subdomains WHERE target_id = ?").run(id);
 }
 
+export function bulkUpdateShodanStatus(targetId: string | number, shodanSubdomains: string[]): number {
+    const db = getDatabase();
+    if (!db) return 0;
+
+    const now = Math.floor(Date.now() / 1000);
+
+    const transaction = db.transaction(() => {
+        // First, mark all existing subdomains for this target as -1 (checked, not found)
+        db.prepare("UPDATE monitored_subdomains SET shodan_status = -1 WHERE target_id = ?").run(targetId);
+
+        // Prepare statements
+        const checkExisting = db.prepare("SELECT id FROM monitored_subdomains WHERE target_id = ? AND subdomain = ?");
+        const insertNew = db.prepare("INSERT INTO monitored_subdomains (target_id, subdomain, first_seen, last_seen, shodan_status) VALUES (?, ?, ?, ?, 1)");
+        const updateVerified = db.prepare("UPDATE monitored_subdomains SET shodan_status = 1, last_seen = ? WHERE id = ?");
+
+        let newlyAdded = 0;
+
+        for (const sub of shodanSubdomains) {
+            const existing = checkExisting.get(targetId, sub) as { id: number } | undefined;
+            if (existing) {
+                // Was already in inventory, just mark it verified
+                updateVerified.run(now, existing.id);
+            } else {
+                // Shodan found a subdomain that Subfinder missed! Add it.
+                insertNew.run(targetId, sub, now, now);
+                newlyAdded++;
+            }
+        }
+
+        // Update total_count if we added new subdomains
+        if (newlyAdded > 0) {
+            const countResult = db.prepare("SELECT COUNT(*) as count FROM monitored_subdomains WHERE target_id = ?").get(targetId) as { count: number };
+            db.prepare("UPDATE monitored_targets SET total_count = ? WHERE id = ?").run(countResult.count, targetId);
+        }
+
+        return newlyAdded;
+    });
+
+    try {
+        return transaction() as number;
+    } catch (e) {
+        console.error("Error bulk updating Shodan status:", e);
+        throw e;
+    }
+}
+
 export function deleteSubfinderScan(id: string) {
     const db = getDatabase();
     if (!db) return;
@@ -1006,4 +1081,23 @@ export function getSchedulerLogs(limit: number = 50): SchedulerLog[] {
 export function clearSchedulerLogs() {
     const db = getDatabase();
     db.exec('DELETE FROM scheduler_logs');
+}
+
+// Shodan IP Enrichment Caching
+export function getShodanIp(ip: string): { ip: string, raw_data: string, last_updated: number } | undefined {
+    const db = getDatabase();
+    if (!db) return undefined;
+    return db.prepare("SELECT * FROM shodan_ips WHERE ip = ?").get(ip) as any;
+}
+
+export function upsertShodanIp(ip: string, rawData: string) {
+    const db = getDatabase();
+    if (!db) return;
+    const now = Math.floor(Date.now() / 1000);
+    const stmt = db.prepare(`
+        INSERT INTO shodan_ips (ip, raw_data, last_updated) 
+        VALUES (?, ?, ?)
+        ON CONFLICT(ip) DO UPDATE SET raw_data=excluded.raw_data, last_updated=excluded.last_updated
+    `);
+    stmt.run(ip, rawData, now);
 }

@@ -6,11 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Send, CheckCircle2, AlertCircle, Save, Bell, BellOff, Lock } from "lucide-react";
+import { Send, CheckCircle2, AlertCircle, Save, Bell, BellOff, Lock, Globe } from "lucide-react";
 
 export function SettingsPanel() {
     const [token, setToken] = useState("");
     const [chatId, setChatId] = useState("");
+    const [shodanKey, setShodanKey] = useState("");
     const [enabled, setEnabled] = useState(false);
     const [loading, setLoading] = useState(true);
     const [testing, setTesting] = useState(false);
@@ -27,6 +28,7 @@ export function SettingsPanel() {
             if (data) {
                 setToken(data.telegram_bot_token || "");
                 setChatId(data.telegram_chat_id || "");
+                setShodanKey(data.shodan_api_key || "");
                 setEnabled(data.notifications_enabled || false);
                 setIsConfigured(data.is_configured);
             }
@@ -95,7 +97,8 @@ export function SettingsPanel() {
                 body: JSON.stringify({
                     telegram_bot_token: token,
                     telegram_chat_id: chatId,
-                    notifications_enabled: enabled
+                    notifications_enabled: enabled,
+                    shodan_api_key: shodanKey
                 }),
             });
 
@@ -162,6 +165,28 @@ export function SettingsPanel() {
                             onChange={(e) => setChatId(e.target.value)}
                             className="font-mono"
                         />
+                    </div>
+                </div>
+
+                <div className="space-y-4 pt-4 border-t border-border">
+                    <div className="flex items-center gap-2">
+                        <Globe className="h-5 w-5 text-emerald-500" />
+                        <h4 className="font-semibold tracking-tight">Shodan API Integration</h4>
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="shodan_key">Shodan API Key</Label>
+                        <div className="relative">
+                            <Input
+                                id="shodan_key"
+                                type="password"
+                                placeholder="Your 32-character Shodan API Key"
+                                value={shodanKey}
+                                onChange={(e) => setShodanKey(e.target.value)}
+                                className="pr-10 font-mono"
+                            />
+                            <Lock className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground opacity-50" />
+                        </div>
+                        <p className="text-xs text-muted-foreground">Used for bulk cross-referencing IPs and Subdomains.</p>
                     </div>
                 </div>
 

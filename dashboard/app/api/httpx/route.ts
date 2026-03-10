@@ -11,7 +11,8 @@ import {
     getHttpxResults,
     deleteHttpxScan,
     getHttpxDomainSummary,
-    clearHttpxResults
+    clearHttpxResults,
+    deleteHttpxDomain
 } from "@/lib/db";
 import { HTTPX_BINARY } from "@/lib/nuclei/config";
 import { auth } from "@/auth";
@@ -34,6 +35,17 @@ export async function DELETE(req: NextRequest) {
             clearHttpxResults();
             // Optional: clean up logs/screenshots directory if needed
             return NextResponse.json({ success: true, message: 'All assets cleared' });
+        } catch (e: any) {
+            return NextResponse.json({ error: e.message }, { status: 500 });
+        }
+    }
+
+    if (action === 'delete_domain') {
+        const domain = searchParams.get('domain');
+        if (!domain) return NextResponse.json({ error: 'Missing domain parameter' }, { status: 400 });
+        try {
+            deleteHttpxDomain(domain);
+            return NextResponse.json({ success: true, message: `Deleted ${domain}` });
         } catch (e: any) {
             return NextResponse.json({ error: e.message }, { status: 500 });
         }

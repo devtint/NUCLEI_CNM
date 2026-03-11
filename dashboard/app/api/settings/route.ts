@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSetting, setSetting } from "@/lib/db";
 import { auth } from "@/auth";
+import { initHeartbeat } from "@/lib/scheduler";
 
 export async function GET(req: NextRequest) {
     const session = await auth();
@@ -13,6 +14,8 @@ export async function GET(req: NextRequest) {
     let chatId = getSetting("telegram_chat_id");
     let notificationsEnabled = getSetting("notifications_enabled");
     let shodanKey = getSetting("shodan_api_key");
+    const tunnelKeepAlive = getSetting("tunnel_keep_alive") === "true";
+    const tunnelUrl = getSetting("tunnel_url") || "";
 
     // If missing in DB, check Env and Sync
     if (!token && process.env.TELEGRAM_BOT_TOKEN) {
@@ -59,6 +62,8 @@ export async function GET(req: NextRequest) {
         telegram_chat_id: chatId || "",
         notifications_enabled: notificationsEnabled === "true",
         shodan_api_key: maskedShodan,
+        tunnel_keep_alive: tunnelKeepAlive,
+        tunnel_url: tunnelUrl,
         is_configured: !!(token && chatId)
     });
 }
@@ -71,7 +76,14 @@ export async function POST(req: NextRequest) {
 
     try {
         const body = await req.json();
-        const { telegram_bot_token, telegram_chat_id, notifications_enabled, shodan_api_key } = body;
+        const { 
+            telegram_bot_token, 
+            telegram_chat_id, 
+            notifications_enabled, 
+            shodan_api_key,
+            tunnel_keep_alive,
+            tunnel_url
+        } = body;
 
         // If user sends masked token, DO NOT update it in DB (keep existing)
         // If user sends new token (not masked), update it
@@ -90,6 +102,17 @@ export async function POST(req: NextRequest) {
         if (shodan_api_key && !shodan_api_key.includes("••••")) {
             setSetting("shodan_api_key", shodan_api_key);
         }
+        
+        if (tunnel_keep_alive !== undefined) {
+            setSetting("tunnel_keep_alive", String(tunnel_keep_alive));
+        }
+        
+        if (tunnel_url !== undefined) {
+            setSetting("tunnel_url", String(tunnel_url));
+        }
+
+        // Re-initialize heartbeat with new settings
+        initHeartbeat();
 
         return NextResponse.json({ success: true });
     } catch (e: any) {

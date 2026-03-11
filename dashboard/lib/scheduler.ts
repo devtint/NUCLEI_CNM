@@ -3,6 +3,7 @@ import { getDatabase, getSetting, setSetting, insertSchedulerLog, updateSchedule
 import { sendTelegramNotification } from "./notifications";
 
 let schedulerTask: ScheduledTask | null = null;
+let heartbeatTask: ScheduledTask | null = null;
 let isProcessing = false;
 let currentDomain: string | null = null;
 
@@ -169,6 +170,37 @@ export function initScheduler() {
     });
 
     console.log("[Scheduler] Initialized successfully");
+
+    initHeartbeat();
+}
+
+// Initialize Tunnel Keep-Alive (Heartbeat every 5 minutes)
+export function initHeartbeat() {
+    // Stop existing if any (Singleton pattern)
+    if (heartbeatTask) {
+        heartbeatTask.stop();
+        heartbeatTask = null;
+    }
+
+    console.log("[Heartbeat] Initializing Tunnel Keep-Alive check...");
+
+    heartbeatTask = cron.schedule("*/5 * * * *", async () => {
+        const keepAlive = getSetting("tunnel_keep_alive") === "true";
+        const url = getSetting("tunnel_url");
+        
+        if (keepAlive && url) {
+            try {
+                // Perform a headless fetch to the tunnel URL to keep it awake
+                console.log(`[Heartbeat] Pinging tunnel: ${url}`);
+                await fetch(url, { 
+                    method: 'GET',
+                    headers: { 'User-Agent': 'Nuclei-CNM-StayAwake-Bot/1.0' }
+                });
+            } catch (e) {
+                console.warn(`[Heartbeat] Tunnel ping failed (Normal if tunnel is down):`, e instanceof Error ? e.message : e);
+            }
+        }
+    });
 }
 
 // Run scheduled scans for all enabled domains

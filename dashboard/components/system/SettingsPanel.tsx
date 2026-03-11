@@ -13,6 +13,8 @@ export function SettingsPanel() {
     const [chatId, setChatId] = useState("");
     const [shodanKey, setShodanKey] = useState("");
     const [enabled, setEnabled] = useState(false);
+    const [tunnelKeepAlive, setTunnelKeepAlive] = useState(false);
+    const [tunnelUrl, setTunnelUrl] = useState("");
     const [loading, setLoading] = useState(true);
     const [testing, setTesting] = useState(false);
     const [isConfigured, setIsConfigured] = useState(false);
@@ -30,6 +32,8 @@ export function SettingsPanel() {
                 setChatId(data.telegram_chat_id || "");
                 setShodanKey(data.shodan_api_key || "");
                 setEnabled(data.notifications_enabled || false);
+                setTunnelKeepAlive(data.tunnel_keep_alive || false);
+                setTunnelUrl(data.tunnel_url || "");
                 setIsConfigured(data.is_configured);
             }
         } catch (e) {
@@ -98,7 +102,9 @@ export function SettingsPanel() {
                     telegram_bot_token: token,
                     telegram_chat_id: chatId,
                     notifications_enabled: enabled,
-                    shodan_api_key: shodanKey
+                    shodan_api_key: shodanKey,
+                    tunnel_keep_alive: tunnelKeepAlive,
+                    tunnel_url: tunnelUrl
                 }),
             });
 
@@ -187,6 +193,38 @@ export function SettingsPanel() {
                             <Lock className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground opacity-50" />
                         </div>
                         <p className="text-xs text-muted-foreground">Used for bulk cross-referencing IPs and Subdomains.</p>
+                    </div>
+                </div>
+
+                <div className="space-y-4 pt-4 border-t border-border">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <Globe className="h-5 w-5 text-amber-500" />
+                            <h4 className="font-semibold tracking-tight">Tunnel Connectivity (Stay Awake)</h4>
+                        </div>
+                        <Button
+                            variant={tunnelKeepAlive ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setTunnelKeepAlive(!tunnelKeepAlive)}
+                            className={tunnelKeepAlive ? "bg-amber-500 hover:bg-amber-600 h-7" : "h-7 text-muted-foreground"}
+                        >
+                            {tunnelKeepAlive ? "Stay Awake ON" : "Stay Awake OFF"}
+                        </Button>
+                    </div>
+                    
+                    <div className="grid gap-2">
+                        <Label htmlFor="tunnel_url">Public Tunnel URL</Label>
+                        <Input
+                            id="tunnel_url"
+                            placeholder="https://your-random-word.trycloudflare.com"
+                            value={tunnelUrl}
+                            onChange={(e) => setTunnelUrl(e.target.value)}
+                            className="font-mono text-xs"
+                        />
+                        <p className="text-[10px] text-muted-foreground leading-relaxed">
+                            Because you are using <b>Quick Tunnels</b>, Cloudflare may suspend the connection if it's idle. 
+                            When enabled, this app will "ping" itself every 5 minutes to keep the tunnel warm and prevent timeouts.
+                        </p>
                     </div>
                 </div>
 

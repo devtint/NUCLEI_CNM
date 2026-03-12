@@ -21,6 +21,16 @@ services:
       - NODE_ENV=production
       - DATABASE_PATH=/app/data/nuclei.db
     restart: unless-stopped
+    # Resource limits: prevent nuclei scans from starving the dashboard
+    # Override at runtime via env vars: CNM_CPU_LIMIT, CNM_MEM_LIMIT
+    deploy:
+      resources:
+        limits:
+          cpus: '${CNM_CPU_LIMIT:-2.0}'
+          memory: ${CNM_MEM_LIMIT:-2G}
+        reservations:
+          cpus: '0.5'
+          memory: 512M
     healthcheck:
       test: [ "CMD", "wget", "-q", "--spider", "http://localhost:3000/login" ]
       interval: 30s

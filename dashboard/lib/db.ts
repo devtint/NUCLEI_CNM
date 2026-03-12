@@ -258,6 +258,15 @@ function initializeSchema() {
     } catch (e: any) {
         if (!e.message.includes("duplicate column")) { /* ignore */ }
     }
+
+    // On startup: mark orphaned "running" scans as "interrupted"
+    // These are scans that were running when Docker stopped/restarted
+    const orphaned = db.prepare(
+        "UPDATE scans SET status = 'interrupted', end_time = ? WHERE status = 'running'"
+    ).run(Date.now());
+    if (orphaned.changes > 0) {
+        console.log(`📋 Marked ${orphaned.changes} orphaned scan(s) as interrupted (from previous shutdown)`);
+    }
 }
 
 
@@ -268,7 +277,7 @@ export interface ScanRecord {
     config?: string;
     start_time: number;
     end_time?: number;
-    status: 'running' | 'completed' | 'failed' | 'stopped';
+    status: 'running' | 'completed' | 'failed' | 'stopped' | 'interrupted';
     exit_code?: number;
 }
 

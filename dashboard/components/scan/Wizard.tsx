@@ -25,15 +25,15 @@ export function ScanWizard({ onScanStart, initialTemplate, initialTarget }: Wiza
         if (!target) return;
         setLoading(true);
         try {
-            // Read settings from localStorage
+            // Read scan performance settings from server (database-persisted)
             let settings = {};
-            const storedSettings = localStorage.getItem("nuclei_settings");
-            if (storedSettings) {
-                try {
-                    settings = JSON.parse(storedSettings);
-                } catch (e) {
-                    console.error("Failed to parse settings", e);
+            try {
+                const settingsRes = await fetch("/api/scan-settings");
+                if (settingsRes.ok) {
+                    settings = await settingsRes.json();
                 }
+            } catch (e) {
+                console.error("Failed to fetch scan settings", e);
             }
 
             const res = await fetch("/api/scan", {

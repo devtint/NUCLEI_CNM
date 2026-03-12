@@ -6,8 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
-import { Save, RefreshCw } from "lucide-react";
-import { toast } from "sonner"; // Assuming sonner is used, or we can use a simple alert if not
+import { Save, RefreshCw, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 // Default values as per Nuclei documentation/recommendation
 const DEFAULTS = {
@@ -18,38 +18,56 @@ const DEFAULTS = {
 
 export function ScannerConfig() {
     const [config, setConfig] = useState(DEFAULTS);
+    const [savedConfig, setSavedConfig] = useState(DEFAULTS);
     const [hasChanges, setHasChanges] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [loadingSettings, setLoadingSettings] = useState(true);
 
+    // Load from server (database) on mount
     useEffect(() => {
-        // Load from localStorage on mount
-        const stored = localStorage.getItem("nuclei_settings");
-        if (stored) {
-            try {
-                const parsed = JSON.parse(stored);
-                setConfig({ ...DEFAULTS, ...parsed });
-            } catch (e) {
-                console.error("Failed to parse settings", e);
-            }
-        }
+        fetch("/api/scan-settings")
+            .then(res => res.json())
+            .then(data => {
+                const loaded = { ...DEFAULTS, ...data };
+                setConfig(loaded);
+                setSavedConfig(loaded);
+            })
+            .catch(() => {
+                toast.error("Failed to load settings");
+            })
+            .finally(() => setLoadingSettings(false));
     }, []);
 
     const handleChange = (key: string, value: number | boolean) => {
-        setConfig(prev => ({ ...prev, [key]: value }));
-        setHasChanges(true);
+        setConfig(prev => {
+            const next = { ...prev, [key]: value };
+            setHasChanges(JSON.stringify(next) !== JSON.stringify(savedConfig));
+            return next;
+        });
     };
 
-    const saveSettings = () => {
-        localStorage.setItem("nuclei_settings", JSON.stringify(config));
-        setHasChanges(false);
-        // We can use a toast here if configured, or just console log
-        console.log("Settings saved:", config);
-        // Simple visual feedback if no toast library
-        alert("Settings Saved Successfully!");
+    const saveSettings = async () => {
+        setSaving(true);
+        try {
+            const res = await fetch("/api/scan-settings", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(config),
+            });
+            if (!res.ok) throw new Error("Save failed");
+            setSavedConfig(config);
+            setHasChanges(false);
+            toast.success("Settings saved to database");
+        } catch {
+            toast.error("Failed to save settings");
+        } finally {
+            setSaving(false);
+        }
     };
 
     const resetDefaults = () => {
         setConfig(DEFAULTS);
-        setHasChanges(true);
+        setHasChanges(JSON.stringify(DEFAULTS) !== JSON.stringify(savedConfig));
     };
 
     return (
@@ -66,10 +84,11 @@ export function ScannerConfig() {
                     <Button
                         size="sm"
                         onClick={saveSettings}
-                        disabled={!hasChanges}
+                        disabled={!hasChanges || saving}
                         className="bg-emerald-600 hover:bg-emerald-700 text-white"
                     >
-                        <Save className="mr-2 h-4 w-4" /> Save Changes
+                        {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                        {saving ? "Saving..." : "Save Changes"}
                     </Button>
                 </div>
             </div>

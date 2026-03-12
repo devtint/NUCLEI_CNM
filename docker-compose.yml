@@ -15,6 +15,18 @@ services:
       - NODE_ENV=production
       - DATABASE_PATH=/app/data/nuclei.db
     restart: unless-stopped
+    # Resource limits: prevent nuclei scans from starving dashboard + tunnel
+    # Override at runtime via env vars: CNM_CPU_LIMIT, CNM_MEM_LIMIT
+    deploy:
+      resources:
+        limits:
+          cpus: '${CNM_CPU_LIMIT:-2.0}'
+          memory: ${CNM_MEM_LIMIT:-2G}
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    # If OOM occurs, kill this container first (not cloudflared)
+    oom_score_adj: 500
     healthcheck:
       test: [ "CMD", "wget", "-q", "--spider", "http://localhost:3000/login" ]
       interval: 30s
@@ -27,8 +39,19 @@ services:
     container_name: nuclei-cnm-tunnel
     command: tunnel --no-autoupdate --url http://nuclei-cnm:3000
     depends_on:
-      - nuclei-cnm
+      nuclei-cnm:
+        condition: service_healthy
     restart: unless-stopped
+    # Protect tunnel: low resource needs, high OOM survival priority
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+    oom_score_adj: -500
 
 volumes:
   nuclei_data:

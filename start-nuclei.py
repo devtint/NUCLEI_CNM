@@ -27,6 +27,18 @@ HEALTH_CHECK_URL = "http://localhost:3000/login"
 MAX_TUNNEL_WAIT = 30  # seconds
 MAX_HEALTH_WAIT = 60  # seconds
 
+# Default resource limits (can be changed interactively)
+DEFAULT_CPU_LIMIT = "2.0"
+DEFAULT_MEM_LIMIT = "2G"
+
+# Preset resource profiles
+RESOURCE_PROFILES = {
+    "1": {"name": "Light (1 CPU / 1GB)",   "cpu": "1.0", "mem": "1G"},
+    "2": {"name": "Normal (2 CPU / 2GB)",   "cpu": "2.0", "mem": "2G"},
+    "3": {"name": "Heavy (3 CPU / 4GB)",    "cpu": "3.0", "mem": "4G"},
+    "4": {"name": "Max (4 CPU / 6GB)",      "cpu": "4.0", "mem": "6G"},
+}
+
 # ANSI color codes
 class Colors:
     CYAN = '\033[0;36m'
@@ -236,6 +248,38 @@ def prompt_permissions_choice():
         print()
         return False
 
+def prompt_resource_choice():
+    """Ask user to choose resource limits for the scanner container"""
+    print_colored(f"\n{icon('⚙️')} Resource Allocation", Colors.CYAN)
+    print_colored("  How much CPU/RAM should the scanner use?", Colors.GRAY)
+    print_colored("  (Your data is safe — only container resources change)\n", Colors.GRAY)
+    
+    for key, profile in RESOURCE_PROFILES.items():
+        marker = " (default)" if key == "2" else ""
+        print(f"  {key}. {icon('📦')} {profile['name']}{marker}")
+    print(f"  5. {icon('✏️')}  Custom (enter your own values)")
+    print()
+    
+    try:
+        choice = input("Enter choice [1-5] (default: 2): ").strip()
+        
+        if choice in RESOURCE_PROFILES:
+            p = RESOURCE_PROFILES[choice]
+            print_colored(f"   {icon('✓', '+')} Selected: {p['name']}", Colors.GREEN)
+            return p['cpu'], p['mem']
+        elif choice == '5':
+            cpu = input(f"  CPU cores (e.g. 2.0, default {DEFAULT_CPU_LIMIT}): ").strip() or DEFAULT_CPU_LIMIT
+            mem = input(f"  Memory (e.g. 2G, 4G, default {DEFAULT_MEM_LIMIT}): ").strip() or DEFAULT_MEM_LIMIT
+            print_colored(f"   {icon('✓', '+')} Custom: {cpu} CPU, {mem} RAM", Colors.GREEN)
+            return cpu, mem
+        else:
+            # Default: Normal
+            print_colored(f"   {icon('✓', '+')} Using default: 2 CPU, 2G RAM", Colors.GREEN)
+            return DEFAULT_CPU_LIMIT, DEFAULT_MEM_LIMIT
+    except (KeyboardInterrupt, EOFError):
+        print()
+        return DEFAULT_CPU_LIMIT, DEFAULT_MEM_LIMIT
+
 def check_permissions_needed():
     """Check if permission fix is actually needed"""
     # Check ownership of templates directory inside container
@@ -270,6 +314,11 @@ def main():
         download_docker_compose()
         time.sleep(1)
     
+    # Ask user about resource limits
+    cpu_limit, mem_limit = prompt_resource_choice()
+    os.environ['CNM_CPU_LIMIT'] = cpu_limit
+    os.environ['CNM_MEM_LIMIT'] = mem_limit
+    
     # Stop existing containers
     print_colored(f"\n{icon('🔄')} Stopping existing containers...", Colors.CYAN)
     run_command('docker compose down', silent=True)
@@ -279,8 +328,8 @@ def main():
     print_colored(f"\n{icon('📥')} Pulling latest images...", Colors.CYAN)
     run_command('docker compose pull')
     
-    # Start containers
-    print_colored(f"\n{icon('🚀')} Starting containers...", Colors.CYAN)
+    # Start containers with resource limits
+    print_colored(f"\n{icon('🚀')} Starting containers (CPU: {cpu_limit}, RAM: {mem_limit})...", Colors.CYAN)
     run_command('docker compose up -d')
     time.sleep(3)
     

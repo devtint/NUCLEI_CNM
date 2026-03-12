@@ -94,7 +94,9 @@ export function LiveConsole({ scanId, onNavigate }: { scanId: string | null; onN
                                                     ? "bg-blue-600 hover:bg-blue-600"
                                                     : scan.status === "stopped"
                                                         ? "bg-orange-600 hover:bg-orange-600"
-                                                        : "bg-red-600 hover:bg-red-600"
+                                                        : scan.status === "interrupted"
+                                                            ? "bg-yellow-600 hover:bg-yellow-600"
+                                                            : "bg-red-600 hover:bg-red-600"
                                         }
                                     >
                                         {scan.status.toUpperCase()}

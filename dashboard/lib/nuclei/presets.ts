@@ -1,9 +1,9 @@
 export const PREDEFINED_COMMANDS = [
     {
         name: "Full Scan",
-        description: "Runs all templates (comprehensive scan)",
-        flags: "none",
-        config: {}
+        description: "Runs all severity levels (critical, high, medium, low, info)",
+        flags: "-s critical,high,medium,low,info",
+        config: { severity: ["critical", "high", "medium", "low", "info"] }
     },
     {
         name: "Critical Only",

@@ -48,6 +48,7 @@ interface LogLine {
     plain: string;
     html: string;
     severity: Severity;
+    protocol: string; // e.g. "ssl", "http", "dns", "network", etc.
 }
 
 // ─── Constants ──────────────────────────────────────────
@@ -89,6 +90,12 @@ function detectSeverity(line: string): Severity {
     if (/\[low\]/.test(lower)) return "low";
     if (/\[info\]/.test(lower)) return "info";
     return "other";
+}
+
+// Detect protocol type from nuclei output: [template-id] [protocol] [severity]
+function detectProtocol(line: string): string {
+    const match = line.match(/\]\s*\[(ssl|http|dns|network|file|headless|code|javascript|whois|websocket|tcp|udp)\s*\]/i);
+    return match ? match[1].toLowerCase() : "";
 }
 
 function escapeRegex(str: string): string {
@@ -148,6 +155,9 @@ export function LogViewer({ scanId, isRunning, open, onClose, onNavigate }: LogV
         other: true,
     });
 
+    // Protocol/type exclusion filter state (hidden protocols)
+    const [hiddenProtocols, setHiddenProtocols] = useState<Set<string>>(new Set());
+
     // Refs
     const scrollRef = useRef<HTMLDivElement>(null);
     const lineRefs = useRef<Map<number, HTMLDivElement>>(new Map());
@@ -163,6 +173,7 @@ export function LogViewer({ scanId, isRunning, open, onClose, onNavigate }: LogV
                 plain,
                 html: ansiToHtml(raw),
                 severity: detectSeverity(plain),
+                protocol: detectProtocol(plain),
             };
         });
     }, [rawLogs]);
@@ -175,6 +186,21 @@ export function LogViewer({ scanId, isRunning, open, onClose, onNavigate }: LogV
         return counts;
     }, [lines]);
 
+    // Count lines per protocol type (only for finding lines)
+    const protocolCounts = useMemo(() => {
+        const counts: Record<string, number> = {};
+        lines.forEach((l) => {
+            if (l.protocol) {
+                counts[l.protocol] = (counts[l.protocol] || 0) + 1;
+            }
+        });
+        return counts;
+    }, [lines]);
+
+    const protocolList = useMemo(() => {
+        return Object.keys(protocolCounts).sort();
+    }, [protocolCounts]);
+
     const hasFindingLines = useMemo(() => {
         return (
             severityCounts.critical +
@@ -186,8 +212,14 @@ export function LogViewer({ scanId, isRunning, open, onClose, onNavigate }: LogV
     }, [severityCounts]);
 
     const filteredLines = useMemo(() => {
-        return lines.filter((line) => severityFilters[line.severity]);
-    }, [lines, severityFilters]);
+        return lines.filter((line) => {
+            // Severity filter
+            if (!severityFilters[line.severity]) return false;
+            // Protocol exclusion filter
+            if (line.protocol && hiddenProtocols.has(line.protocol)) return false;
+            return true;
+        });
+    }, [lines, severityFilters, hiddenProtocols]);
 
     const matchingIndices = useMemo(() => {
         if (!searchQuery.trim()) return [];
@@ -387,6 +419,15 @@ export function LogViewer({ scanId, isRunning, open, onClose, onNavigate }: LogV
 
     const toggleSeverity = (sev: Severity) => {
         setSeverityFilters((prev) => ({ ...prev, [sev]: !prev[sev] }));
+    };
+
+    const toggleProtocol = (proto: string) => {
+        setHiddenProtocols((prev) => {
+            const next = new Set(prev);
+            if (next.has(proto)) next.delete(proto);
+            else next.add(proto);
+            return next;
+        });
     };
 
     // ─── Line HTML with optional search highlighting ────
@@ -658,6 +699,35 @@ export function LogViewer({ scanId, isRunning, open, onClose, onNavigate }: LogV
                                             }}
                                         >
                                             {severityCounts[sev]}
+                                        </span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    {/* Protocol/Type filter chips (hide ssl, dns, etc.) */}
+                    {protocolList.length > 0 && (
+                        <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                            <span className="text-xs text-muted-foreground mr-1">Type:</span>
+                            {protocolList.map((proto) => {
+                                const isHidden = hiddenProtocols.has(proto);
+                                return (
+                                    <button
+                                        key={proto}
+                                        onClick={() => toggleProtocol(proto)}
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-all cursor-pointer border"
+                                        style={{
+                                            backgroundColor: isHidden ? "transparent" : "#8b5cf6",
+                                            color: isHidden ? "var(--muted-foreground)" : "#ffffff",
+                                            borderColor: isHidden ? "var(--border)" : "#8b5cf6",
+                                            opacity: isHidden ? 0.4 : 1,
+                                            textDecoration: isHidden ? "line-through" : "none",
+                                        }}
+                                    >
+                                        {proto}
+                                        <span style={{ opacity: 0.8, fontSize: "0.65rem" }}>
+                                            {protocolCounts[proto]}
                                         </span>
                                     </button>
                                 );

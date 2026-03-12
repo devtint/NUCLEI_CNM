@@ -28,7 +28,7 @@ services:
     # If OOM occurs, kill this container first (not cloudflared)
     oom_score_adj: 500
     healthcheck:
-      test: [ "CMD", "wget", "-q", "--spider", "http://localhost:3000/login" ]
+      test: [ "CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/login" ]
       interval: 30s
       timeout: 10s
       retries: 3

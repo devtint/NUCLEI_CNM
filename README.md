@@ -9,6 +9,12 @@
 >
 > *See the [Installation Guide below](#-installation--deployment) for full details.*
 
+> [!TIP]
+> **Using `start-nuclei.py`?** Re-download the latest version for bug fixes and improvements:
+> ```bash
+> curl -O https://raw.githubusercontent.com/devtint/NUCLEI_CNM/main/start-nuclei.py
+> ```
+
 <p align="center">
   <img src="https://raw.githubusercontent.com/projectdiscovery/nuclei/master/static/nuclei-logo.png" alt="Nuclei Command Center" width="200"/>
 </p>
@@ -32,6 +38,7 @@
   <img src="https://img.shields.io/badge/TypeScript-5.0-blue?style=flat-square&logo=typescript" alt="TypeScript"/>
   <img src="https://img.shields.io/badge/Auth.js-v5-green?style=flat-square&logo=auth0" alt="Auth.js"/>
   <img src="https://img.shields.io/badge/SQLite-3-003B57?style=flat-square&logo=sqlite" alt="SQLite"/>
+  <img src="https://img.shields.io/badge/Platform-amd64%20%7C%20arm64-purple?style=flat-square&logo=docker" alt="Multi-Arch"/>
   <img src="https://img.shields.io/badge/License-MIT-yellow?style=flat-square" alt="License"/>
 </p>
 
@@ -181,6 +188,14 @@
 1.  **Docker Desktop** (running).
 2.  **Python 3** (for quick start script) - *optional but recommended*
 
+### 💻 Platform Support
+
+| Platform | Architecture | Status |
+|----------|-------------|--------|
+| **Windows / Linux** (Intel/AMD) | `linux/amd64` | ✅ Supported |
+| **macOS** (Apple Silicon M1–M4) | `linux/arm64` | ✅ Supported |
+| **macOS** (Intel) | `linux/amd64` | ✅ Supported |
+
 ### 🎯 Quick Start Script (Easiest)
 
 Download and run the auto-start script - it handles everything for you:
@@ -233,7 +248,7 @@ services:
       - DATABASE_PATH=/app/data/nuclei.db
     restart: unless-stopped
     healthcheck:
-      test: [ "CMD", "wget", "-q", "--spider", "http://localhost:3000/login" ]
+      test: [ "CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/login" ]
       interval: 30s
       timeout: 10s
       retries: 3

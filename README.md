@@ -9,12 +9,6 @@
 >
 > *See the [Installation Guide below](#-installation--deployment) for full details.*
 
-> [!TIP]
-> **Using `start-nuclei.py`?** Re-download the latest version for bug fixes and improvements:
-> ```bash
-> curl -O https://raw.githubusercontent.com/devtint/NUCLEI_CNM/main/start-nuclei.py
-> ```
-
 <p align="center">
   <img src="https://raw.githubusercontent.com/projectdiscovery/nuclei/master/static/nuclei-logo.png" alt="Nuclei Command Center" width="200"/>
 </p>
@@ -38,7 +32,6 @@
   <img src="https://img.shields.io/badge/TypeScript-5.0-blue?style=flat-square&logo=typescript" alt="TypeScript"/>
   <img src="https://img.shields.io/badge/Auth.js-v5-green?style=flat-square&logo=auth0" alt="Auth.js"/>
   <img src="https://img.shields.io/badge/SQLite-3-003B57?style=flat-square&logo=sqlite" alt="SQLite"/>
-  <img src="https://img.shields.io/badge/Platform-amd64%20%7C%20arm64-purple?style=flat-square&logo=docker" alt="Multi-Arch"/>
   <img src="https://img.shields.io/badge/License-MIT-yellow?style=flat-square" alt="License"/>
 </p>
 
@@ -188,14 +181,6 @@
 1.  **Docker Desktop** (running).
 2.  **Python 3** (for quick start script) - *optional but recommended*
 
-### 💻 Platform Support
-
-| Platform | Architecture | Status |
-|----------|-------------|--------|
-| **Windows / Linux** (Intel/AMD) | `linux/amd64` | ✅ Supported |
-| **macOS** (Apple Silicon M1–M4) | `linux/arm64` | ✅ Supported |
-| **macOS** (Intel) | `linux/amd64` | ✅ Supported |
-
 ### 🎯 Quick Start Script (Easiest)
 
 Download and run the auto-start script - it handles everything for you:
@@ -235,6 +220,8 @@ Or copy this exact content - it is production ready & includes Cloudflare Tunnel
 services:
   nuclei-cnm:
     image: mrtintnaingwin/nucleicnm:latest
+    # Uncomment below if you want to build from source instead of pulling image
+    # build: ./dashboard
     container_name: nuclei-command-center
     ports:
       - "3000:3000"
@@ -247,8 +234,20 @@ services:
       - NODE_ENV=production
       - DATABASE_PATH=/app/data/nuclei.db
     restart: unless-stopped
+    # Resource limits: prevent nuclei scans from starving dashboard + tunnel
+    # Override at runtime via env vars: CNM_CPU_LIMIT, CNM_MEM_LIMIT
+    deploy:
+      resources:
+        limits:
+          cpus: '${CNM_CPU_LIMIT:-2.0}'
+          memory: ${CNM_MEM_LIMIT:-2G}
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    # If OOM occurs, kill this container first (not cloudflared)
+    oom_score_adj: 500
     healthcheck:
-      test: [ "CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/login" ]
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost:3000/login" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -259,8 +258,19 @@ services:
     container_name: nuclei-cnm-tunnel
     command: tunnel --no-autoupdate --url http://nuclei-cnm:3000
     depends_on:
-      - nuclei-cnm
+      nuclei-cnm:
+        condition: service_healthy
     restart: unless-stopped
+    # Protect tunnel: low resource needs, high OOM survival priority
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+    oom_score_adj: -500
 
 volumes:
   nuclei_data:

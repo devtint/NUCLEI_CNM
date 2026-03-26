@@ -62,6 +62,7 @@
 | **Nuclei** | 7 preset modes (Full, Critical, CVEs, Tech Detection, etc.) + custom CLI builder |
 | **Subfinder** | Subdomain enumeration with persistent inventory |
 | **HTTPX** | HTTP probing for live host detection with technology fingerprinting |
+| **Agentic AI** | Ask questions about your vulnerabilities and scans in natural language (Powered by Groq Llama-3) |
 
 ### 📊 Vulnerability Management
 
@@ -411,6 +412,8 @@ We use **Docker Named Volumes** (`nuclei_data`, `nuclei_scans`, `nuclei_custom_t
 | `ADMIN_PASSWORD_HASH` | ❌ | **Auto-configured via setup wizard** |
 | `AUTH_SECRET` | ❌ | **Auto-generated via setup wizard** |
 | `DATABASE_PATH` | ❌ | Custom database location (default: `/app/data/nuclei.db`) |
+| `GROQ_API_KEY` | ❌ | API key from [Groq](https://console.groq.com/keys) to enable the AI Chat Assistant (can also be set in UI Settings) |
+| `SHODAN_API_KEY` | ❌ | Shodan API Key for OSINT enrichment (can also be set in UI Settings) |
 
 > **Docker Note**: Password and auth secret are configured via the first-run setup wizard. No manual config required!
 

@@ -12,11 +12,14 @@ export function SettingsPanel() {
     const [token, setToken] = useState("");
     const [chatId, setChatId] = useState("");
     const [shodanKey, setShodanKey] = useState("");
+    const [groqKey, setGroqKey] = useState("");
     const [enabled, setEnabled] = useState(false);
     const [tunnelKeepAlive, setTunnelKeepAlive] = useState(false);
     const [tunnelUrl, setTunnelUrl] = useState("");
     const [loading, setLoading] = useState(true);
     const [testing, setTesting] = useState(false);
+    const [testingShodan, setTestingShodan] = useState(false);
+    const [testingGroq, setTestingGroq] = useState(false);
     const [isConfigured, setIsConfigured] = useState(false);
 
     useEffect(() => {
@@ -31,6 +34,7 @@ export function SettingsPanel() {
                 setToken(data.telegram_bot_token || "");
                 setChatId(data.telegram_chat_id || "");
                 setShodanKey(data.shodan_api_key || "");
+                setGroqKey(data.groq_api_key || "");
                 setEnabled(data.notifications_enabled || false);
                 setTunnelKeepAlive(data.tunnel_keep_alive || false);
                 setTunnelUrl(data.tunnel_url || "");
@@ -93,6 +97,58 @@ export function SettingsPanel() {
         }
     };
 
+    const handleTestShodan = async () => {
+        if (!shodanKey) return;
+        if (shodanKey.includes("••••")) {
+            toast.error("Please enter the full Shodan key to test.");
+            return;
+        }
+        setTestingShodan(true);
+        try {
+            const res = await fetch("/api/settings/verify-shodan", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ apiKey: shodanKey }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                toast.success("Shodan API Connected!");
+            } else {
+                toast.error("Shodan Test Failed", { description: data.error });
+            }
+        } catch (e) {
+            toast.error("Test Request Failed");
+        } finally {
+            setTestingShodan(false);
+        }
+    };
+
+    const handleTestGroq = async () => {
+        if (!groqKey) return;
+        if (groqKey.includes("••••")) {
+            toast.error("Please enter the full Groq key to test.");
+            return;
+        }
+        setTestingGroq(true);
+        try {
+            const res = await fetch("/api/settings/verify-groq", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ apiKey: groqKey }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                toast.success("Groq API Connected!");
+            } else {
+                toast.error("Groq Test Failed", { description: data.error });
+            }
+        } catch (e) {
+            toast.error("Test Request Failed");
+        } finally {
+            setTestingGroq(false);
+        }
+    };
+
     const handleSave = async () => {
         try {
             const res = await fetch("/api/settings", {
@@ -103,6 +159,7 @@ export function SettingsPanel() {
                     telegram_chat_id: chatId,
                     notifications_enabled: enabled,
                     shodan_api_key: shodanKey,
+                    groq_api_key: groqKey,
                     tunnel_keep_alive: tunnelKeepAlive,
                     tunnel_url: tunnelUrl
                 }),
@@ -181,18 +238,58 @@ export function SettingsPanel() {
                     </div>
                     <div className="grid gap-2">
                         <Label htmlFor="shodan_key">Shodan API Key</Label>
-                        <div className="relative">
-                            <Input
-                                id="shodan_key"
-                                type="password"
-                                placeholder="Your 32-character Shodan API Key"
-                                value={shodanKey}
-                                onChange={(e) => setShodanKey(e.target.value)}
-                                className="pr-10 font-mono"
-                            />
-                            <Lock className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground opacity-50" />
+                        <div className="flex gap-2">
+                            <div className="relative flex-1">
+                                <Input
+                                    id="shodan_key"
+                                    type="password"
+                                    placeholder="Your 32-character Shodan API Key"
+                                    value={shodanKey}
+                                    onChange={(e) => setShodanKey(e.target.value)}
+                                    className="pr-10 font-mono"
+                                />
+                                <Lock className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground opacity-50" />
+                            </div>
+                            <Button 
+                                variant="outline" 
+                                onClick={handleTestShodan}
+                                disabled={testingShodan || !shodanKey || shodanKey.includes("••••")}
+                            >
+                                {testingShodan ? "Testing..." : "Test"}
+                            </Button>
                         </div>
                         <p className="text-xs text-muted-foreground">Used for bulk cross-referencing IPs and Subdomains.</p>
+                    </div>
+                </div>
+
+                <div className="space-y-4 pt-4 border-t border-border">
+                    <div className="flex items-center gap-2">
+                        <span className="text-xl">🤖</span>
+                        <h4 className="font-semibold tracking-tight">AI Assistant (Groq)</h4>
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="groq_key">Groq API Key</Label>
+                        <div className="flex gap-2">
+                            <div className="relative flex-1">
+                                <Input
+                                    id="groq_key"
+                                    type="password"
+                                    placeholder="gsk_..."
+                                    value={groqKey}
+                                    onChange={(e) => setGroqKey(e.target.value)}
+                                    className="pr-10 font-mono"
+                                />
+                                <Lock className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground opacity-50" />
+                            </div>
+                            <Button 
+                                variant="outline" 
+                                onClick={handleTestGroq}
+                                disabled={testingGroq || !groqKey || groqKey.includes("••••")}
+                            >
+                                {testingGroq ? "Testing..." : "Test"}
+                            </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground">Powers the Nuclei CC AI chat panel for asking questions about your data.</p>
                     </div>
                 </div>
 

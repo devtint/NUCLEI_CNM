@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Download, RefreshCw, Filter, Trash2, Copy, ExternalLink, Zap, Terminal } from "lucide-react";
+import { Download, RefreshCw, Filter, Trash2, Copy, ExternalLink, Zap, Terminal, Bot } from "lucide-react";
 import { toast } from "sonner";
 import {
     DropdownMenu,
@@ -505,6 +505,15 @@ export function FindingsTable() {
                         <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                     </Button>
 
+                    <Button variant="outline" size="sm" onClick={() => {
+                        const event = new CustomEvent('open-ai-chat', { 
+                            detail: { message: `Summarize my most critical ongoing vulnerabilities and top risk targets.` }
+                        });
+                        window.dispatchEvent(event);
+                    }} className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border border-emerald-500/20 shadow-none">
+                        <Bot className="mr-2 h-4 w-4" /> AI Summary
+                    </Button>
+
                     <Button variant="outline" size="sm" onClick={exportToPDF} title="Export PDF">
                         <Download className="mr-2 h-4 w-4" /> PDF
                     </Button>
@@ -638,7 +647,7 @@ export function FindingsTable() {
             )}
 
             <Dialog open={!!selectedFinding} onOpenChange={(open) => !open && setSelectedFinding(null)}>
-                <DialogContent className="max-w-3xl bg-card border-border text-foreground max-h-[90vh] overflow-y-auto">
+                <DialogContent className="max-w-[95vw] lg:max-w-[calc(100vw-17rem)] w-full h-[95vh] max-h-[95vh] flex flex-col bg-card border-border text-foreground overflow-hidden">
                     <DialogHeader>
                         <DialogTitle className="text-xl font-mono text-emerald-400">
                             {selectedFinding?.["template-id"]}
@@ -648,7 +657,7 @@ export function FindingsTable() {
                         </DialogDescription>
                     </DialogHeader>
 
-                    <Tabs defaultValue="overview" className="w-full mt-4">
+                    <Tabs defaultValue="overview" className="w-full mt-4 flex-1 flex flex-col min-h-0">
                         <TabsList className="grid w-full grid-cols-4 bg-muted/50">
                             <TabsTrigger value="overview">Overview</TabsTrigger>
                             <TabsTrigger value="request">Request</TabsTrigger>
@@ -656,7 +665,7 @@ export function FindingsTable() {
                             <TabsTrigger value="raw">Raw JSON</TabsTrigger>
                         </TabsList>
 
-                        <TabsContent value="overview" className="mt-4 space-y-4">
+                        <TabsContent value="overview" className="mt-4 flex-1 overflow-y-auto space-y-4 pr-2">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <Card className="bg-muted/50 border-border">
                                     <CardHeader className="pb-2">
@@ -706,19 +715,34 @@ export function FindingsTable() {
 
                             <div className="pt-4 border-t border-border mt-4 flex justify-end">
                                 <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                        const event = new CustomEvent('open-ai-chat', { 
+                                            detail: { message: `Analyze finding ${selectedFinding?.["template-id"]} from ${selectedFinding?.host || selectedFinding?.["matched-at"]}` }
+                                        });
+                                        window.dispatchEvent(event);
+                                        setSelectedFinding(null); // Close the dialog
+                                    }}
+                                    className="bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 shadow-none border border-emerald-500/20 mr-2"
+                                >
+                                    <Bot className="w-4 h-4 mr-2" />
+                                    AI Action
+                                </Button>
+                                <Button
                                     variant="destructive"
                                     size="sm"
                                     onClick={() => selectedFinding && setFindingToDelete(selectedFinding)}
-                                    className="bg-red-500/10 text-red-500 hover:bg-red-500/20 border-red-500/20"
+                                    className="bg-red-500/10 text-red-500 hover:bg-red-500/20 border-red-500/20 shadow-none"
                                 >
                                     <Trash2 className="w-4 h-4 mr-2" />
-                                    Delete Finding
+                                    Delete
                                 </Button>
                             </div>
                         </TabsContent>
 
-                        <TabsContent value="request" className="mt-4">
-                            <div className="flex justify-end mb-2">
+                        <TabsContent value="request" className="mt-4 flex-1 flex flex-col min-h-0">
+                            <div className="flex justify-end mb-2 shrink-0">
                                 <Button
                                     variant="outline"
                                     size="sm"
@@ -763,23 +787,23 @@ export function FindingsTable() {
                                     <Terminal className="mr-2 h-3 w-3" /> Copy as cURL
                                 </Button>
                             </div>
-                            <ScrollArea className="h-[360px] w-full rounded-md border border-border bg-black/50 p-4">
+                            <ScrollArea className="flex-1 w-full rounded-md border border-border bg-black/50 p-4">
                                 <pre className="text-xs font-mono text-blue-300 whitespace-pre-wrap break-all">
                                     {selectedFinding?.request || "No request data available."}
                                 </pre>
                             </ScrollArea>
                         </TabsContent>
 
-                        <TabsContent value="response" className="mt-4">
-                            <ScrollArea className="h-[400px] w-full rounded-md border border-border bg-black/50 p-4">
+                        <TabsContent value="response" className="mt-4 flex-1 flex flex-col min-h-0">
+                            <ScrollArea className="flex-1 w-full rounded-md border border-border bg-black/50 p-4">
                                 <pre className="text-xs font-mono text-orange-300 whitespace-pre-wrap break-all">
                                     {selectedFinding?.response || "No response data available."}
                                 </pre>
                             </ScrollArea>
                         </TabsContent>
 
-                        <TabsContent value="raw" className="mt-4">
-                            <ScrollArea className="h-[400px] w-full rounded-md border border-border bg-black/50 p-4">
+                        <TabsContent value="raw" className="mt-4 flex-1 flex flex-col min-h-0">
+                            <ScrollArea className="flex-1 w-full rounded-md border border-border bg-black/50 p-4">
                                 <pre className="text-xs font-mono text-emerald-400 whitespace-pre-wrap break-all">
                                     {JSON.stringify(selectedFinding, null, 2)}
                                 </pre>

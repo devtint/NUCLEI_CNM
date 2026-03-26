@@ -67,3 +67,33 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: String(e) }, { status: 500 });
     }
 }
+
+export async function DELETE(req: NextRequest) {
+    const session = await auth();
+    if (!session) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    try {
+        const { searchParams } = new URL(req.url);
+        const templateId = searchParams.get("id");
+
+        if (!templateId) {
+            return NextResponse.json({ error: "Template ID is required" }, { status: 400 });
+        }
+
+        const home = os.homedir();
+        const customDir = path.join(home, "nuclei-custom-templates");
+        const safeName = templateId.replace(/[^a-zA-Z0-9-_]/g, "");
+        const filePath = path.join(customDir, `${safeName}.yaml`);
+
+        if (!fs.existsSync(filePath)) {
+            return NextResponse.json({ error: "Template not found" }, { status: 404 });
+        }
+
+        fs.unlinkSync(filePath);
+        return NextResponse.json({ success: true, message: `Deleted template: ${safeName}` });
+    } catch (e) {
+        return NextResponse.json({ error: String(e) }, { status: 500 });
+    }
+}

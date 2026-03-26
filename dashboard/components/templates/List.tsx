@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { FileCode, Calendar } from "lucide-react";
+import { FileCode, Calendar, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 interface Template {
     id: string;
@@ -13,7 +14,7 @@ interface Template {
     lastModified: string;
 }
 
-export function TemplateList({ refreshTrigger, onRun }: { refreshTrigger: number, onRun?: (path: string) => void }) {
+export function TemplateList({ refreshTrigger, onRun, onDeleted }: { refreshTrigger: number, onRun?: (path: string) => void, onDeleted?: () => void }) {
     const [templates, setTemplates] = useState<Template[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -75,6 +76,30 @@ export function TemplateList({ refreshTrigger, onRun }: { refreshTrigger: number
                                         Run
                                     </Button>
                                 )}
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-6 text-[10px] px-2 text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                                    onClick={async (e: React.MouseEvent) => {
+                                        e.stopPropagation();
+                                        if (!confirm(`Delete template "${t.id}"?`)) return;
+                                        try {
+                                            const res = await fetch(`/api/templates?id=${encodeURIComponent(t.id)}`, { method: 'DELETE' });
+                                            if (res.ok) {
+                                                toast.success(`Deleted ${t.id}`);
+                                                setTemplates(prev => prev.filter(x => x.id !== t.id));
+                                                onDeleted?.();
+                                            } else {
+                                                const data = await res.json();
+                                                toast.error(data.error || 'Failed to delete');
+                                            }
+                                        } catch {
+                                            toast.error('Failed to delete template');
+                                        }
+                                    }}
+                                >
+                                    <Trash2 className="h-3 w-3" />
+                                </Button>
                             </div>
                         </div>
                         <div>

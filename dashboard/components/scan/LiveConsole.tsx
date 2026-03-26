@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, Square, RefreshCcw, FileText } from "lucide-react";
+import { Loader2, Square, RefreshCcw, FileText, Copy } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { LogViewer } from "./LogViewer";
@@ -164,11 +164,26 @@ export function LiveConsole({ scanId, onNavigate }: { scanId: string | null; onN
                                     </div>
                                 </div>
                                 {scan.config?.customArgs && (
-                                    <div className="mt-3 pt-3 border-t border-border">
-                                        <span className="text-muted-foreground block text-xs mb-1">Custom Arguments</span>
-                                        <code className="text-xs bg-black/20 p-1.5 rounded text-emerald-400 font-mono block overflow-x-auto whitespace-nowrap">
-                                            {scan.config.customArgs}
-                                        </code>
+                                    <div className="mt-3 pt-3 border-t border-border relative group">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="text-muted-foreground block text-xs">Custom Arguments</span>
+                                            <Button 
+                                                variant="ghost" 
+                                                size="sm" 
+                                                className="h-6 px-2 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity" 
+                                                onClick={() => { 
+                                                    navigator.clipboard.writeText(scan.config?.customArgs || ""); 
+                                                    toast.success("Copied to clipboard"); 
+                                                }}
+                                            >
+                                                <Copy className="h-3 w-3 mr-1" /> Copy Full Tags
+                                            </Button>
+                                        </div>
+                                        <ScrollArea className="max-h-24 w-full rounded bg-black/20 border border-white/5">
+                                            <code className="text-[11px] p-2 text-emerald-400/90 font-mono block break-all whitespace-pre-wrap leading-relaxed">
+                                                {scan.config.customArgs}
+                                            </code>
+                                        </ScrollArea>
                                     </div>
                                 )}
                             </div>

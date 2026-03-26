@@ -38,6 +38,12 @@ export async function GET(req: NextRequest) {
         setSetting("shodan_api_key", shodanKey);
     }
 
+    let groqKey = getSetting("groq_api_key");
+    if (!groqKey && process.env.GROQ_API_KEY) {
+        groqKey = process.env.GROQ_API_KEY;
+        setSetting("groq_api_key", groqKey);
+    }
+
     // Mask Token for security
     let maskedToken = "";
     if (token) {
@@ -57,11 +63,21 @@ export async function GET(req: NextRequest) {
         }
     }
 
+    let maskedGroq = "";
+    if (groqKey) {
+        if (groqKey.length > 10) {
+            maskedGroq = groqKey.substring(0, 4) + "••••••••" + groqKey.substring(groqKey.length - 4);
+        } else {
+            maskedGroq = "••••";
+        }
+    }
+
     return NextResponse.json({
         telegram_bot_token: maskedToken,
         telegram_chat_id: chatId || "",
         notifications_enabled: notificationsEnabled === "true",
         shodan_api_key: maskedShodan,
+        groq_api_key: maskedGroq,
         tunnel_keep_alive: tunnelKeepAlive,
         tunnel_url: tunnelUrl,
         is_configured: !!(token && chatId)
@@ -81,6 +97,7 @@ export async function POST(req: NextRequest) {
             telegram_chat_id, 
             notifications_enabled, 
             shodan_api_key,
+            groq_api_key,
             tunnel_keep_alive,
             tunnel_url
         } = body;
@@ -101,6 +118,10 @@ export async function POST(req: NextRequest) {
 
         if (shodan_api_key && !shodan_api_key.includes("••••")) {
             setSetting("shodan_api_key", shodan_api_key);
+        }
+        
+        if (groq_api_key && !groq_api_key.includes("••••")) {
+            setSetting("groq_api_key", groq_api_key);
         }
         
         if (tunnel_keep_alive !== undefined) {

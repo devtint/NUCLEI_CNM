@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { DashboardStats } from "@/components/dashboard/Stats";
 import { ScanWizard } from "@/components/scan/Wizard";
 import { LiveConsole } from "@/components/scan/LiveConsole";
@@ -19,15 +19,33 @@ import { SchedulerPanel } from "@/components/system/SchedulerPanel";
 import { useKeyboardShortcuts } from "@/components/layout/KeyboardShortcuts";
 import { CommandPalette } from "@/components/layout/CommandPalette";
 import { ShortcutHelp } from "@/components/layout/ShortcutHelp";
+import { AIPage } from "@/components/ai/AIPage";
 import { Command } from "lucide-react";
 
 export function DashboardClient({ initialStats }: { initialStats: any }) {
     const [activeScanId, setActiveScanId] = useState<string | null>(null);
     const [selectedTemplate, setSelectedTemplate] = useState<string>("");
     const [scanTarget, setScanTarget] = useState<string>("");
+    
+    // Start with overview for SSR to prevent hydration mismatch
     const [activeView, setActiveView] = useState("overview");
+    const [previousView, setPreviousView] = useState("overview");
     const [templateRefresh, setTemplateRefresh] = useState(0);
     const [statsRefresh, setStatsRefresh] = useState(0);
+    const [isMounted, setIsMounted] = useState(false);
+
+    // Sync activeView with URL hash after mount
+    useEffect(() => {
+        setIsMounted(true);
+        if (window.location.hash) {
+            const hashView = window.location.hash.slice(1);
+            const validViews = ['overview', 'vulnerabilities', 'scan', 'activity', 'history', 'templates', 'subfinder', 'httpx', 'automation', 'ai', 'backup', 'system'];
+            if (validViews.includes(hashView)) {
+                setActiveView(hashView);
+                setPreviousView('overview');
+            }
+        }
+    }, []);
 
     // Keyboard shortcuts state
     const [paletteOpen, setPaletteOpen] = useState(false);
@@ -37,8 +55,18 @@ export function DashboardClient({ initialStats }: { initialStats: any }) {
         setStatsRefresh(prev => prev + 1);
     }, []);
 
+    const navigateToView = useCallback((view: string) => {
+        setActiveView(prev => {
+            if (view !== prev) {
+                setPreviousView(prev);
+                window.location.hash = view; // Update URL hash for persistence across refreshes
+            }
+            return view;
+        });
+    }, []);
+
     useKeyboardShortcuts({
-        onNavigate: setActiveView,
+        onNavigate: navigateToView,
         onOpenCommandPalette: () => setPaletteOpen(true),
         onOpenHelp: () => setHelpOpen(true),
         onRefresh: handleRefresh,
@@ -59,13 +87,26 @@ export function DashboardClient({ initialStats }: { initialStats: any }) {
 
     return (
         <div className="flex bg-background min-h-screen text-foreground font-sans selection:bg-emerald-500/30">
-            <Sidebar activeView={activeView} onChangeView={setActiveView} />
+            <Sidebar activeView={activeView} onChangeView={navigateToView} />
 
             <div className="pl-64 w-full">
                 <div className="p-8 max-w-7xl mx-auto min-h-screen">
                     <header className="flex justify-between items-center mb-8 border-b border-border pb-4">
-                        <h1 className="text-2xl font-bold tracking-tight text-foreground capitalize">
-                            {activeView.replace("-", " ")}
+                        <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-3">
+                            <span className="capitalize">{activeView.replace("-", " ")}</span>
+                            {activeView === "overview" && (
+                                <button
+                                    onClick={() => {
+                                        const event = new CustomEvent('open-ai-chat', { 
+                                            detail: { message: `Summarize my entire Nuclei environment, including overall stats, recent runs, and current risk level.` }
+                                        });
+                                        window.dispatchEvent(event);
+                                    }}
+                                    className="px-2 py-1 flex items-center gap-1.5 text-[10px] font-semibold tracking-wider uppercase text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 rounded-md transition-colors"
+                                >
+                                    AI Summary
+                                </button>
+                            )}
                         </h1>
                         <div className="flex items-center gap-2">
                             <button
@@ -167,6 +208,12 @@ export function DashboardClient({ initialStats }: { initialStats: any }) {
                         </div>
                     )}
 
+                    {activeView === "ai" && (
+                        <div className="animate-in fade-in duration-500" style={{ height: 'calc(100vh - 10rem)' }}>
+                            <AIPage previousView={previousView} onNavigate={(view: string) => { setPreviousView(activeView); setActiveView(view); }} />
+                        </div>
+                    )}
+
                     {activeView === "backup" && (
                         <BackupRestorePanel onRestoreComplete={() => {
                             setStatsRefresh(prev => prev + 1);
@@ -179,7 +226,7 @@ export function DashboardClient({ initialStats }: { initialStats: any }) {
             <CommandPalette
                 open={paletteOpen}
                 onClose={() => setPaletteOpen(false)}
-                onNavigate={setActiveView}
+                onNavigate={navigateToView}
                 onOpenHelp={() => { setPaletteOpen(false); setHelpOpen(true); }}
             />
             <ShortcutHelp

@@ -13,7 +13,8 @@ import {
     Star,
     Network,
     Database,
-    Zap
+    Zap,
+    Bot
 } from "lucide-react";
 
 import { handleSignOut } from "@/app/lib/actions";
@@ -35,6 +36,7 @@ export function Sidebar({ className, activeView, onChangeView }: SidebarProps) {
         { id: "subfinder", label: "Subfinder", icon: Network },
         { id: "httpx", label: "Live Assets", icon: Activity },
         { id: "automation", label: "Automation", icon: Zap },
+        { id: "ai", label: "AI Intelligence", icon: Bot },
         { id: "backup", label: "Backup & Restore", icon: Database },
         { id: "system", label: "System", icon: Settings },
     ];

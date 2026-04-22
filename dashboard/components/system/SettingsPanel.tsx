@@ -13,6 +13,7 @@ export function SettingsPanel() {
     const [chatId, setChatId] = useState("");
     const [shodanKey, setShodanKey] = useState("");
     const [groqKey, setGroqKey] = useState("");
+    const [aiModel, setAiModel] = useState("llama-3.3-70b-versatile");
     const [enabled, setEnabled] = useState(false);
     const [tunnelKeepAlive, setTunnelKeepAlive] = useState(false);
     const [tunnelUrl, setTunnelUrl] = useState("");
@@ -35,6 +36,7 @@ export function SettingsPanel() {
                 setChatId(data.telegram_chat_id || "");
                 setShodanKey(data.shodan_api_key || "");
                 setGroqKey(data.groq_api_key || "");
+                setAiModel(data.ai_model || "llama-3.3-70b-versatile");
                 setEnabled(data.notifications_enabled || false);
                 setTunnelKeepAlive(data.tunnel_keep_alive || false);
                 setTunnelUrl(data.tunnel_url || "");
@@ -160,6 +162,7 @@ export function SettingsPanel() {
                     notifications_enabled: enabled,
                     shodan_api_key: shodanKey,
                     groq_api_key: groqKey,
+                    ai_model: aiModel,
                     tunnel_keep_alive: tunnelKeepAlive,
                     tunnel_url: tunnelUrl
                 }),
@@ -290,6 +293,26 @@ export function SettingsPanel() {
                             </Button>
                         </div>
                         <p className="text-xs text-muted-foreground">Powers the Nuclei CC AI chat panel for asking questions about your data.</p>
+                    </div>
+                    <div className="grid gap-2 mt-3">
+                        <Label htmlFor="ai_model">AI Model</Label>
+                        <select
+                            id="ai_model"
+                            value={aiModel}
+                            onChange={(e) => setAiModel(e.target.value)}
+                            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            <option value="llama-3.3-70b-versatile">Llama 3.3 70B Versatile (12K TPM) ⭐</option>
+                            <option value="meta-llama/llama-4-scout-17b-16e-instruct">Llama 4 Scout 17B (30K TPM)</option>
+                            <option value="llama-3.1-8b-instant">Llama 3.1 8B Instant (6K TPM)</option>
+                            <option value="moonshotai/kimi-k2-instruct">Kimi K2 Instruct (10K TPM)</option>
+                            <option value="qwen/qwen3-32b">Qwen3 32B (6K TPM)</option>
+                            <option value="openai/gpt-oss-120b">GPT-OSS 120B (8K TPM)</option>
+                            <option value="openai/gpt-oss-20b">GPT-OSS 20B (8K TPM)</option>
+                        </select>
+                        <p className="text-[10px] text-muted-foreground leading-relaxed">
+                            TPM = Tokens per Minute (Groq free tier). Higher TPM = more room for complex tool calls. ⭐ = Recommended.
+                        </p>
                     </div>
                 </div>
 

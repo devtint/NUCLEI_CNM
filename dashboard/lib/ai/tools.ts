@@ -1,17 +1,23 @@
 /**
  * AI Agent Tool Definitions
  * 
- * Each tool is a safe, READ-ONLY database query function.
- * The LLM picks which tool to call based on the user's question.
+ * Tools are organized into two categories:
+ * 1. READ-ONLY: Safe database query functions for analyzing scan data.
+ * 2. ACTION: Scoped mutation tools for triggering scans and updating findings.
  * 
- * SECURITY: No write operations. No mutations. Read-only queries only.
+ * SECURITY: Action tools enforce concurrency guards, private IP blocking,
+ * and strict allowlists for mutation operations.
  */
 
-import { getDatabase, getSetting } from '@/lib/db';
+import { getDatabase, getSetting, updateFinding, insertScan, updateScan } from '@/lib/db';
 import OpenAI from 'openai';
+import { tool, jsonSchema } from 'ai';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import crypto from 'crypto';
+import { triggerSubfinderScan, triggerHttpxScan, triggerNucleiScan, getNucleiSettings, getSchedulerStatus, type NucleiScanSettings } from '@/lib/scheduler';
+import { cache } from '@/lib/cache';
 
 // ─── Tool Definitions (OpenAI Function Calling Schema) ───────────────────────
 
@@ -272,6 +278,181 @@ export const TOOL_DEFINITIONS = [
                 required: ["scan_id_a", "scan_id_b"]
             }
         }
+    },
+    {
+        type: "function" as const,
+        function: {
+            name: "advanced_asset_search",
+            description: "Advanced dynamic search for inventory, domains, subdomains, and live assets. Use this when the user asks for complex combinations, 'except' filters, or specific technologies.",
+            parameters: {
+                type: "object",
+                properties: {
+                    query_type: {
+                        type: "string",
+                        enum: ["subdomains", "live_assets", "monitored_targets"],
+                        description: "The type of asset to query."
+                    },
+                    includes: {
+                        type: "array",
+                        items: { type: "string" },
+                        description: "Keywords that MUST be present in the record (e.g. ['php', 'example.com'])."
+                    },
+                    excludes: {
+                        type: "array",
+                        items: { type: "string" },
+                        description: "Keywords that MUST NOT be present in the record (e.g. ['cloudflare'])."
+                    },
+                    limit: { type: "number", description: "Max results to return. Default 50." }
+                },
+                required: ["query_type"]
+            }
+        }
+    },
+    {
+        type: "function" as const,
+        function: {
+            name: "advanced_vuln_search",
+            description: "Advanced dynamic search for vulnerabilities/findings. Use this when the user asks for complex combinations like 'vulns with XSS except on staging' or multiple severities.",
+            parameters: {
+                type: "object",
+                properties: {
+                    includes: {
+                        type: "array",
+                        items: { type: "string" },
+                        description: "Keywords that MUST be present (matches name, template_id, host)."
+                    },
+                    excludes: {
+                        type: "array",
+                        items: { type: "string" },
+                        description: "Keywords that MUST NOT be present."
+                    },
+                    severities: {
+                        type: "array",
+                        items: { type: "string" },
+                        description: "List of severities to include (e.g., ['high', 'critical'])."
+                    },
+                    limit: { type: "number", description: "Max results to return. Default 50." }
+                },
+                required: []
+            }
+        }
+    },
+    {
+        type: "function" as const,
+        function: {
+            name: "execute_readonly_sql",
+            description: "Execute raw read-only SQL queries directly against the SQLite database. Use this ONLY as a fallback for complex analytical questions that standard tools cannot answer. The query MUST start with SELECT and must not perform mutations.",
+            parameters: {
+                type: "object",
+                properties: {
+                    query: {
+                        type: "string",
+                        description: "The SQLite SELECT query to execute."
+                    }
+                },
+                required: ["query"]
+            }
+        }
+    },
+    // ─── ACTION TOOLS (Scan Triggering & Mutations) ────────────────────────────
+    {
+        type: "function" as const,
+        function: {
+            name: "trigger_nuclei_scan",
+            description: "Start a Nuclei vulnerability scan on a specific target URL or domain. Use when the user explicitly asks to scan a target for vulnerabilities. ALWAYS confirm the target with the user in the conversation before calling this tool. NEVER call this without explicit user approval of the target.",
+            parameters: {
+                type: "object",
+                properties: {
+                    target: {
+                        type: "string",
+                        description: "The URL or domain to scan (e.g. 'https://example.com' or 'example.com')."
+                    },
+                    severity: {
+                        type: "array",
+                        items: { type: "string" },
+                        description: "Optional severity filters e.g. ['critical','high']. If omitted, uses dashboard default settings."
+                    },
+                    tags: {
+                        type: "array",
+                        items: { type: "string" },
+                        description: "Optional template tags e.g. ['cve','wordpress','jira']. Narrows scan to specific technology."
+                    },
+                    template_id: {
+                        type: "string",
+                        description: "Optional: specific template path to run (e.g. '~/nuclei-custom-templates/cve-2024-1234.yaml')."
+                    }
+                },
+                required: ["target"]
+            }
+        }
+    },
+    {
+        type: "function" as const,
+        function: {
+            name: "trigger_subfinder_scan",
+            description: "Run Subfinder to enumerate subdomains for a root domain. Use when the user asks to discover, find, or enumerate subdomains for a domain.",
+            parameters: {
+                type: "object",
+                properties: {
+                    domain: {
+                        type: "string",
+                        description: "The root domain to enumerate subdomains for (e.g. 'example.com')."
+                    }
+                },
+                required: ["domain"]
+            }
+        }
+    },
+    {
+        type: "function" as const,
+        function: {
+            name: "trigger_full_recon",
+            description: "Run a FULL reconnaissance chain on a domain: Subfinder (subdomains) → HTTPX (live host probing) → Nuclei (vulnerability scan). This is a long-running operation. Use when the user asks for a 'complete scan', 'full recon', or 'map out' a domain.",
+            parameters: {
+                type: "object",
+                properties: {
+                    domain: {
+                        type: "string",
+                        description: "The root domain to fully recon (e.g. 'example.com')."
+                    }
+                },
+                required: ["domain"]
+            }
+        }
+    },
+    {
+        type: "function" as const,
+        function: {
+            name: "mark_finding_status",
+            description: "Update the status of a specific vulnerability finding by its ID. Use when the user says a finding is a false positive, has been fixed, or wants to change its status.",
+            parameters: {
+                type: "object",
+                properties: {
+                    finding_id: {
+                        type: "number",
+                        description: "The integer ID of the finding from the findings table."
+                    },
+                    status: {
+                        type: "string",
+                        enum: ["False Positive", "Fixed", "Accepted Risk", "New"],
+                        description: "The new status to apply to the finding."
+                    }
+                },
+                required: ["finding_id", "status"]
+            }
+        }
+    },
+    {
+        type: "function" as const,
+        function: {
+            name: "get_scan_status",
+            description: "Check if there are any scans currently running, including AI-triggered, manual, and scheduler-triggered scans. Use when the user asks if a scan is running or wants to check scan progress.",
+            parameters: {
+                type: "object",
+                properties: {},
+                required: []
+            }
+        }
     }
 ];
 
@@ -311,6 +492,23 @@ export async function executeToolCall(toolName: string, args: Record<string, unk
                 return JSON.stringify(deleteCustomTemplate(args.template_id as string));
             case 'compare_scans':
                 return JSON.stringify(compareScans(args.scan_id_a as string, args.scan_id_b as string));
+            case 'advanced_asset_search':
+                return JSON.stringify(advancedAssetSearch(args.query_type as string, args.includes as string[], args.excludes as string[], args.limit as number));
+            case 'advanced_vuln_search':
+                return JSON.stringify(advancedVulnSearch(args.includes as string[], args.excludes as string[], args.severities as string[], args.limit as number));
+            case 'execute_readonly_sql':
+                return JSON.stringify(executeReadonlySql(args.query as string));
+            // ─── ACTION TOOLS ─────────────────────────────────────────────
+            case 'trigger_nuclei_scan':
+                return JSON.stringify(await aiTriggerNucleiScan(args.target as string, args.severity as string[], args.tags as string[], args.template_id as string));
+            case 'trigger_subfinder_scan':
+                return JSON.stringify(await aiTriggerSubfinderScan(args.domain as string));
+            case 'trigger_full_recon':
+                return JSON.stringify(await aiTriggerFullRecon(args.domain as string));
+            case 'mark_finding_status':
+                return JSON.stringify(aiMarkFindingStatus(args.finding_id as number, args.status as string));
+            case 'get_scan_status':
+                return JSON.stringify(aiGetScanStatus());
             default:
                 return JSON.stringify({ error: `Unknown tool: ${toolName}` });
         }
@@ -867,5 +1065,495 @@ function compareScans(scanIdA: string, scanIdB: string) {
     };
 }
 
+// ─── Advanced Tools Implementations ─────────────────────────────
+
+function formatLargeResult(results: any[]) {
+    if (results.length > 20) {
+        if (results.length === 0) return results;
+        const headers = Object.keys(results[0]).join(',');
+        const rows = results.map(row => Object.values(row).map(v => JSON.stringify(v ?? '')).join(',')).join('\n');
+        const csv = `${headers}\n${rows}`;
+        const base64Csv = Buffer.from(csv).toString('base64');
+        const downloadLink = `<export_data href="data:text/csv;base64,${base64Csv}" count="${results.length}" />`;
+        
+        return {
+            note: "Dataset was too large to fully display inline. A CSV file has been generated. You MUST display the first 5 sample rows for context, and explicitly output the raw <export_data> XML tag so the UI can render the download button.",
+            total_records: results.length,
+            sample: results.slice(0, 5),
+            download_payload: downloadLink
+        };
+    }
+    return results;
+}
+
+function advancedAssetSearch(queryType: string, includes?: string[], excludes?: string[], limit: number = 50) {
+    const db = getDatabase();
+    let tableName = "";
+    let selectFields = "";
+    
+    if (queryType === "subdomains") {
+        tableName = "subfinder_results";
+        selectFields = "subdomain, first_seen, last_seen";
+    } else if (queryType === "live_assets") {
+        tableName = "httpx_results";
+        selectFields = "url, status_code, title, webserver, tech, content_length";
+    } else if (queryType === "monitored_targets") {
+        tableName = "monitored_targets";
+        selectFields = "target, last_scan_date, total_count";
+    } else {
+        return { error: "Invalid query_type" };
+    }
+
+    let query = `SELECT ${selectFields} FROM ${tableName} WHERE 1=1 `;
+    const params: any[] = [];
+
+    let searchConcat = "";
+    if (queryType === "subdomains") searchConcat = "subdomain";
+    else if (queryType === "live_assets") searchConcat = "url || ' ' || COALESCE(title,'') || ' ' || COALESCE(webserver,'') || ' ' || COALESCE(tech,'')";
+    else searchConcat = "target";
+
+    if (includes && includes.length > 0) {
+        includes.forEach(inc => {
+            query += ` AND LOWER(${searchConcat}) LIKE ? `;
+            params.push(`%${inc.toLowerCase()}%`);
+        });
+    }
+
+    if (excludes && excludes.length > 0) {
+        excludes.forEach(exc => {
+            query += ` AND LOWER(${searchConcat}) NOT LIKE ? `;
+            params.push(`%${exc.toLowerCase()}%`);
+        });
+    }
+
+    query += ` LIMIT ?`;
+    params.push(limit);
+
+    try {
+        const stmt = db.prepare(query);
+        const results = stmt.all(...params);
+        return formatLargeResult(results);
+    } catch (e: any) {
+        return { error: e.message };
+    }
+}
+
+function advancedVulnSearch(includes?: string[], excludes?: string[], severities?: string[], limit: number = 50) {
+    const db = getDatabase();
+    let query = `SELECT template_id, name, severity, host, type, matched_at FROM findings WHERE 1=1 `;
+    const params: any[] = [];
+    const searchConcat = "COALESCE(template_id,'') || ' ' || COALESCE(name,'') || ' ' || COALESCE(host,'') || ' ' || COALESCE(matched_at,'')";
+
+    if (severities && severities.length > 0) {
+        const placeholders = severities.map(() => '?').join(',');
+        query += ` AND LOWER(severity) IN (${placeholders}) `;
+        severities.forEach(s => params.push(s.toLowerCase()));
+    }
+
+    if (includes && includes.length > 0) {
+        includes.forEach(inc => {
+            query += ` AND LOWER(${searchConcat}) LIKE ? `;
+            params.push(`%${inc.toLowerCase()}%`);
+        });
+    }
+
+    if (excludes && excludes.length > 0) {
+        excludes.forEach(exc => {
+            query += ` AND LOWER(${searchConcat}) NOT LIKE ? `;
+            params.push(`%${exc.toLowerCase()}%`);
+        });
+    }
+
+    query += ` ORDER BY created_at DESC LIMIT ?`;
+    params.push(limit);
+
+    try {
+        const stmt = db.prepare(query);
+        const results = stmt.all(...params);
+        return formatLargeResult(results);
+    } catch (e: any) {
+        return { error: e.message };
+    }
+}
+
+function executeReadonlySql(rawQuery: string) {
+    if (!rawQuery) return { error: "No query provided" };
+    const q = rawQuery.trim().toUpperCase();
+    
+    // Strict safety checks
+    if (!q.startsWith("SELECT") && !q.startsWith("WITH") && !q.startsWith("EXPLAIN") && !q.startsWith("PRAGMA ")) {
+        return { error: "Only SELECT queries are allowed." };
+    }
+    
+    const blockedKeywords = ["INSERT ", "UPDATE ", "DELETE ", "DROP ", "ALTER ", "ATTACH ", "DETACH ", "REPLACE ", "CREATE "];
+    for (const kw of blockedKeywords) {
+        if (q.includes(kw)) {
+             return { error: `Query contains forbidden keyword: ${kw}` };
+        }
+    }
+    
+    const db = getDatabase();
+    try {
+        // Enforce a hard limit internally to prevent massive queries from locking everything
+        let finalQuery = rawQuery;
+        if (!q.includes("LIMIT")) {
+            finalQuery = rawQuery + " LIMIT 150";
+        }
+        
+        const stmt = db.prepare(finalQuery);
+        const results = stmt.all();
+        return formatLargeResult(results);
+    } catch (e: any) {
+        return { error: `SQLite Error: ${e.message}` };
+    }
+}
+
+// ─── ACTION TOOL IMPLEMENTATIONS ─────────────────────────────────────────────
+
+// Security: Block private/loopback IPs from being scanned by AI
+function isPrivateTarget(target: string): boolean {
+    const privatePatterns = [
+        /^127\./,
+        /^10\./,
+        /^192\.168\./,
+        /^172\.(1[6-9]|2[0-9]|3[01])\./,
+        /^0\./,
+        /^localhost/i,
+        /^\[?::1\]?/,
+        /^fc00:/i,
+        /^fe80:/i,
+    ];
+    // Strip protocol to check the hostname/IP
+    const stripped = target.replace(/^https?:\/\//, '').split('/')[0].split(':')[0];
+    return privatePatterns.some(p => p.test(stripped));
+}
+
+// Concurrency guard: check if a scan is already running
+function isAnyScanRunning(): boolean {
+    try {
+        const db = getDatabase();
+        const running = db.prepare("SELECT COUNT(*) as count FROM scans WHERE status = 'running'").get() as { count: number };
+        return running.count > 0;
+    } catch {
+        return false;
+    }
+}
+
+async function aiTriggerNucleiScan(
+    target: string,
+    severity?: string[],
+    tags?: string[],
+    templateId?: string
+): Promise<Record<string, unknown>> {
+    if (!target) return { error: "Target is required." };
+
+    // Security: block private IPs
+    if (isPrivateTarget(target)) {
+        return { error: "Scanning private or loopback IPs (127.x, 10.x, 192.168.x, localhost) is not allowed for safety." };
+    }
+
+    // Concurrency guard
+    if (isAnyScanRunning()) {
+        return { error: "A scan is already running. Please wait for it to complete or stop it first before starting a new one." };
+    }
+
+    // Build settings from user params, falling back to dashboard defaults
+    const defaults = getNucleiSettings();
+    const settings: NucleiScanSettings = {
+        scanMode: defaults.scanMode,
+        templates: templateId || (tags && tags.length > 0 ? '' : defaults.templates),
+        severity: severity && severity.length > 0 ? severity.join(',') : defaults.severity,
+        rateLimit: defaults.rateLimit,
+        concurrency: defaults.concurrency,
+    };
+
+    console.log(`🤖 AI triggering Nuclei scan on: ${target}`);
+
+    // Create a scan record so it appears in Activity Monitor IMMEDIATELY
+    const scanId = `ai-${crypto.randomUUID()}`;
+    insertScan({
+        id: scanId,
+        target,
+        config: JSON.stringify({ source: 'ai-agent', severity: settings.severity, templates: settings.templates }),
+        start_time: Date.now(),
+        status: 'running',
+    });
+
+    // 🔥 FIRE-AND-FORGET: Start scan in background, return immediately
+    triggerNucleiScan([target], settings)
+        .then((result) => {
+            updateScan(scanId, {
+                status: 'completed',
+                end_time: Date.now(),
+                exit_code: 0,
+            });
+            cache.invalidate("scan-history");
+            cache.invalidatePattern("findings");
+            console.log(`🤖 ✅ AI Nuclei scan completed on ${target}: ${result?.findingsCount || 0} findings`);
+        })
+        .catch((e: Error) => {
+            updateScan(scanId, {
+                status: 'failed',
+                end_time: Date.now(),
+                exit_code: 1,
+            });
+            cache.invalidate("scan-history");
+            console.error(`🤖 ❌ AI Nuclei scan failed on ${target}:`, e.message);
+        });
+
+    // Return IMMEDIATELY — don't wait for scan to finish
+    return {
+        success: true,
+        scan_id: scanId,
+        message: `Nuclei vulnerability scan started on ${target}`,
+        status: "running",
+        monitor: "You can track progress in the Scan History tab or ask me 'is there a scan running?' to check status.",
+        note: "I'll notify you automatically when the scan completes via the chat panel."
+    };
+}
+
+async function aiTriggerSubfinderScan(domain: string): Promise<Record<string, unknown>> {
+    if (!domain) return { error: "Domain is required." };
+
+    // Basic validation: should look like a domain
+    if (!domain.includes('.')) {
+        return { error: `"${domain}" doesn't look like a valid domain. Expected format: example.com` };
+    }
+
+    console.log(`🤖 AI triggering Subfinder scan on: ${domain}`);
+
+    // Create a scan record so it appears in Activity Monitor IMMEDIATELY
+    const scanId = `ai-subfinder-${crypto.randomUUID()}`;
+    insertScan({
+        id: scanId,
+        target: domain,
+        config: JSON.stringify({ source: 'ai-agent', type: 'subfinder' }),
+        start_time: Date.now(),
+        status: 'running',
+    });
+
+    // 🔥 FIRE-AND-FORGET: Start subfinder in background, return immediately
+    triggerSubfinderScan(domain)
+        .then((result) => {
+            updateScan(scanId, {
+                status: 'completed',
+                end_time: Date.now(),
+                exit_code: 0,
+            });
+            if (result) {
+                console.log(`🤖 ✅ AI Subfinder completed for ${domain}: ${result.total} total, ${result.newCount} new`);
+            } else {
+                console.log(`🤖 ⚠️ AI Subfinder returned no results for ${domain}`);
+            }
+        })
+        .catch((e: Error) => {
+            updateScan(scanId, {
+                status: 'failed',
+                end_time: Date.now(),
+                exit_code: 1,
+            });
+            console.error(`🤖 ❌ AI Subfinder failed for ${domain}:`, e.message);
+        });
+
+    // Return IMMEDIATELY
+    return {
+        success: true,
+        scan_id: scanId,
+        message: `Subfinder subdomain scan started on ${domain}`,
+        status: "running",
+        monitor: "You can track progress in the Activity log via dashboard.",
+        note: "The scan typically takes 1-3 minutes depending on the domain size. I'll notify you when it completes."
+    };
+}
+
+async function aiTriggerFullRecon(domain: string): Promise<Record<string, unknown>> {
+    if (!domain) return { error: "Domain is required." };
+
+    if (!domain.includes('.')) {
+        return { error: `"${domain}" doesn't look like a valid domain. Expected format: example.com` };
+    }
+
+    // Concurrency guard
+    if (isAnyScanRunning()) {
+        return { error: "A scan is already running. Please wait for it to complete before starting a full recon." };
+    }
+
+    console.log(`🤖 AI triggering FULL RECON on: ${domain}`);
+
+    // Create a scan record for the full recon pipeline
+    const scanId = `ai-recon-${crypto.randomUUID()}`;
+    insertScan({
+        id: scanId,
+        target: domain,
+        config: JSON.stringify({ source: 'ai-full-recon', phases: ['subfinder', 'httpx', 'nuclei'] }),
+        start_time: Date.now(),
+        status: 'running',
+    });
+
+    // 🔥 FIRE-AND-FORGET: Chain all 3 phases in background
+    (async () => {
+        try {
+            // Phase 1: Subfinder
+            console.log(`🤖 [Phase 1/3] Running Subfinder for ${domain}...`);
+            const subResult = await triggerSubfinderScan(domain);
+
+            if (!subResult) {
+                updateScan(scanId, { status: 'failed', end_time: Date.now(), exit_code: 1 });
+                console.error(`🤖 ❌ Full recon failed at Phase 1 (Subfinder) for ${domain}`);
+                return;
+            }
+
+            console.log(`🤖 [Phase 1/3] ✅ Subfinder: ${subResult.total} total, ${subResult.newCount} new`);
+
+            // Phase 2: HTTPX (only if new subdomains found)
+            if (subResult.newSubdomains.length > 0) {
+                console.log(`🤖 [Phase 2/3] Running HTTPX on ${subResult.newSubdomains.length} new subdomains...`);
+                const httpxResult = await triggerHttpxScan(subResult.newSubdomains);
+
+                if (httpxResult && httpxResult.liveCount > 0) {
+                    console.log(`🤖 [Phase 2/3] ✅ HTTPX: ${httpxResult.liveCount} live hosts`);
+
+                    // Phase 3: Nuclei
+                    console.log(`🤖 [Phase 3/3] Running Nuclei on ${httpxResult.liveCount} live hosts...`);
+                    const liveUrls = httpxResult.liveHosts.map(h => h.host);
+                    const nucleiResult = await triggerNucleiScan(liveUrls, getNucleiSettings());
+                    console.log(`🤖 [Phase 3/3] ✅ Nuclei: ${nucleiResult?.findingsCount || 0} findings`);
+                } else {
+                    console.log(`🤖 [Phase 2/3] ⚠️ No live hosts found, skipping Nuclei`);
+                }
+            } else {
+                console.log(`🤖 [Phase 2/3] ⚠️ No new subdomains, skipping HTTPX and Nuclei`);
+            }
+
+            // Mark pipeline as completed
+            updateScan(scanId, { status: 'completed', end_time: Date.now(), exit_code: 0 });
+            cache.invalidate("scan-history");
+            cache.invalidatePattern("findings");
+            console.log(`🤖 ✅ Full recon completed for ${domain}`);
+        } catch (e: any) {
+            updateScan(scanId, { status: 'failed', end_time: Date.now(), exit_code: 1 });
+            cache.invalidate("scan-history");
+            console.error(`🤖 ❌ Full recon failed for ${domain}:`, e.message);
+        }
+    })();
+
+    // Return IMMEDIATELY
+    return {
+        success: true,
+        scan_id: scanId,
+        message: `Full reconnaissance pipeline started on ${domain}`,
+        status: "running",
+        phases: "Subfinder (subdomains) → HTTPX (live probing) → Nuclei (vulnerability scan)",
+        monitor: "Track progress in the Scan History tab. Each phase will log to the console.",
+        note: "This is a long-running operation (10-60 min depending on domain size). I'll notify you when it completes."
+    };
+}
+
+function aiMarkFindingStatus(findingId: number, status: string): Record<string, unknown> {
+    if (!findingId) return { error: "finding_id is required." };
+    if (!status) return { error: "status is required." };
+
+    // Strict allowlist enforcement
+    const allowedStatuses = ["False Positive", "Fixed", "Accepted Risk", "New"];
+    if (!allowedStatuses.includes(status)) {
+        return { error: `Invalid status "${status}". Allowed values: ${allowedStatuses.join(', ')}` };
+    }
+
+    try {
+        // Verify the finding exists first
+        const db = getDatabase();
+        const existing = db.prepare("SELECT id, name, severity, host FROM findings WHERE id = ?").get(findingId) as any;
+        if (!existing) {
+            return { error: `Finding with ID ${findingId} not found.` };
+        }
+
+        updateFinding(findingId, { status });
+
+        // Invalidate findings cache
+        cache.invalidatePattern("findings");
+
+        return {
+            success: true,
+            message: `Finding #${findingId} status updated to "${status}"`,
+            finding: {
+                id: existing.id,
+                name: existing.name,
+                severity: existing.severity,
+                host: existing.host,
+                new_status: status
+            }
+        };
+    } catch (e: any) {
+        console.error("AI mark finding error:", e);
+        return { error: `Failed to update finding: ${e.message}` };
+    }
+}
+
+function aiGetScanStatus(): Record<string, unknown> {
+    try {
+        const db = getDatabase();
+
+        // Check for running scans in the database
+        const runningScans = db.prepare(
+            "SELECT id, target, status, start_time FROM scans WHERE status = 'running' ORDER BY start_time DESC LIMIT 5"
+        ).all() as any[];
+
+        // Check scheduler status
+        const schedulerStatus = getSchedulerStatus();
+
+        // Check for recent completed scans (last 3)
+        const recentCompleted = db.prepare(
+            "SELECT id, target, status, start_time, end_time FROM scans WHERE status IN ('completed', 'failed', 'stopped') ORDER BY end_time DESC LIMIT 3"
+        ).all() as any[];
+
+        return {
+            has_running_scans: runningScans.length > 0,
+            running_scans: runningScans.map(s => ({
+                id: s.id,
+                target: s.target,
+                started: new Date(s.start_time).toLocaleString(),
+                running_for_seconds: Math.round((Date.now() - s.start_time) / 1000)
+            })),
+            scheduler: {
+                is_processing: schedulerStatus.isProcessing,
+                current_domain: schedulerStatus.currentDomain,
+                next_run: schedulerStatus.nextRun ? schedulerStatus.nextRun.toLocaleString() : null
+            },
+            recent_completed: recentCompleted.map(s => ({
+                id: s.id,
+                target: s.target,
+                status: s.status,
+                completed: s.end_time ? new Date(s.end_time).toLocaleString() : null
+            }))
+        };
+    } catch (e: any) {
+        console.error("AI scan status error:", e);
+        return { error: `Failed to check scan status: ${e.message}` };
+    }
+}
+
 // Export for API route use (custom templates page)
 export { listCustomTemplates, deleteCustomTemplate };
+
+// ─── Vercel AI SDK Tool Export ───────────────────────────────────────────────
+// Dynamically converts our raw JSON schema definitions into Vercel AI Core tools
+// This allows native streaming, streaming tool calls, and parallel execution.
+export const AI_TOOLS: Record<string, any> = TOOL_DEFINITIONS.reduce((acc, def) => {
+    acc[def.function.name] = tool({
+        description: def.function.description,
+        parameters: jsonSchema(def.function.parameters as any),
+        execute: async (args: any) => {
+            console.log(`🤖 Vercel Executing: ${def.function.name}(${JSON.stringify(args)})`);
+            // Run the existing legacy tool handler
+            const rawResult = await executeToolCall(def.function.name, args);
+            try {
+                // If the tool returned stringified JSON, parse it back to a standard object 
+                // so the Vercel SDK can stream the structured result to the LLM better.
+                return JSON.parse(rawResult);
+            } catch {
+                return rawResult; // Fallback to raw string
+            }
+        }
+    } as any);
+    return acc;
+}, {} as Record<string, any>);

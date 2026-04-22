@@ -163,6 +163,8 @@ export function AIPage({ previousView, onNavigate }: AIPageProps) {
         // Reset textarea height
         if (inputRef.current) inputRef.current.style.height = 'auto';
 
+        const assistantId = crypto.randomUUID();
+
         try {
             abortControllerRef.current = new AbortController();
 
@@ -177,24 +179,82 @@ export function AIPage({ previousView, onNavigate }: AIPageProps) {
                 signal: abortControllerRef.current.signal,
             });
 
-            const data = await response.json();
-
             if (!response.ok) {
-                throw new Error(data.error || 'Failed to get AI response');
+                // Error responses may still be JSON
+                let errMsg = 'Failed to get AI response';
+                try {
+                    const errData = await response.json();
+                    errMsg = errData.error || errMsg;
+                } catch { /* ignore parse errors on error responses */ }
+                throw new Error(errMsg);
             }
 
-            const assistantMessage: Message = {
-                id: crypto.randomUUID(),
-                role: 'assistant',
-                content: data.response,
-                timestamp: new Date(),
-                toolCalls: data.tool_calls_made,
-            };
+            // Route returns SSE event-stream — consume it line-by-line
+            const reader = response.body?.getReader();
+            if (!reader) throw new Error('No response body');
 
-            setMessages(prev => [...prev, assistantMessage]);
+            const decoder = new TextDecoder();
+            let accumulated = '';
+            let toolCallCount = 0;
+            let actionTarget: string | undefined;
+            let actionScanId: string | undefined;
+
+            // Insert a placeholder assistant message that we'll update via streaming
+            setMessages(prev => [...prev, {
+                id: assistantId,
+                role: 'assistant',
+                content: '',
+                timestamp: new Date(),
+            }]);
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value, { stream: true });
+                const lines = chunk.split('\n');
+
+                for (const line of lines) {
+                    if (!line.startsWith('data: ')) continue;
+                    const payload = line.slice(6).trim();
+                    if (payload === '[DONE]') continue;
+
+                    try {
+                        const event = JSON.parse(payload);
+
+                        if (event.type === 'text-delta') {
+                            accumulated += event.delta;
+                            // Update the assistant message in-place for live streaming
+                            const currentAccumulated = accumulated;
+                            setMessages(prev => prev.map(m =>
+                                m.id === assistantId ? { ...m, content: currentAccumulated } : m
+                            ));
+                        } else if (event.type === 'tool-invocation-start' || event.type === 'tool-call') {
+                            toolCallCount++;
+                            // Extract actionTarget/ScanId from tool args if available
+                            if (event.args) {
+                                if (event.args.target) actionTarget = event.args.target;
+                                if (event.args.scan_id) actionScanId = event.args.scan_id;
+                            }
+                        }
+                        // reasoning-delta, reasoning-start, reasoning-end, start, finish, etc. — skip
+                    } catch {
+                        // Skip unparseable lines
+                    }
+                }
+            }
+
+            // Final update with metadata
+            setMessages(prev => prev.map(m =>
+                m.id === assistantId
+                    ? { ...m, content: accumulated, toolCalls: toolCallCount, actionTarget, actionScanId }
+                    : m
+            ));
         } catch (err: any) {
             if (err.name === 'AbortError') return;
             setError(err instanceof Error ? err.message : 'Something went wrong');
+            // Remove the empty placeholder message on error
+            setMessages(prev => prev.filter(m => m.id !== assistantId));
         } finally {
             setIsLoading(false);
             abortControllerRef.current = null;
@@ -426,6 +486,21 @@ export function AIPage({ previousView, onNavigate }: AIPageProps) {
             }
             if (line.match(/^\d+\.\s/)) {
                 listItems.push(line.replace(/^\d+\.\s/, ''));
+                continue;
+            }
+
+            // Export Data Button
+            const exportMatch = line.match(/<export_data href="([^"]+)" count="([^"]+)" \/>/);
+            if (exportMatch) {
+                flushList();
+                elements.push(
+                    <div key={`export-${i}`} className="ai-page-export-box">
+                        <a href={exportMatch[1]} download={`ai-export-${new Date().getTime()}.csv`} className="ai-page-export-btn">
+                            <Download className="h-4 w-4" />
+                            Download {exportMatch[2]} Records (CSV)
+                        </a>
+                    </div>
+                );
                 continue;
             }
 

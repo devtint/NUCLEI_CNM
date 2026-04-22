@@ -82,6 +82,14 @@ Modern card-based Vulnerability Feed (refactored from table layout).
 *   New primitive based on Radix UI.
 *   Used for "Delete Single Scan" and "Delete All History" warnings.
 
+### 🤖 Agentic AI Framework (`lib/ai/`)
+The native AI integration powered by Groq Llama-3 provides full analytical access to the database.
+*   **Tool Executions (`tools.ts`)**: Secure, read-only definitions that the LLM can call.
+    *   `advanced_asset_search` / `advanced_vuln_search`: Dynamically injects parameterized SQL (`LIKE` / `NOT LIKE`) based on arrays of inclusions and exclusions.
+    *   `execute_readonly_sql`: Text-to-SQL functionality restricted strictly to predefined `SELECT` queries for advanced aggregations.
+*   **Large Dataset Handling**: If a tool returns > 20 records, an `<export_data>` XML tag is injected into the payload securely, returning a `base64` CSV link to prevent browser crashes from massive markdown renders.
+*   **Persistence (`AIPage.tsx`)**: The UI saves memory drafts to `localStorage` and persists the view state via URL hashes (`#ai`) to survive full page reloads.
+
 ---
 
 ## ⚡ Performance Notes for Cloud Hosting

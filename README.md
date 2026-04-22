@@ -64,6 +64,15 @@
 | **HTTPX** | HTTP probing for live host detection with technology fingerprinting |
 | **Agentic AI** | Ask questions about your vulnerabilities and scans in natural language (Powered by Groq Llama-3) |
 
+### 🧠 Full-Page AI Intelligence
+
+Turn standard vulnerability management into an interactive data conversation:
+- **Advanced Dynamic Search:** Ask the AI to filter with complex combinations (e.g., *"Show me all subdomains that include 'api' but except 'staging'"*). The AI natively injects exact parameterized SQL queries.
+- **Natural Language to SQL:** For complex aggregations, the AI understands your SQLite schema and can execute raw, read-only analytics queries on the fly.
+- **Large Dataset Export:** If you ask the AI to retrieve thousands of assets, it won't crash your browser. It automatically detects massive payloads, summarizes the first 5 rows, and generates a one-click **Download CSV** button.
+- **Persistent Memory:** Draft inputs are saved to local storage, ensuring you never lose a prompt if you accidentally refresh or navigate away.
+- **Markdown Tables & Per-Message Actions:** Seamless rendering of data tables, with one-click actions to Copy, Retry, or Delete specific messages in your conversation history.
+
 ### 📊 Vulnerability Management
 
 - **Unified Finding Feed** - All scan results in one filterable, searchable interface

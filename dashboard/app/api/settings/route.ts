@@ -44,6 +44,8 @@ export async function GET(req: NextRequest) {
         setSetting("groq_api_key", groqKey);
     }
 
+    const aiModel = getSetting("ai_model") || process.env.AI_MODEL || "llama-3.3-70b-versatile";
+
     // Mask Token for security
     let maskedToken = "";
     if (token) {
@@ -78,6 +80,7 @@ export async function GET(req: NextRequest) {
         notifications_enabled: notificationsEnabled === "true",
         shodan_api_key: maskedShodan,
         groq_api_key: maskedGroq,
+        ai_model: aiModel,
         tunnel_keep_alive: tunnelKeepAlive,
         tunnel_url: tunnelUrl,
         is_configured: !!(token && chatId)
@@ -98,6 +101,7 @@ export async function POST(req: NextRequest) {
             notifications_enabled, 
             shodan_api_key,
             groq_api_key,
+            ai_model,
             tunnel_keep_alive,
             tunnel_url
         } = body;
@@ -122,6 +126,10 @@ export async function POST(req: NextRequest) {
         
         if (groq_api_key && !groq_api_key.includes("••••")) {
             setSetting("groq_api_key", groq_api_key);
+        }
+
+        if (ai_model !== undefined) {
+            setSetting("ai_model", ai_model);
         }
         
         if (tunnel_keep_alive !== undefined) {

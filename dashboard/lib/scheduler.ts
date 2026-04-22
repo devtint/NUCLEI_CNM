@@ -403,7 +403,7 @@ export async function runScheduledScans() {
 }
 
 // Trigger a subfinder scan and wait for completion (direct process spawn)
-async function triggerSubfinderScan(domain: string): Promise<{ total: number; newCount: number; newSubdomains: string[] } | null> {
+export async function triggerSubfinderScan(domain: string): Promise<{ total: number; newCount: number; newSubdomains: string[] } | null> {
     const { spawn } = await import("child_process");
     const fs = await import("fs");
     const path = await import("path");
@@ -523,7 +523,7 @@ async function triggerSubfinderScan(domain: string): Promise<{ total: number; ne
 }
 
 // Trigger HTTPX scan on a list of subdomains
-async function triggerHttpxScan(subdomains: string[]): Promise<{ total: number; liveCount: number; liveHosts: { host: string; statusCode: number; title?: string }[] } | null> {
+export async function triggerHttpxScan(subdomains: string[]): Promise<{ total: number; liveCount: number; liveHosts: { host: string; statusCode: number; title?: string }[] } | null> {
     const { spawn } = await import("child_process");
     const fs = await import("fs");
     const path = await import("path");
@@ -614,7 +614,7 @@ async function triggerHttpxScan(subdomains: string[]): Promise<{ total: number; 
 }
 
 // Nuclei settings type for function parameter
-interface NucleiScanSettings {
+export interface NucleiScanSettings {
     scanMode: "quick" | "standard" | "full";
     templates: string;
     severity: string;
@@ -623,7 +623,7 @@ interface NucleiScanSettings {
 }
 
 // Trigger Nuclei scan on a list of live hosts
-async function triggerNucleiScan(liveUrls: string[], settings: NucleiScanSettings): Promise<{ findingsCount: number; criticalCount: number; highCount: number } | null> {
+export async function triggerNucleiScan(liveUrls: string[], settings: NucleiScanSettings): Promise<{ findingsCount: number; criticalCount: number; highCount: number } | null> {
     const { spawn } = await import("child_process");
     const fs = await import("fs");
     const path = await import("path");

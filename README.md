@@ -1,14 +1,3 @@
-> [!WARNING]
-> **CRITICAL UPDATE (v1.5.6+): Custom Templates Persistence**
->
-> If you are upgrading from an older version, you **MUST** update your `docker-compose.yml` and fix permissions to ensure custom templates are saved.
->
-> 1. **Update Config**: Add `- nuclei_custom_templates:/home/nextjs/nuclei-custom-templates` to your volumes.
-> 2. **Fix Permissions**: Run `docker exec -u 0 nuclei-command-center chown -R nextjs:nodejs /home/nextjs/nuclei-custom-templates`
-> 3. **Restart**: Run `docker compose up -d`
->
-> *See the [Installation Guide below](#-installation--deployment) for full details.*
-
 <p align="center">
   <img src="https://raw.githubusercontent.com/projectdiscovery/nuclei/master/static/nuclei-logo.png" alt="Nuclei Command Center" width="200"/>
 </p>
@@ -37,6 +26,27 @@
 
 ---
 
+### 🎯 Quick Start Script (Easiest)
+
+Download and run the auto-start script - it handles everything for you:
+
+```bash
+# Download the script
+curl -O https://raw.githubusercontent.com/devtint/NUCLEI_CNM/main/start-nuclei.py
+
+# Run it
+python start-nuclei.py
+```
+
+The script will:
+- ✅ Verify Docker is running
+- ✅ Download `docker-compose.yml` if missing
+- ✅ Pull latest images and start containers
+- ✅ Wait for health check
+- ✅ Copy Cloudflare URL to clipboard
+
+---
+
 ## Overview
 
 **Nuclei Command Center (NUCLEI_CNM)** is a production-ready, security-hardened web interface for orchestrating vulnerability assessments using [ProjectDiscovery's Nuclei](https://github.com/projectdiscovery/nuclei) scanner. Built by security professionals for security professionals, it transforms raw Nuclei output into actionable intelligence through a modern, authenticated dashboard.
@@ -50,6 +60,49 @@
 | No vulnerability lifecycle tracking | **Status workflow**: New → Confirmed → Fixed → Closed |
 | Manual subdomain monitoring is tedious | **Scheduled scans** with auto-probe and Telegram alerts |
 | No access control for scan operations | **NextAuth v5 integration** with bcrypt password hashing |
+
+---
+
+## 📸 Screenshots
+
+### 📊 Core Dashboard
+![Dashboard Overview](screenshots/dashboard-overview.png)
+
+### 🧪 Vulnerability Management
+| Vulnerabilities Feed | Scan Wizard |
+|:---:|:---:|
+| ![Vulnerabilities Feed](screenshots/vulnerabilities-feed.png) | ![Scan Wizard](screenshots/scan-wizard.png) |
+
+| Activity Monitor | Scan History |
+|:---:|:---:|
+| ![Activity Monitor](screenshots/activity-monitor.png) | ![Scan History](screenshots/scan-history.png) |
+
+### 🤖 Agentic AI Intelligence
+| AI Chat Interface | Tech Stack Analysis |
+|:---:|:---:|
+| ![AI Intelligence](screenshots/ai-intelligence.png) | ![AI Tech Stacks](screenshots/ai-tech-stacks.png) |
+
+### 🔍 Asset Inventory & Probing
+| Live Asset Probing | Asset Detail (Shodan) |
+|:---:|:---:|
+| ![Live Asset Probing](screenshots/live-asset-probing.png) | ![Asset Detail](screenshots/asset-detail.png) |
+
+| Subfinder Scanner | Subdomains List |
+|:---:|:---:|
+| ![Subfinder Scanner](screenshots/subfinder-scanner.png) | ![Subdomains List](screenshots/subdomains-list.png) |
+
+### ⚙️ Automation & System
+| Automation Scheduler | Security Audit Log |
+|:---:|:---:|
+| ![Automation Scheduler](screenshots/automation-scheduler.png) | ![Security Audit Log](screenshots/security-audit.png) |
+
+| Backup & Restore | Scanner Management |
+|:---:|:---:|
+| ![Backup & Restore](screenshots/backup-restore.png) | ![Scanner Management](screenshots/scanner-management.png) |
+
+| Scanner Settings | General Settings |
+|:---:|:---:|
+| ![Scanner Settings](screenshots/scanner-settings.png) | ![General Settings](screenshots/general-settings.png) |
 
 ---
 
@@ -132,54 +185,53 @@ Turn standard vulnerability management into an interactive data conversation:
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                           NUCLEI COMMAND CENTER                         │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐                 │
-│  │   Browser   │───▶│  proxy.ts   │───▶│  Next.js    │                 │
-│  │   Client    │    │ (Middleware)│    │  App Router │                 │
-│  └─────────────┘    └─────────────┘    └─────────────┘                 │
-│         │                  │                  │                         │
-│         │           ┌──────▼──────┐          │                         │
-│         │           │  NextAuth   │          │                         │
-│         │           │  Sessions   │          │                         │
-│         │           └─────────────┘          │                         │
-│         │                                    │                         │
-│         │           ┌────────────────────────▼─────────────────────┐   │
-│         │           │              API Routes (/api/*)              │   │
-│         │           │  ┌─────────┐ ┌─────────┐ ┌─────────────────┐ │   │
-│         │           │  │  scan   │ │findings │ │ system/scanners │ │   │
-│         │           │  └────┬────┘ └────┬────┘ └────────┬────────┘ │   │
-│         │           └───────┼───────────┼───────────────┼──────────┘   │
-│         │                   │           │               │              │
-│  ┌──────▼──────┐     ┌──────▼───────────▼───────────────▼──────┐       │
-│  │    React    │     │              SQLite Database             │       │
-│  │  Components │     │  ┌────────┐  ┌──────────┐  ┌─────────┐  │       │
-│  └─────────────┘     │  │ scans  │  │ findings │  │ access  │  │       │
-│                      │  │        │  │          │  │  logs   │  │       │
-│                      │  └────────┘  └──────────┘  └─────────┘  │       │
-│                      └─────────────────────────────────────────┘       │
-│                                        │                               │
-│                               ┌────────▼────────┐                      │
-│                               │  Nuclei Binary  │                      │
-│                               │   (System PATH) │                      │
-│                               └─────────────────┘                      │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                             NUCLEI COMMAND CENTER                               │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  ┌─────────────┐       ┌─────────────────┐       ┌────────────────────────┐     │
+│  │   Browser   │◀─────▶│  Next.js (SSR)  │◀─────▶│    Agentic AI (Groq)   │     │
+│  │   Client    │       │   App Router    │       │    (Llama-3/Llama-4)   │     │
+│  └─────────────┘       └────────┬────────┘       └────────────────────────┘     │
+│         ▲                       │                            ▲                  │
+│         │              ┌────────▼────────┐                   │                  │
+│         │              │  Auth.js (v5)   │                   │                  │
+│         │              │  Session Mgmt   │                   │                  │
+│         │              └────────┬────────┘                   │                  │
+│         │                       │                            │                  │
+│  ┌──────▼──────┐       ┌────────▼────────┐          ┌────────▼────────┐         │
+│  │    React    │◀─────▶│   API Routes    │◀────────▶│  SQLite (WAL)   │         │
+│  │  Components │       │   (/api/*)      │          │   (Persistence) │         │
+│  └─────────────┘       └────────┬────────┘          └────────┬────────┘         │
+│                                 │                            │                  │
+│                ┌────────────────▼────────────────┐           │                  │
+│                │      Binary Execution Layer     │◀──────────┘                  │
+│                │     (child_process spawning)    │                              │
+│                └────┬───────────┬───────────┬────┘                              │
+│                     │           │           │                                   │
+│              ┌──────▼─────┐┌────▼────┐┌─────▼──────┐      ┌─────────────┐       │
+│              │   Nuclei   ││Subfinder││   HTTPX    │◀────▶│  Shodan API │       │
+│              │  (Scans)   ││ (Enum)  ││ (Probing)  │      └─────────────┘       │
+│              └──────┬─────┘└─────────┘└────────────┘                            │
+│                     │                                     ┌─────────────┐       │
+│                     └────────────────────────────────────▶│  Telegram   │       │
+│                                                           │ (Alerting)  │       │
+│                                                           └─────────────┘       │
+└─────────────────────────────────────────────────────────────────────────────────┘
 ```
+
 
 ### Technology Stack
 
 | Layer | Technology | Purpose |
 |-------|------------|---------|
 | **Frontend** | Next.js 16, React 19, Tailwind CSS v4 | Server-side rendering, responsive UI |
-| **Components** | shadcn/ui (Radix primitives) | Accessible, customizable UI library |
+| **Agentic AI** | Groq (Llama-3 / Llama-4 Scout) | Intelligent data analysis & tool orchestration |
 | **Authentication** | Auth.js v5 (NextAuth) | Session management, middleware protection |
-| **Password Security** | bcrypt (10 rounds) | Secure credential hashing |
-| **Database** | SQLite + better-sqlite3 | Embedded, zero-config persistence |
-| **API** | Next.js Route Handlers | RESTful endpoints with type safety |
-| **Process Mgmt** | Node.js child_process | Binary execution |
+| **Database** | SQLite + better-sqlite3 | Embedded, zero-config persistence (WAL mode) |
+| **Core Binaries** | Nuclei, Subfinder, HTTPX | Security scanning, discovery, and probing |
+| **Integrations** | Shodan API, Telegram Bot | Infrastructure intel & real-time alerting |
+| **Deployment** | Docker & Cloudflare Tunnel | Isolated execution & secure remote access |
 
 ---
 
@@ -191,26 +243,7 @@ Turn standard vulnerability management into an interactive data conversation:
 1.  **Docker Desktop** (running).
 2.  **Python 3** (for quick start script) - *optional but recommended*
 
-### 🎯 Quick Start Script (Easiest)
 
-Download and run the auto-start script - it handles everything for you:
-
-```bash
-# Download the script
-curl -O https://raw.githubusercontent.com/devtint/NUCLEI_CNM/main/start-nuclei.py
-
-# Run it
-python start-nuclei.py
-```
-
-The script will:
-- ✅ Verify Docker is running
-- ✅ Download `docker-compose.yml` if missing
-- ✅ Pull latest images and start containers
-- ✅ Wait for health check
-- ✅ Copy Cloudflare URL to clipboard
-
----
 
 ### Method 1: Docker Compose (Recommended)
 

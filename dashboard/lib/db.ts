@@ -219,6 +219,104 @@ function initializeSchema() {
         )
     `);
 
+    // --- RECONWEAVER TABLES ---
+
+    // asset_edges: relationships between assets (shared IP, cert, tech, etc.)
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS asset_edges (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source_asset TEXT NOT NULL,
+            target_asset TEXT NOT NULL,
+            edge_type TEXT NOT NULL,
+            edge_value TEXT,
+            confidence REAL DEFAULT 1.0,
+            discovered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(source_asset, target_asset, edge_type)
+        )
+    `);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_edges_source ON asset_edges(source_asset);`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_edges_target ON asset_edges(target_asset);`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_edges_type ON asset_edges(edge_type);`);
+
+    // asset_clusters: named groups of related assets
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS asset_clusters (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            cluster_key TEXT NOT NULL UNIQUE,
+            cluster_type TEXT NOT NULL,
+            cluster_value TEXT NOT NULL,
+            asset_count INTEGER DEFAULT 0,
+            has_vulns INTEGER DEFAULT 0,
+            highest_severity TEXT,
+            last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
+
+    // cluster_members: many-to-many assets <-> clusters
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS cluster_members (
+            cluster_id INTEGER REFERENCES asset_clusters(id) ON DELETE CASCADE,
+            asset TEXT NOT NULL,
+            asset_type TEXT DEFAULT 'subdomain',
+            PRIMARY KEY (cluster_id, asset)
+        )
+    `);
+
+    // pivot_alerts: actionable intelligence alerts
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS pivot_alerts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            alert_type TEXT NOT NULL,
+            title TEXT NOT NULL,
+            description TEXT NOT NULL,
+            affected_assets TEXT NOT NULL,
+            cluster_key TEXT,
+            priority TEXT DEFAULT 'medium',
+            action_type TEXT,
+            action_payload TEXT,
+            dismissed INTEGER DEFAULT 0,
+            notified INTEGER DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            dismissed_at DATETIME
+        )
+    `);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_pivots_priority ON pivot_alerts(priority);`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_pivots_dismissed ON pivot_alerts(dismissed);`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_pivots_type ON pivot_alerts(alert_type);`);
+
+    // cert_assets: assets discovered via certificate transparency
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS cert_assets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            domain TEXT NOT NULL,
+            discovered_asset TEXT NOT NULL,
+            cert_issuer TEXT,
+            cert_not_before TEXT,
+            cert_not_after TEXT,
+            source TEXT DEFAULT 'crt.sh',
+            in_subfinder INTEGER DEFAULT 0,
+            discovered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(domain, discovered_asset)
+        )
+    `);
+
+    // vhost_results: confirmed virtual hosts
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS vhost_results (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ip TEXT NOT NULL,
+            host_header TEXT NOT NULL,
+            status_code INTEGER,
+            content_length INTEGER,
+            title TEXT,
+            is_different INTEGER DEFAULT 0,
+            discovered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(ip, host_header)
+        )
+    `);
+
+    // --- END RECONWEAVER TABLES ---
+
     // Create settings table for Global Config
     db.exec(`
         CREATE TABLE IF NOT EXISTS settings (

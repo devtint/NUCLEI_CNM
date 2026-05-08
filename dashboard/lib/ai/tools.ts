@@ -1532,6 +1532,7 @@ function aiGetScanStatus(): Record<string, unknown> {
     }
 }
 
+
 // Export for API route use (custom templates page)
 export { listCustomTemplates, deleteCustomTemplate };
 

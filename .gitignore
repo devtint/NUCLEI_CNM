@@ -100,11 +100,25 @@ sessions/
 dashboard/.auth/
 dashboard/sessions/
 
-# Agent Workflows (Local Only)
+# Agent Workflows & AI Tools (Local Only)
 .agent/
+.antigravityignore
+scratch/
+
+# Prompt & Plan Files (Local working docs)
+*.prompt.md
+plan-*.md
+IMPROVEMENTS_ANALYSIS.md
+SCHEDULER_AND_AUTOMATION_DEEP_DIVE.md
+
 
 # Docker
 .env.docker
 dashboard/data/
 test-data/
 docker-build.log
+dashboard/docker-build.log
+
+# CI/CD — .github/workflows/ MUST be tracked (not ignored)
+# No entries here should match .github/
+

@@ -15,8 +15,11 @@ dist/
 *.db-wal
 
 # Local environment (use docker env instead)
+.env
 .env.local
 .env*.local
+.env.production
+.env.development
 
 # Scan artifacts (use volume mount)
 scans/
@@ -28,6 +31,9 @@ public/screenshots/
 .gitignore
 *.md
 !README.md
+
+# CI/CD & GitHub Actions (not needed in image)
+.github/
 
 # IDE
 .vscode/
@@ -46,3 +52,34 @@ tsconfig.tsbuildinfo
 *.spec.*
 __tests__/
 coverage/
+
+# Docker build artifacts (prevent recursive context)
+docker-build.log
+docker-compose*.yml
+
+# Backup files
+*-backup*.json
+*.backup.json
+backup/
+backups/
+
+# Logs
+*.log
+*.log*
+logs/
+
+# Prompt & plan files
+*.prompt.md
+plan-*.md
+
+# Scratch & temp
+scratch/
+*.tmp
+*.temp
+temp/
+tmp/
+
+# Agent & AI tools
+.agent/
+.antigravityignore
+

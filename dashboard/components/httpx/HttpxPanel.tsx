@@ -205,7 +205,7 @@ const HttpxAssetCard = ({ data: r, onClick, onScanTarget, style }: HttpxAssetCar
                             </div>
 
                             {/* Tech Stack Row */}
-                            <div className="flex flex-wrap gap-1 mt-1">
+                            <div className="flex flex-wrap items-center gap-2 mt-1">
                                 {renderTech(r.technologies, r.web_server)}
                             </div>
                         </div>
@@ -1185,14 +1185,16 @@ export function HttpxPanel({ onScanTarget }: { onScanTarget?: (target: string) =
 
                                             {/* Asset Cards */}
                                             <div className="flex-1 min-h-[400px] max-h-[600px] overflow-y-auto p-4 space-y-3">
-                                                {filteredResults.map((r) => (
-                                                    <HttpxAssetCard
-                                                        key={r.id}
-                                                        data={r}
-                                                        onClick={() => setSelectedAsset(r)}
-                                                        onScanTarget={onScanTarget}
-                                                    />
-                                                ))}
+                                                {filteredResults.map((r) => {
+                                                    return (
+                                                        <HttpxAssetCard
+                                                            key={r.id}
+                                                            data={r}
+                                                            onClick={() => setSelectedAsset(r)}
+                                                            onScanTarget={onScanTarget}
+                                                        />
+                                                    );
+                                                })}
                                             </div>
                                         </ScrollArea>
                                     )}

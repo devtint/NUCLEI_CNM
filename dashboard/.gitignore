@@ -77,3 +77,9 @@ tmp/
 # Docker data directory (contains config.json with password hash)
 data/
 docker-build.log
+
+# Scratch & temporary working files
+scratch/
+*.prompt.md
+plan-*.md
+

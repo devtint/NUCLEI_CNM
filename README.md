@@ -21,6 +21,7 @@
   <img src="https://img.shields.io/badge/TypeScript-5.0-blue?style=flat-square&logo=typescript" alt="TypeScript"/>
   <img src="https://img.shields.io/badge/Auth.js-v5-green?style=flat-square&logo=auth0" alt="Auth.js"/>
   <img src="https://img.shields.io/badge/SQLite-3-003B57?style=flat-square&logo=sqlite" alt="SQLite"/>
+  <img src="https://img.shields.io/badge/Docker-Multi--Arch-2496ED?style=flat-square&logo=docker" alt="Docker Multi-Arch"/>
   <img src="https://img.shields.io/badge/License-MIT-yellow?style=flat-square" alt="License"/>
 </p>
 
@@ -39,11 +40,12 @@ python start-nuclei.py
 ```
 
 The script will:
-- ✅ Verify Docker is running
-- ✅ Download `docker-compose.yml` if missing
-- ✅ Pull latest images and start containers
-- ✅ Wait for health check
-- ✅ Copy Cloudflare URL to clipboard
+- ✅ **Check Environment**: Verifies Docker is running and Compose is available.
+- ✅ **Auto-Update**: Downloads latest `docker-compose.yml` if missing or requested.
+- ✅ **Resource Tuning**: Interactive choice for CPU/RAM allocation profiles.
+- ✅ **Smart Permission Fix**: Automatically detects and fixes template volume permission issues.
+- ✅ **Automated Launch**: Pulls latest images and waits for service health.
+- ✅ **Clipboard Integration**: Automatically captures and copies your Cloudflare URL to the clipboard.
 
 ---
 
@@ -237,7 +239,11 @@ Turn standard vulnerability management into an interactive data conversation:
 
 ## 🚀 Installation & Deployment
 
-**We strongly recommend using Docker.** It allows you to run the full vulnerability dashboard without installing Node.js, Go, or configuring complex dependencies manually.
+**We strongly recommend using Docker.** Our official image is **multi-platform**, meaning it runs natively on:
+- 🖥️ **linux/amd64** (Intel/AMD Servers, Cloud VMs)
+- 🍓 **linux/arm64** (Raspberry Pi, Apple Silicon M1/M2/M3, AWS Graviton)
+
+It allows you to run the full vulnerability dashboard without installing Node.js, Go, or configuring complex dependencies manually.
 
 ### Prerequisites
 1.  **Docker Desktop** (running).

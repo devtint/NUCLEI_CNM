@@ -20,6 +20,7 @@ import { useKeyboardShortcuts } from "@/components/layout/KeyboardShortcuts";
 import { CommandPalette } from "@/components/layout/CommandPalette";
 import { ShortcutHelp } from "@/components/layout/ShortcutHelp";
 import { AIPage } from "@/components/ai/AIPage";
+
 import { Command } from "lucide-react";
 
 export function DashboardClient({ initialStats }: { initialStats: any }) {
@@ -132,6 +133,7 @@ export function DashboardClient({ initialStats }: { initialStats: any }) {
                             {/* Analysis Row */}
                             <AnalysisRow />
 
+                
                             {activeScanId && (
                                 <div className="p-6 rounded-xl border border-emerald-500/20 bg-emerald-500/5 mt-6">
                                     <div className="flex justify-between items-center mb-2">
@@ -219,6 +221,9 @@ export function DashboardClient({ initialStats }: { initialStats: any }) {
                             setStatsRefresh(prev => prev + 1);
                         }} />
                     )}
+
+
+
                 </div>
             </div>
 

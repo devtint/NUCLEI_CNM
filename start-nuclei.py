@@ -5,7 +5,9 @@ This script automates the startup process and opens the Cloudflare tunnel URL
 Works on: Windows, Linux, macOS
 
 Usage:
-    python start-nuclei.py
+    python start-nuclei.py [--dry-run]
+    python start-nuclei.py --stop
+    python start-nuclei.py --down
     
 For Windows users without Python:
     Create a start-nuclei.bat file with: python start-nuclei.py
@@ -30,6 +32,10 @@ MAX_HEALTH_WAIT = 60  # seconds
 # Default resource limits (can be changed interactively)
 DEFAULT_CPU_LIMIT = "2.0"
 DEFAULT_MEM_LIMIT = "2G"
+
+# Logging
+LOG_DIR = os.path.join(os.path.expanduser("~"), ".nuclei-cnm")
+LOG_FILE = os.path.join(LOG_DIR, "start.log")
 
 # Preset resource profiles
 RESOURCE_PROFILES = {
@@ -65,10 +71,23 @@ def icon(emoji, fallback='*'):
 
 def print_colored(text, color=''):
     """Print colored text if supported, otherwise plain text"""
+    write_log(text)
     if Colors.supports_color():
         print(f"{color}{text}{Colors.RESET}")
     else:
         print(text)
+
+def write_log(text):
+    """Write log text to file (best-effort)"""
+    try:
+        if not os.path.exists(LOG_DIR):
+            os.makedirs(LOG_DIR, exist_ok=True)
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(f"[{timestamp}] {text}\n")
+    except Exception:
+        # Logging should never block startup
+        pass
 
 def print_header():
     """Print stylish header"""
@@ -78,21 +97,46 @@ def print_header():
     print_colored("=" * 60, Colors.CYAN)
     print()
 
-def run_command(cmd, capture_output=False, silent=False):
-    """Run a docker compose command"""
+def run_command(cmd, capture_output=False, silent=False, timeout=None):
+    """Run a command and return subprocess.CompletedProcess or None"""
     try:
         if capture_output:
-            result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-            return result.stdout + result.stderr
+            return subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
         else:
             if silent:
-                subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                return subprocess.run(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=timeout)
             else:
-                subprocess.run(cmd, shell=True)
-            return None
+                return subprocess.run(cmd, shell=True, timeout=timeout)
     except Exception as e:
         print_colored(f"Error running command: {e}", Colors.RED)
         return None
+
+def run_with_retries(cmd, attempts=3, delay=2):
+    """Run a command with retry and basic backoff"""
+    for attempt in range(1, attempts + 1):
+        result = run_command(cmd)
+        if result and result.returncode == 0:
+            return True
+        if attempt < attempts:
+            print_colored(f"   Retrying ({attempt}/{attempts})...", Colors.YELLOW)
+            time.sleep(delay * attempt)
+    return False
+
+def get_compose_command():
+    """Detect docker compose v2 or v1 command"""
+    v2 = run_command("docker compose version", capture_output=True)
+    if v2 and v2.returncode == 0:
+        return "docker compose"
+    v1 = run_command("docker-compose version", capture_output=True)
+    if v1 and v1.returncode == 0:
+        return "docker-compose"
+    return None
+
+def validate_cpu(value):
+    return re.fullmatch(r"\d+(\.\d+)?", value or "") is not None
+
+def validate_mem(value):
+    return re.fullmatch(r"\d+(M|G|MB|GB)", value or "", re.IGNORECASE) is not None
 
 def check_docker():
     """Verify Docker is running"""
@@ -132,7 +176,7 @@ def copy_to_clipboard(text):
         system = platform.system()
         if system == 'Windows':
             # Use PowerShell for better Unicode support
-            subprocess.run(['powershell', '-command', f'Set-Clipboard -Value "{text}"'], 
+            subprocess.run(['powershell', '-NoProfile', '-Command', 'Set-Clipboard', '-Value', text],
                          capture_output=True, check=True)
         elif system == 'Darwin':  # macOS
             subprocess.run(['pbcopy'], input=text.encode('utf-8'), check=True)
@@ -151,7 +195,7 @@ def copy_to_clipboard(text):
     except Exception:
         return False
 
-def extract_cloudflare_url():
+def extract_cloudflare_url(compose_cmd):
     """Extract Cloudflare URL from logs and wait for tunnel to be ready"""
     url_pattern = r'https://[a-zA-Z0-9-]+\.trycloudflare\.com'
     tunnel_ready_pattern = r'Registered tunnel connection|Connection registered'
@@ -160,18 +204,20 @@ def extract_cloudflare_url():
     tunnel_ready = False
     
     for attempt in range(MAX_TUNNEL_WAIT):
-        logs = run_command('docker compose logs cloudflared 2>&1', capture_output=True)
-        if logs:
+        logs = run_command(f"{compose_cmd} logs cloudflared 2>&1", capture_output=True)
+        if logs and logs.stdout:
             # First find the URL
             if not cloudflare_url:
-                match = re.search(url_pattern, logs)
-                if match:
-                    cloudflare_url = match.group(0)
-                    print_colored(f"   Found URL: {cloudflare_url}", Colors.GRAY)
+                matches = re.findall(url_pattern, logs.stdout)
+                for match in matches:
+                    if match != "https://api.trycloudflare.com":
+                        cloudflare_url = match
+                        print_colored(f"   Found URL: {cloudflare_url}", Colors.GRAY)
+                        break
             
             # Then wait for tunnel to be registered
             if cloudflare_url and not tunnel_ready:
-                if re.search(tunnel_ready_pattern, logs):
+                if re.search(tunnel_ready_pattern, logs.stdout):
                     tunnel_ready = True
                     print_colored(f"   {icon('✓', '+')} Tunnel connected!", Colors.GRAY)
                     time.sleep(2)
@@ -248,6 +294,24 @@ def prompt_permissions_choice():
         print()
         return False
 
+def confirm_action(prompt):
+    """Ask for a Y/n confirmation, default is Yes on Enter"""
+    suffix = "[Y/n] (Enter = Y)"
+    while True:
+        try:
+            choice = input(f"{prompt} {suffix} ").strip().lower()
+        except (KeyboardInterrupt, EOFError):
+            print()
+            return False
+
+        if choice == "":
+            return True
+        if choice in ("y", "yes"):
+            return True
+        if choice in ("n", "no"):
+            return False
+        print_colored("   Please enter Y or N (Enter = default)", Colors.YELLOW)
+
 def prompt_resource_choice():
     """Ask user to choose resource limits for the scanner container"""
     print_colored(f"\n{icon('⚙️')} Resource Allocation", Colors.CYAN)
@@ -268,8 +332,16 @@ def prompt_resource_choice():
             print_colored(f"   {icon('✓', '+')} Selected: {p['name']}", Colors.GREEN)
             return p['cpu'], p['mem']
         elif choice == '5':
-            cpu = input(f"  CPU cores (e.g. 2.0, default {DEFAULT_CPU_LIMIT}): ").strip() or DEFAULT_CPU_LIMIT
-            mem = input(f"  Memory (e.g. 2G, 4G, default {DEFAULT_MEM_LIMIT}): ").strip() or DEFAULT_MEM_LIMIT
+            while True:
+                cpu = input(f"  CPU cores (e.g. 2.0, default {DEFAULT_CPU_LIMIT}): ").strip() or DEFAULT_CPU_LIMIT
+                if validate_cpu(cpu):
+                    break
+                print_colored("   Invalid CPU value. Example: 2.0", Colors.YELLOW)
+            while True:
+                mem = input(f"  Memory (e.g. 2G, 4G, default {DEFAULT_MEM_LIMIT}): ").strip() or DEFAULT_MEM_LIMIT
+                if validate_mem(mem):
+                    break
+                print_colored("   Invalid memory value. Example: 2G", Colors.YELLOW)
             print_colored(f"   {icon('✓', '+')} Custom: {cpu} CPU, {mem} RAM", Colors.GREEN)
             return cpu, mem
         else:
@@ -287,26 +359,48 @@ def check_permissions_needed():
     owner = run_command(cmd, capture_output=True)
     
     # If owner is 'root', we need to fix it (should be 'nextjs')
-    if owner and 'root' in owner:
+    if owner and owner.stdout and 'root' in owner.stdout:
         return True
     return False
 
 def main():
     """Main execution flow"""
+    dry_run = "--dry-run" in sys.argv
+    stop_only = "--stop" in sys.argv
+    down_only = "--down" in sys.argv
+
     # Change to script directory
     script_dir = Path(__file__).parent
     if script_dir.exists():
         os.chdir(script_dir)
     
     print_header()
+    print_colored(f"{icon('📝', '-')} Log file: {LOG_FILE}", Colors.GRAY)
     
     # Pre-flight checks
+    print_colored("\nStep 1/6: Docker checks", Colors.CYAN)
     if not check_docker():
         sys.exit(1)
     
     if not check_compose_file():
         print_colored(f"\n{icon('✗', 'X')} Cannot proceed without docker-compose.yml", Colors.RED)
         sys.exit(1)
+
+    compose_cmd = get_compose_command()
+    if not compose_cmd:
+        print_colored(f"\n{icon('✗', 'X')} Docker Compose not available", Colors.RED)
+        print_colored("   Please install Docker Compose v2 or v1 and try again.", Colors.YELLOW)
+        sys.exit(1)
+
+    if down_only:
+        print_colored(f"\n{icon('🧹')} Stopping and removing containers...", Colors.CYAN)
+        run_command(f"{compose_cmd} down")
+        return
+
+    if stop_only:
+        print_colored(f"\n{icon('⏹️', '[]')} Stopping containers...", Colors.CYAN)
+        run_command(f"{compose_cmd} stop")
+        return
     
     # Ask user about updating
     print()
@@ -314,23 +408,37 @@ def main():
         download_docker_compose()
         time.sleep(1)
     
+    print_colored("\nStep 2/6: Resource selection", Colors.CYAN)
     # Ask user about resource limits
     cpu_limit, mem_limit = prompt_resource_choice()
     os.environ['CNM_CPU_LIMIT'] = cpu_limit
     os.environ['CNM_MEM_LIMIT'] = mem_limit
+
+    if dry_run:
+        print_colored(f"\n{icon('🧪')} Dry run enabled. Skipping container operations.", Colors.YELLOW)
+        return
     
-    # Stop existing containers
-    print_colored(f"\n{icon('🔄')} Stopping existing containers...", Colors.CYAN)
-    run_command('docker compose down', silent=True)
-    time.sleep(2)
+    print_colored("\nStep 3/6: Container cleanup", Colors.CYAN)
+    if confirm_action("Stop existing containers?"):
+        print_colored(f"{icon('🔄')} Stopping existing containers...", Colors.CYAN)
+        run_command(f"{compose_cmd} down", silent=True)
+        time.sleep(2)
+    else:
+        print_colored(f"{icon('ℹ', 'i')} Skipping container stop", Colors.GRAY)
     
-    # Pull latest images
-    print_colored(f"\n{icon('📥')} Pulling latest images...", Colors.CYAN)
-    run_command('docker compose pull')
+    print_colored("\nStep 4/6: Image update", Colors.CYAN)
+    if confirm_action("Pull latest images?"):
+        print_colored(f"{icon('📥')} Pulling latest images...", Colors.CYAN)
+        if not run_with_retries(f"{compose_cmd} pull"):
+            print_colored(f"   {icon('✗', 'X')} Failed to pull images after retries", Colors.RED)
+            print_colored("   Hint: Check your network and Docker login status.", Colors.YELLOW)
+            sys.exit(1)
+    else:
+        print_colored(f"{icon('ℹ', 'i')} Skipping image pull", Colors.GRAY)
     
-    # Start containers with resource limits
-    print_colored(f"\n{icon('🚀')} Starting containers (CPU: {cpu_limit}, RAM: {mem_limit})...", Colors.CYAN)
-    run_command('docker compose up -d')
+    print_colored("\nStep 5/6: Start containers", Colors.CYAN)
+    print_colored(f"{icon('🚀')} Starting containers (CPU: {cpu_limit}, RAM: {mem_limit})...", Colors.CYAN)
+    run_command(f"{compose_cmd} up -d")
     time.sleep(3)
     
     # Smart Permission Fix
@@ -350,13 +458,14 @@ def main():
     else:
         print_colored(f"   {icon('✓', '+')} Permissions are correct (owned by nextjs)", Colors.GREEN)
     
+    print_colored("\nStep 6/6: Health + tunnel", Colors.CYAN)
     # Wait for health
     wait_for_health()
     
     # Get Cloudflare URL
     print_colored(f"\n{icon('🔍')} Capturing Cloudflare tunnel URL...", Colors.CYAN)
     time.sleep(5)
-    cloudflare_url = extract_cloudflare_url()
+    cloudflare_url = extract_cloudflare_url(compose_cmd)
     
     # Final output
     print()
@@ -378,14 +487,15 @@ def main():
             print_colored(f"  {icon('📋')} Cloudflare URL copied to clipboard!", Colors.GREEN)
         
         print()
-        print_colored(f"  {icon('💡')} Tip: Run 'docker compose logs -f' to view logs", Colors.GRAY)
+        print_colored(f"  {icon('💡')} Tip: Run '{compose_cmd} logs -f' to view logs", Colors.GRAY)
     else:
         print_colored(f"  {icon('⚠️')} Started, but Cloudflare URL not detected", Colors.YELLOW)
         print_colored("=" * 60, Colors.YELLOW)
         print()
         print_colored(f"  {icon('🏠')} Local URL: http://localhost:3000", Colors.CYAN)
         print()
-        print_colored(f"  {icon('💡')} Run 'docker compose logs cloudflared' to find the URL", Colors.GRAY)
+        print_colored(f"  {icon('💡')} Run '{compose_cmd} logs cloudflared' to find the URL", Colors.GRAY)
+        print_colored("  Hint: Look for a https://<id>.trycloudflare.com URL in the logs.", Colors.GRAY)
     
     print()
 

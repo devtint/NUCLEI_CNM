@@ -1,17 +1,26 @@
 # =============================================================================
 # Stage 1: Build Go Tools (nuclei, subfinder, httpx)
 # =============================================================================
-FROM golang:1.23-alpine AS tools
+# Use BUILDPLATFORM so Go runs natively on the runner (no emulation overhead).
+# Cross-compile output binaries for the target platform via GOOS/GOARCH.
+FROM --platform=$BUILDPLATFORM golang:1.23-alpine AS tools
+
+ARG TARGETOS
+ARG TARGETARCH
 
 RUN apk add --no-cache git
 
 # Enable automatic toolchain download for newer Go requirements
 ENV GOTOOLCHAIN=auto
 
-# Install ProjectDiscovery tools
-RUN go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
-RUN go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
-RUN go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest
+# Force all binaries into /go/bin regardless of target platform
+# (without GOBIN, cross-compiled binaries go to /go/bin/${GOOS}_${GOARCH}/)
+ENV GOBIN=/go/bin
+
+# Cross-compile ProjectDiscovery tools for the target platform
+RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
+RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
+RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest
 
 # =============================================================================
 # Stage 2: Build Next.js Application

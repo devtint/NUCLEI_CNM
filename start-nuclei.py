@@ -510,6 +510,7 @@ def check_for_update():
     except Exception:
         # Any other error — skip silently
         pass
+
 def main():
     """Main execution flow"""
     # Handle simple flags first

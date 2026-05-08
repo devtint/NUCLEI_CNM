@@ -5,9 +5,12 @@ This script automates the startup process and opens the Cloudflare tunnel URL
 Works on: Windows, Linux, macOS
 
 Usage:
-    python start-nuclei.py [--dry-run]
-    python start-nuclei.py --stop
-    python start-nuclei.py --down
+    python start-nuclei.py              # Normal startup
+    python start-nuclei.py --dry-run    # Preview without starting
+    python start-nuclei.py --stop       # Stop containers
+    python start-nuclei.py --down       # Stop and remove containers
+    python start-nuclei.py --status     # Show current status
+    python start-nuclei.py --version    # Show version
     
 For Windows users without Python:
     Create a start-nuclei.bat file with: python start-nuclei.py
@@ -23,11 +26,15 @@ import urllib.request
 import urllib.error
 from pathlib import Path
 
+# Version
+VERSION = "1.8.3"
+
 # Configuration
 GITHUB_COMPOSE_URL = "https://raw.githubusercontent.com/devtint/NUCLEI_CNM/main/docker-compose.yml"
 HEALTH_CHECK_URL = "http://localhost:3000/login"
 MAX_TUNNEL_WAIT = 30  # seconds
 MAX_HEALTH_WAIT = 60  # seconds
+MAX_LOG_SIZE = 5 * 1024 * 1024  # 5MB
 
 # Default resource limits (can be changed interactively)
 DEFAULT_CPU_LIMIT = "2.0"
@@ -76,6 +83,17 @@ def print_colored(text, color=''):
         print(f"{color}{text}{Colors.RESET}")
     else:
         print(text)
+
+def rotate_log():
+    """Rotate log file if it exceeds MAX_LOG_SIZE"""
+    try:
+        if os.path.exists(LOG_FILE) and os.path.getsize(LOG_FILE) > MAX_LOG_SIZE:
+            old_log = LOG_FILE + ".old"
+            if os.path.exists(old_log):
+                os.remove(old_log)
+            os.rename(LOG_FILE, old_log)
+    except Exception:
+        pass
 
 def write_log(text):
     """Write log text to file (best-effort)"""
@@ -363,8 +381,76 @@ def check_permissions_needed():
         return True
     return False
 
+def show_status():
+    """Show current container status, uptime, and Cloudflare URL"""
+    print_header()
+    print_colored(f"  Version: {VERSION}\n", Colors.GRAY)
+    
+    compose_cmd = get_compose_command()
+    if not compose_cmd:
+        print_colored(f"  {icon('✗', 'X')} Docker Compose not available", Colors.RED)
+        return
+    
+    # Container status
+    print_colored(f"{icon('📊')} Container Status:", Colors.CYAN)
+    result = run_command(f"{compose_cmd} ps", capture_output=True)
+    if result and result.stdout:
+        print(result.stdout)
+    else:
+        print_colored("   No containers running.\n", Colors.YELLOW)
+        return
+    
+    # Health check
+    print_colored(f"{icon('🏥')} Health Check:", Colors.CYAN)
+    try:
+        req = urllib.request.Request(HEALTH_CHECK_URL, method='HEAD')
+        req.add_header('User-Agent', 'NucleiCNM-StatusCheck/1.0')
+        response = urllib.request.urlopen(req, timeout=5)
+        if response.status in [200, 302, 301]:
+            print_colored(f"   {icon('✓', '+')} Application is healthy (HTTP {response.status})", Colors.GREEN)
+    except Exception:
+        print_colored(f"   {icon('✗', 'X')} Application is not responding", Colors.RED)
+    
+    # Cloudflare URL
+    print_colored(f"\n{icon('🌐')} Cloudflare Tunnel:", Colors.CYAN)
+    url_pattern = r'https://[a-zA-Z0-9-]+\.trycloudflare\.com'
+    logs = run_command(f"{compose_cmd} logs cloudflared 2>&1", capture_output=True)
+    if logs and logs.stdout:
+        matches = re.findall(url_pattern, logs.stdout)
+        found_url = None
+        for match in matches:
+            if match != "https://api.trycloudflare.com":
+                found_url = match
+                break
+        if found_url:
+            print_colored(f"   {icon('✓', '+')} {found_url}", Colors.GREEN)
+            if copy_to_clipboard(found_url):
+                print_colored(f"   {icon('📋')} Copied to clipboard!", Colors.GREEN)
+        else:
+            print_colored(f"   {icon('✗', 'X')} No tunnel URL detected", Colors.YELLOW)
+    else:
+        print_colored(f"   {icon('✗', 'X')} Cloudflared container not running", Colors.YELLOW)
+    
+    # Resource usage
+    print_colored(f"\n{icon('💻')} Resource Usage:", Colors.CYAN)
+    stats = run_command("docker stats --no-stream --format \"   {{.Name}}: CPU {{.CPUPerc}} | MEM {{.MemUsage}}\" nuclei-command-center nuclei-cnm-tunnel", capture_output=True)
+    if stats and stats.stdout:
+        print(stats.stdout)
+    
+    print()
+
+
 def main():
     """Main execution flow"""
+    # Handle simple flags first
+    if "--version" in sys.argv:
+        print(f"Nuclei CNM Start Script v{VERSION}")
+        sys.exit(0)
+    
+    if "--status" in sys.argv:
+        show_status()
+        sys.exit(0)
+    
     dry_run = "--dry-run" in sys.argv
     stop_only = "--stop" in sys.argv
     down_only = "--down" in sys.argv
@@ -375,7 +461,11 @@ def main():
         os.chdir(script_dir)
     
     print_header()
+    print_colored(f"  v{VERSION}", Colors.GRAY)
     print_colored(f"{icon('📝', '-')} Log file: {LOG_FILE}", Colors.GRAY)
+    
+    # Rotate log if needed
+    rotate_log()
     
     # Pre-flight checks
     print_colored("\nStep 1/6: Docker checks", Colors.CYAN)

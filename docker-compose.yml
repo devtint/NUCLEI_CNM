@@ -15,6 +15,11 @@ services:
       - NODE_ENV=production
       - DATABASE_PATH=/app/data/nuclei.db
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     # Resource limits: prevent nuclei scans from starving dashboard + tunnel
     # Override at runtime via env vars: CNM_CPU_LIMIT, CNM_MEM_LIMIT
     deploy:
@@ -42,6 +47,11 @@ services:
       nuclei-cnm:
         condition: service_healthy
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
     # Protect tunnel: low resource needs, high OOM survival priority
     deploy:
       resources:

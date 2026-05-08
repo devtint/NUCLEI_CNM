@@ -40,12 +40,25 @@ python start-nuclei.py
 ```
 
 The script will:
+- ✅ **Self-Update Check**: Automatically detects and offers to update to the latest script version.
 - ✅ **Check Environment**: Verifies Docker is running and Compose is available.
 - ✅ **Auto-Update**: Downloads latest `docker-compose.yml` if missing or requested.
-- ✅ **Resource Tuning**: Interactive choice for CPU/RAM allocation profiles.
+- ✅ **Resource Tuning**: Interactive choice for CPU/RAM allocation profiles (Light / Normal / Heavy / Max / Custom).
 - ✅ **Smart Permission Fix**: Automatically detects and fixes template volume permission issues.
 - ✅ **Automated Launch**: Pulls latest images and waits for service health.
 - ✅ **Clipboard Integration**: Automatically captures and copies your Cloudflare URL to the clipboard.
+- ✅ **Log Rotation**: Automatically archives startup logs when they exceed 5MB.
+
+**CLI Flags:**
+
+```bash
+python start-nuclei.py              # Normal startup
+python start-nuclei.py --status     # Show container status, health, URL, and resource usage
+python start-nuclei.py --version    # Show script version
+python start-nuclei.py --stop       # Stop containers
+python start-nuclei.py --down       # Stop and remove containers
+python start-nuclei.py --dry-run    # Preview without starting
+```
 
 ---
 

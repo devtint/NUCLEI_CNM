@@ -1,27 +1,31 @@
 # =============================================================================
-# Stage 1: Build Go Tools (nuclei, subfinder, httpx)
+# Stage 1: Download Pre-built Go Tools (nuclei, subfinder, httpx)
 # =============================================================================
-# Use BUILDPLATFORM so Go runs natively on the runner (no emulation overhead).
-# Cross-compile output binaries for the target platform via GOOS/GOARCH.
-FROM --platform=$BUILDPLATFORM golang:1.23-alpine AS tools
+# Instead of compiling from source (which causes OOM crashes on GitHub Actions),
+# we download the official pre-compiled static binaries for the target architecture.
+FROM alpine:3.19 AS tools
 
-ARG TARGETOS
 ARG TARGETARCH
 
-RUN apk add --no-cache git
+RUN apk add --no-cache curl unzip
 
-# Enable automatic toolchain download for newer Go requirements
-ENV GOTOOLCHAIN=auto
-
-# Force all binaries into /go/bin regardless of target platform
-# (without GOBIN, cross-compiled binaries go to /go/bin/${GOOS}_${GOARCH}/)
-ENV GOBIN=/go/bin
-
-# Cross-compile ProjectDiscovery tools for the target platform (Pinned for stability)
-# CGO_ENABLED=0 is required for reliable cross-compilation of static binaries across platforms
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@v3.3.8
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@v2.6.7
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go install -v github.com/projectdiscovery/httpx/cmd/httpx@v1.6.9
+RUN mkdir -p /go/bin && \
+    if [ "$TARGETARCH" = "amd64" ]; then \
+      export ARCH="amd64"; \
+    elif [ "$TARGETARCH" = "arm64" ]; then \
+      export ARCH="arm64"; \
+    else \
+      echo "Unsupported architecture: $TARGETARCH" && exit 1; \
+    fi && \
+    # Download Nuclei
+    curl -sL "https://github.com/projectdiscovery/nuclei/releases/download/v3.3.8/nuclei_3.3.8_linux_${ARCH}.zip" -o nuclei.zip && \
+    unzip nuclei.zip nuclei && mv nuclei /go/bin/ && \
+    # Download Subfinder
+    curl -sL "https://github.com/projectdiscovery/subfinder/releases/download/v2.6.7/subfinder_2.6.7_linux_${ARCH}.zip" -o subfinder.zip && \
+    unzip subfinder.zip subfinder && mv subfinder /go/bin/ && \
+    # Download HTTPX
+    curl -sL "https://github.com/projectdiscovery/httpx/releases/download/v1.6.9/httpx_1.6.9_linux_${ARCH}.zip" -o httpx.zip && \
+    unzip httpx.zip httpx && mv httpx /go/bin/
 
 # =============================================================================
 # Stage 2: Build Next.js Application

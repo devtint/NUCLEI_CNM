@@ -35,8 +35,8 @@ RUN apk add --no-cache python3 make g++ libc6-compat
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies (includes building native modules)
-RUN npm ci
+# Install dependencies with retry logic to handle transient network issues (ECONNRESET)
+RUN until npm ci; do echo "Retrying npm ci..."; sleep 5; done
 
 # Copy source code
 COPY . .

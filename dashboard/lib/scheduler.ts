@@ -1,4 +1,5 @@
 import cron, { ScheduledTask } from "node-cron";
+import type { ChildProcess } from "child_process";
 import { getDatabase, getSetting, setSetting, insertSchedulerLog, updateSchedulerLog } from "./db";
 import { sendTelegramNotification } from "./notifications";
 
@@ -6,6 +7,49 @@ let schedulerTask: ScheduledTask | null = null;
 let heartbeatTask: ScheduledTask | null = null;
 let isProcessing = false;
 let currentDomain: string | null = null;
+
+function withProcessTimeout<T>(
+    label: string,
+    scanPromise: Promise<T>,
+    childProcess: ChildProcess,
+    timeoutMs: number
+): Promise<T | null> {
+    return new Promise((resolve) => {
+        let settled = false;
+
+        const timer = setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            console.error(`[Scheduler] ${label} timed out after ${timeoutMs / 1000}s, killing process`);
+            try {
+                childProcess.kill("SIGTERM");
+                setTimeout(() => {
+                    if (!childProcess.killed) {
+                        childProcess.kill("SIGKILL");
+                    }
+                }, 5000);
+            } catch (e) {
+                console.error(`[Scheduler] ${label} failed to terminate:`, e);
+            }
+            resolve(null);
+        }, timeoutMs);
+
+        scanPromise
+            .then((result) => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
+                resolve(result);
+            })
+            .catch((err) => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
+                console.error(`[Scheduler] ${label} error:`, err);
+                resolve(null);
+            });
+    });
+}
 
 // Scheduler settings interface
 interface SchedulerSettings {
@@ -381,6 +425,16 @@ export async function runScheduledScans() {
                     status: 'error',
                     error_message: 'Subfinder scan returned no results'
                 });
+
+                try {
+                    await sendTelegramNotification(
+                        `⚠️ *Subfinder Failed*\n\n` +
+                        `Domain: \`${domain.target}\`\n` +
+                        `Subfinder returned no results or timed out.`
+                    );
+                } catch (notifyErr) {
+                    console.error("[Scheduler] Failed to send subfinder failure notification:", notifyErr);
+                }
             }
         } catch (e) {
             console.error(`[Scheduler] Error scanning ${domain.target}:`, e);
@@ -390,6 +444,17 @@ export async function runScheduledScans() {
                 status: 'error',
                 error_message: e instanceof Error ? e.message : String(e)
             });
+
+            try {
+                const failMsg = `🚨 *Scheduled Scan Failed*\n\n` +
+                    `🎯 Domain: \`${domain.target}\`\n` +
+                    `⏰ Time: ${new Date().toISOString().replace('T', ' ').substring(0, 19)} UTC\n` +
+                    `❌ Error: ${e instanceof Error ? e.message : String(e)}\n\n` +
+                    `_Check dashboard logs for details_`;
+                await sendTelegramNotification(failMsg);
+            } catch (notifyErr) {
+                console.error("[Scheduler] Failed to send failure notification:", notifyErr);
+            }
         }
 
         currentDomain = null;
@@ -431,8 +496,8 @@ export async function triggerSubfinderScan(domain: string): Promise<{ total: num
             fs.mkdirSync(scansDir, { recursive: true });
         }
 
-        return new Promise((resolve) => {
-            const child = spawn(SUBFINDER_BINARY, cmdArgs);
+        const child = spawn(SUBFINDER_BINARY, cmdArgs);
+        const scanPromise = new Promise<{ total: number; newCount: number; newSubdomains: string[] } | null>((resolve) => {
             let jsonOutput = "";
 
             child.stdout.on("data", (data: Buffer) => {
@@ -516,6 +581,8 @@ export async function triggerSubfinderScan(domain: string): Promise<{ total: num
             });
         });
 
+        return withProcessTimeout(`Subfinder:${domain}`, scanPromise, child, 300000);
+
     } catch (e) {
         console.error(`[Scheduler] Error during scan for ${domain}:`, e);
         return null;
@@ -540,8 +607,8 @@ export async function triggerHttpxScan(subdomains: string[]): Promise<{ total: n
         // Run httpx with JSON output
         const args = ["-l", tempFile, "-json", "-silent", "-sc", "-title", "-timeout", "10"];
 
-        return new Promise((resolve) => {
-            const child = spawn(HTTPX_BINARY, args);
+        const child = spawn(HTTPX_BINARY, args);
+        const scanPromise = new Promise<{ total: number; liveCount: number; liveHosts: { host: string; statusCode: number; title?: string }[] } | null>((resolve) => {
             let jsonOutput = "";
 
             child.stdout.on("data", (data: Buffer) => {
@@ -607,6 +674,8 @@ export async function triggerHttpxScan(subdomains: string[]): Promise<{ total: n
             });
         });
 
+        return withProcessTimeout("HTTPX", scanPromise, child, 300000);
+
     } catch (e) {
         console.error(`[Scheduler/HTTPX] Error:`, e);
         return null;
@@ -658,8 +727,8 @@ export async function triggerNucleiScan(liveUrls: string[], settings: NucleiScan
 
         console.log(`[Scheduler/Nuclei] Running: nuclei ${args.join(" ")}`);
 
-        return new Promise((resolve) => {
-            const child = spawn(NUCLEI_BINARY, args);
+        const child = spawn(NUCLEI_BINARY, args);
+        const scanPromise = new Promise<{ findingsCount: number; criticalCount: number; highCount: number } | null>((resolve) => {
             let jsonOutput = "";
             const scanId = crypto.randomUUID();
 
@@ -779,10 +848,25 @@ export async function triggerNucleiScan(liveUrls: string[], settings: NucleiScan
             });
         });
 
+        return withProcessTimeout("Nuclei", scanPromise, child, 600000);
+
     } catch (e) {
         console.error(`[Scheduler/Nuclei] Error:`, e);
         return null;
     }
+}
+
+export function getSchedulerHealth() {
+    const settings = getSchedulerSettings();
+
+    return {
+        enabled: settings.enabled,
+        cronJobExists: schedulerTask !== null,
+        heartbeatExists: heartbeatTask !== null,
+        isProcessing,
+        currentDomain,
+        needsRestart: settings.enabled && schedulerTask === null
+    };
 }
 
 // Get current scheduler status

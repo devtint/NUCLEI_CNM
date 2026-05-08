@@ -4,6 +4,7 @@ import {
     getSchedulerSettings,
     saveSchedulerSettings,
     getSchedulerStatus,
+    getSchedulerHealth,
     initScheduler,
     triggerManualRun,
     getEnabledDomainsForScheduler,
@@ -44,6 +45,7 @@ export async function GET(req: NextRequest) {
             nucleiSettings,
             backupSettings,
             status,
+            health: getSchedulerHealth(),
             domains: allDomains,
             enabledCount: domains.length
         });
@@ -116,12 +118,30 @@ export async function POST(req: NextRequest) {
         if (body.nucleiUpdate) {
             const { scanMode, templates, severity, rateLimit, concurrency, maxNewThreshold } = body.nucleiUpdate;
             const nucleiUpdates: any = {};
+            if (rateLimit !== undefined) {
+                const rl = parseInt(rateLimit, 10);
+                if (isNaN(rl) || rl < 1 || rl > 1000) {
+                    return NextResponse.json({ error: "rateLimit must be 1-1000" }, { status: 400 });
+                }
+                nucleiUpdates.rateLimit = rl;
+            }
+            if (concurrency !== undefined) {
+                const c = parseInt(concurrency, 10);
+                if (isNaN(c) || c < 1 || c > 100) {
+                    return NextResponse.json({ error: "concurrency must be 1-100" }, { status: 400 });
+                }
+                nucleiUpdates.concurrency = c;
+            }
+            if (maxNewThreshold !== undefined) {
+                const t = parseInt(maxNewThreshold, 10);
+                if (isNaN(t) || t < 1 || t > 10000) {
+                    return NextResponse.json({ error: "maxNewThreshold must be 1-10000" }, { status: 400 });
+                }
+                nucleiUpdates.maxNewThreshold = t;
+            }
             if (scanMode !== undefined) nucleiUpdates.scanMode = scanMode;
             if (templates !== undefined) nucleiUpdates.templates = templates;
             if (severity !== undefined) nucleiUpdates.severity = severity;
-            if (rateLimit !== undefined) nucleiUpdates.rateLimit = rateLimit;
-            if (concurrency !== undefined) nucleiUpdates.concurrency = concurrency;
-            if (maxNewThreshold !== undefined) nucleiUpdates.maxNewThreshold = maxNewThreshold;
 
             saveNucleiSettings(nucleiUpdates);
             return NextResponse.json({
@@ -134,9 +154,24 @@ export async function POST(req: NextRequest) {
         const { enabled, frequency, hour, notifyMode, autoHttpx } = body;
 
         const updates: any = {};
+        if (frequency !== undefined) {
+            const valid = ["6h", "12h", "24h", "168h"];
+            if (!valid.includes(frequency)) {
+                return NextResponse.json({ error: `Invalid frequency: ${frequency}. Valid: ${valid.join(", ")}` }, { status: 400 });
+            }
+        }
+        if (hour !== undefined) {
+            const h = parseInt(hour, 10);
+            if (isNaN(h) || h < 0 || h > 23) {
+                return NextResponse.json({ error: `Invalid hour: ${hour}. Must be 0-23.` }, { status: 400 });
+            }
+            updates.hour = h;
+        }
+        if (notifyMode !== undefined && !["always", "new_only"].includes(notifyMode)) {
+            return NextResponse.json({ error: `Invalid notifyMode: ${notifyMode}` }, { status: 400 });
+        }
         if (enabled !== undefined) updates.enabled = enabled;
         if (frequency !== undefined) updates.frequency = frequency;
-        if (hour !== undefined) updates.hour = hour;
         if (notifyMode !== undefined) updates.notifyMode = notifyMode;
         if (autoHttpx !== undefined) updates.autoHttpx = autoHttpx;
 

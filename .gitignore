@@ -122,3 +122,5 @@ dashboard/docker-build.log
 # CI/CD — .github/workflows/ MUST be tracked (not ignored)
 # No entries here should match .github/
 
+CICD/
+CICD/*

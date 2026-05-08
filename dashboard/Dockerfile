@@ -18,9 +18,10 @@ ENV GOTOOLCHAIN=auto
 ENV GOBIN=/go/bin
 
 # Cross-compile ProjectDiscovery tools for the target platform (Pinned for stability)
-RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@v3.3.8
-RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@v2.6.7
-RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go install -v github.com/projectdiscovery/httpx/cmd/httpx@v1.6.9
+# CGO_ENABLED=0 is required for reliable cross-compilation of static binaries across platforms
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@v3.3.8
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@v2.6.7
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go install -v github.com/projectdiscovery/httpx/cmd/httpx@v1.6.9
 
 # =============================================================================
 # Stage 2: Build Next.js Application

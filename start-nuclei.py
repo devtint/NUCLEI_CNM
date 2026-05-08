@@ -26,8 +26,8 @@ import urllib.request
 import urllib.error
 from pathlib import Path
 
-# Version
-VERSION = "1.8.3"
+# Script Version (independent from Docker image version)
+VERSION = "2.0.0"
 
 # Configuration
 GITHUB_COMPOSE_URL = "https://raw.githubusercontent.com/devtint/NUCLEI_CNM/main/docker-compose.yml"

@@ -95,19 +95,7 @@ export function DashboardClient({ initialStats }: { initialStats: any }) {
                     <header className="flex justify-between items-center mb-8 border-b border-border pb-4">
                         <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-3">
                             <span className="capitalize">{activeView.replace("-", " ")}</span>
-                            {activeView === "overview" && (
-                                <button
-                                    onClick={() => {
-                                        const event = new CustomEvent('open-ai-chat', { 
-                                            detail: { message: `Summarize my entire Nuclei environment, including overall stats, recent runs, and current risk level.` }
-                                        });
-                                        window.dispatchEvent(event);
-                                    }}
-                                    className="px-2 py-1 flex items-center gap-1.5 text-[10px] font-semibold tracking-wider uppercase text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 rounded-md transition-colors"
-                                >
-                                    AI Summary
-                                </button>
-                            )}
+
                         </h1>
                         <div className="flex items-center gap-2">
                             <button

@@ -30,18 +30,18 @@ RUN mkdir -p /go/bin && \
 # =============================================================================
 # Stage 2: Build Next.js Application
 # =============================================================================
-FROM node:20-alpine AS builder
+FROM node:20-bookworm-slim AS builder
 
 WORKDIR /app
 
-# Install build dependencies for native modules (better-sqlite3)
-RUN apk add --no-cache python3 make g++ libc6-compat
+# Install build dependencies for native modules if needed (Debian based)
+RUN apt-get update && apt-get install -y python3 make g++ libc6-dev && rm -rf /var/lib/apt/lists/*
 
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies with retry logic to handle transient network issues (ECONNRESET)
-RUN until npm ci; do echo "Retrying npm ci..."; sleep 5; done
+# Install dependencies (Debian glibc allows pre-built better-sqlite3 binaries, bypassing QEMU compilation crashes)
+RUN npm ci
 
 # Copy source code
 COPY . .
@@ -52,32 +52,32 @@ RUN npm run build
 # =============================================================================
 # Stage 3: Production Runner
 # =============================================================================
-FROM node:20-alpine AS runner
+FROM node:20-bookworm-slim AS runner
 
 WORKDIR /app
 
-# Install runtime dependencies for better-sqlite3 native module
-RUN apk add --no-cache libc6-compat libstdc++
+# Install runtime dependencies for Next.js and sqlite
+RUN apt-get update && apt-get install -y curl ca-certificates && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user for security
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
+# Create a non-root user and group
+RUN groupadd -g 1001 nodejs && \
+    useradd -u 1001 -g nodejs -s /bin/bash -m nextjs
 
-# Create data directories BEFORE switching user
-RUN mkdir -p /app/data /app/scans /app/scans/logs /app/scans/uploads /app/public/screenshots /home/nextjs /app/bin
-
-# Copy Go tools to user-owned directory (so self-update can write temp files + replace binaries)
-COPY --from=tools /go/bin/nuclei /app/bin/
-COPY --from=tools /go/bin/subfinder /app/bin/
-COPY --from=tools /go/bin/httpx /app/bin/
-
-# Copy built application from stage 2
-# The standalone output includes node_modules for dependencies
-COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+# Copy built assets and standalone Next.js server
+COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Copy entrypoint script
+# Ensure data directory exists with correct permissions
+RUN mkdir -p /app/data /app/scans /app/scans/logs /app/scans/uploads /app/public/screenshots /home/nextjs /app/bin && \
+    chown -R nextjs:nodejs /app/data /app/scans /app/public/screenshots /home/nextjs /app/bin
+
+# Copy pre-compiled Go tools from Stage 1 into the runner
+COPY --from=tools --chown=nextjs:nodejs /go/bin/nuclei /app/bin/nuclei
+COPY --from=tools --chown=nextjs:nodejs /go/bin/subfinder /app/bin/subfinder
+COPY --from=tools --chown=nextjs:nodejs /go/bin/httpx /app/bin/httpx
+
+# Copy docker entrypoint
 COPY --chown=nextjs:nodejs docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
@@ -90,6 +90,7 @@ ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 ENV DATABASE_PATH=/app/data/nuclei.db
 ENV PATH="/app/bin:$PATH"
+ENV NEXT_TELEMETRY_DISABLED=1
 
 # Switch to non-root user
 USER nextjs

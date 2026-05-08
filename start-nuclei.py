@@ -31,6 +31,7 @@ VERSION = "1.8.3"
 
 # Configuration
 GITHUB_COMPOSE_URL = "https://raw.githubusercontent.com/devtint/NUCLEI_CNM/main/docker-compose.yml"
+GITHUB_SCRIPT_URL = "https://raw.githubusercontent.com/devtint/NUCLEI_CNM/main/start-nuclei.py"
 HEALTH_CHECK_URL = "http://localhost:3000/login"
 MAX_TUNNEL_WAIT = 30  # seconds
 MAX_HEALTH_WAIT = 60  # seconds
@@ -440,6 +441,74 @@ def show_status():
     print()
 
 
+def parse_version(version_str):
+    """Parse a version string like '1.8.3' into a tuple of ints for comparison"""
+    try:
+        return tuple(int(x) for x in version_str.strip().split('.'))
+    except (ValueError, AttributeError):
+        return (0, 0, 0)
+
+
+def check_for_update():
+    """Check GitHub for a newer version of this script and offer to update"""
+    try:
+        req = urllib.request.Request(GITHUB_SCRIPT_URL)
+        req.add_header('User-Agent', 'NucleiCNM-UpdateCheck/1.0')
+        response = urllib.request.urlopen(req, timeout=5)
+        remote_content = response.read().decode('utf-8')
+        
+        # Extract VERSION from remote script
+        match = re.search(r'^VERSION\s*=\s*["\']([\d.]+)["\']', remote_content, re.MULTILINE)
+        if not match:
+            return  # Can't determine remote version, skip silently
+        
+        remote_version = match.group(1)
+        
+        if parse_version(remote_version) <= parse_version(VERSION):
+            return  # Already up to date
+        
+        # Newer version available!
+        print_colored(f"\n  {icon('🆕')} Update available: v{VERSION} → v{remote_version}", Colors.YELLOW)
+        
+        try:
+            choice = input(f"  Update now? [Y/n] (Enter = Y): ").strip().lower()
+        except (KeyboardInterrupt, EOFError):
+            print()
+            return
+        
+        if choice in ('', 'y', 'yes'):
+            script_path = os.path.abspath(__file__)
+            backup_path = script_path + ".backup"
+            
+            try:
+                # Backup current script
+                if os.path.exists(backup_path):
+                    os.remove(backup_path)
+                os.rename(script_path, backup_path)
+                
+                # Write new version
+                with open(script_path, 'w', encoding='utf-8') as f:
+                    f.write(remote_content)
+                
+                print_colored(f"  {icon('✓', '+')} Updated to v{remote_version}!", Colors.GREEN)
+                print_colored(f"  {icon('💾')} Backup saved: {os.path.basename(backup_path)}", Colors.GRAY)
+                print_colored(f"  {icon('🔄')} Please re-run the script to use the new version.\n", Colors.CYAN)
+                sys.exit(0)
+            except Exception as e:
+                # Restore backup if update failed
+                if os.path.exists(backup_path) and not os.path.exists(script_path):
+                    os.rename(backup_path, script_path)
+                print_colored(f"  {icon('✗', 'X')} Update failed: {e}", Colors.RED)
+                print_colored(f"  Continuing with current version...\n", Colors.GRAY)
+        else:
+            print_colored(f"  {icon('ℹ', 'i')} Skipping update\n", Colors.GRAY)
+    
+    except (urllib.error.URLError, TimeoutError):
+        # Network error — skip silently, don't block startup
+        pass
+    except Exception:
+        # Any other error — skip silently
+        pass
 def main():
     """Main execution flow"""
     # Handle simple flags first
@@ -466,6 +535,9 @@ def main():
     
     # Rotate log if needed
     rotate_log()
+    
+    # Check for script updates (non-blocking)
+    check_for_update()
     
     # Pre-flight checks
     print_colored("\nStep 1/6: Docker checks", Colors.CYAN)

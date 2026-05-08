@@ -465,7 +465,8 @@ def check_for_update():
         remote_version = match.group(1)
         
         if parse_version(remote_version) <= parse_version(VERSION):
-            return  # Already up to date
+            print_colored(f"  {icon('✓', '+')} Script is up to date (v{VERSION})", Colors.GREEN)
+            return
         
         # Newer version available!
         print_colored(f"\n  {icon('🆕')} Update available: v{VERSION} → v{remote_version}", Colors.YELLOW)
